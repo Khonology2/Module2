@@ -1624,13 +1624,13 @@ class _DashboardPageState extends State<DashboardPage>
     final cards = [
       {
         'title': 'Draft Proposals',
-        'subtitle': 'Additional description\ninformation can be included.',
+        'subtitle': 'Proposals in progress\nand not yet submitted.',
         'value': counts['Draft']?.toString() ?? '0',
         'icon': 'assets/images/new icons for manager/Draft proposal.png',
       },
       {
         'title': 'Pending CEO Approval',
-        'subtitle': 'Additional description\ninformation can be included.',
+        'subtitle': 'Awaiting executive\napproval before client delivery.',
         'value':
             (counts['Pending CEO Approval'] ?? counts['Pending Approval'] ?? 0)
                 .toString(),
@@ -1638,13 +1638,13 @@ class _DashboardPageState extends State<DashboardPage>
       },
       {
         'title': 'Sent to Client',
-        'subtitle': 'Additional description\ninformation can be included.',
+        'subtitle': 'Delivered to clients\nand awaiting their response.',
         'value': counts['Sent to Client']?.toString() ?? '0',
         'icon': 'assets/images/new icons for manager/sent to client.png',
       },
       {
         'title': 'Signed',
-        'subtitle': 'Additional description\ninformation can be included.',
+        'subtitle': 'Finalized and\napproved by clients.',
         'value': counts['Signed']?.toString() ?? '0',
         'icon': 'assets/images/new icons for manager/signed.png',
       },
@@ -2874,8 +2874,7 @@ class _DashboardPageState extends State<DashboardPage>
                         'assets/images/new icons for manager/proposals.png',
                     iconOnWhiteCircle: true,
                     title: 'Recent Proposals',
-                    subtitle:
-                        'Additional description can be included if required.',
+                    subtitle: 'Latest proposals created or recently updated.',
                     headerTrailing:
                         _buildRecentProposalsMessagesTrailing(app, chrome),
                     child: _buildRecentProposals(app.proposals, chrome),
@@ -2904,8 +2903,7 @@ class _DashboardPageState extends State<DashboardPage>
                     iconAsset:
                         'assets/images/new icons for manager/proposal_workflow.png',
                     title: 'Proposal Workflow',
-                    subtitle:
-                        'Additional description can be included if required.',
+                    subtitle: 'Monitor proposal progress across all stages.',
                     child: _buildWorkflow(context, chrome),
                   ),
                   const SizedBox(height: 16),
