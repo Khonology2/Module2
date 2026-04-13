@@ -35,7 +35,11 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
                       : 'assets/images/client_dashboard_bg.png',
                   fit: BoxFit.cover,
                 ),
-                Container(color: Colors.black.withValues(alpha: 0.48)),
+                Container(
+                  color: _isLightMode
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.48),
+                ),
               ],
             ),
           ),
@@ -83,16 +87,21 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
             right: 0,
             bottom: 84,
             child: Center(
-              child: SizedBox(
-                width: 127.85,
-                height: 127.85,
-                child: Transform.rotate(
-                  angle: -180 * (math.pi / 180),
-                  child: Image.asset(
-                    'assets/images/f65f74_85875a9997aa4107b0ce9b656b80d19b~mv2 1.png',
-                    width: 127.85,
-                    height: 127.85,
-                    fit: BoxFit.contain,
+              child: Opacity(
+                opacity: _isLightMode ? 0.8 : 1.0,
+                child: SizedBox(
+                  width: 127.85,
+                  height: 127.85,
+                  child: Transform.rotate(
+                    angle: -180 * (math.pi / 180),
+                    child: Image.asset(
+                      _isLightMode
+                          ? 'assets/images/Red_Discs.png'
+                          : 'assets/images/white_khono_loading.png',
+                      width: 127.85,
+                      height: 127.85,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
               ),
@@ -103,24 +112,27 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
             bottom: 16,
             child: IgnorePointer(
               child: SizedBox(
-                width: 114.94,
-                height: 25.2,
+                width: 113,
+                height: 23,
                 child: Container(
                 decoration: BoxDecoration(
                   color: _isLightMode
-                      ? Colors.white.withValues(alpha: 0.78)
+                      ? Colors.transparent
                       : Colors.black.withValues(alpha: 0.72),
-                  borderRadius: BorderRadius.circular(4.3),
+                  borderRadius: BorderRadius.circular(5),
                   border: Border.all(
-                    color: _isLightMode ? _lightText : const Color(0xFF333333),
+                    color: _isLightMode
+                        ? const Color(0xFF3D3F40)
+                        : const Color(0xFF3D3F40),
+                    width: 1,
                   ),
                 ),
                   child: Center(
                     child: Text(
                       AppConstants.fullVersion,
                       style: TextStyle(
-                        color: _isLightMode ? _lightText : const Color(0xFF9CA3AF),
-                        fontSize: 10.5,
+                        color: _isLightMode ? const Color(0xFF3D3F40) : const Color(0xFF9CA3AF),
+                        fontSize: 10,
                         fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
