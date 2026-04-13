@@ -45,38 +45,41 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
           ),
           SafeArea(
             child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                child: SizedBox(
-                  width: heroFrameWidth,
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        width: heroFrameWidth,
-                        height: isMobile ? 80 : 102,
-                        child: Image.asset(
-                          'assets/images/2026.png',
-                          fit: BoxFit.contain,
-                          filterQuality: FilterQuality.high,
-                          errorBuilder: (_, __, ___) => Text(
-                            'KHONOLOGY',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: _isLightMode ? _lightText : _white,
-                              fontFamily: 'Poppins',
-                              fontSize: 38,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 14,
+              child: Transform.translate(
+                offset: Offset(0, isMobile ? -14 : -30),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                  child: SizedBox(
+                    width: heroFrameWidth,
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          width: heroFrameWidth,
+                          height: isMobile ? 80 : 102,
+                          child: Image.asset(
+                            'assets/images/2026.png',
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                            errorBuilder: (_, __, ___) => Text(
+                              'KHONOLOGY',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _isLightMode ? _lightText : _white,
+                                fontFamily: 'Poppins',
+                                fontSize: 38,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 14,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 0),
-                      _HeroPanel(
-                        isMobile: isMobile,
-                        isLightMode: _isLightMode,
-                      ),
-                    ],
+                        const SizedBox(height: 0),
+                        _HeroPanel(
+                          isMobile: isMobile,
+                          isLightMode: _isLightMode,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -85,7 +88,7 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
           Positioned(
             left: 0,
             right: 0,
-            bottom: 84,
+            bottom: 46,
             child: Center(
               child: Opacity(
                 opacity: _isLightMode ? 0.8 : 1.0,
