@@ -12,6 +12,7 @@ class CinematicSequencePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final bool isMobile = size.width < 900;
+    final double heroFrameWidth = isMobile ? math.min(size.width - 40, 609.02) : 609.02;
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
@@ -33,27 +34,31 @@ class CinematicSequencePage extends StatelessWidget {
             child: Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1172.74),
+                child: SizedBox(
+                  width: heroFrameWidth,
                   child: Column(
                     children: [
-                      Image.asset(
-                        'assets/images/2026.png',
-                        height: isMobile ? 82 : 105,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                        errorBuilder: (_, __, ___) => const Text(
-                          'KHONOLOGY',
-                          style: TextStyle(
-                            color: _white,
-                            fontFamily: 'Poppins',
-                            fontSize: 38,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 14,
+                      SizedBox(
+                        width: heroFrameWidth,
+                        height: isMobile ? 80 : 102,
+                        child: Image.asset(
+                          'assets/images/2026.png',
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                          errorBuilder: (_, __, ___) => const Text(
+                            'KHONOLOGY',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: _white,
+                              fontFamily: 'Poppins',
+                              fontSize: 38,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 14,
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 0),
                       _HeroPanel(isMobile: isMobile),
                       SizedBox(height: isMobile ? 36 : 56),
                       SizedBox(
@@ -119,9 +124,11 @@ class _HeroPanel extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 2.2, sigmaY: 2.2),
         child: Container(
           width: double.infinity,
-          padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 18 : 24,
-            vertical: isMobile ? 14 : 16,
+          padding: EdgeInsets.fromLTRB(
+            isMobile ? 18 : 24,
+            isMobile ? 13 : 17.5,
+            isMobile ? 18 : 24,
+            isMobile ? 14 : 16,
           ),
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.24),
@@ -152,7 +159,7 @@ class _HeroPanel extends StatelessWidget {
                   height: 1.05,
                 ),
               ),
-              SizedBox(height: isMobile ? 12 : 14),
+              SizedBox(height: isMobile ? 24 : 32.58),
               Wrap(
                 alignment: WrapAlignment.center,
                 crossAxisAlignment: WrapCrossAlignment.center,
