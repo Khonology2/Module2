@@ -309,6 +309,27 @@ class _ProposalsPageState extends State<ProposalsPage>
     );
   }
 
+  Widget _buildHeaderIconButton({
+    required ManagerChromeTheme chrome,
+    required String assetPath,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 80,
+        height: 80,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: chrome.floatingFill,
+          shape: BoxShape.circle,
+        ),
+        child: Image.asset(assetPath, fit: BoxFit.contain),
+      ),
+    );
+  }
+
   Future<void> _navigateToBlankProposal() async {
     try {
       // Navigate directly to blank document editor
@@ -383,11 +404,8 @@ class _ProposalsPageState extends State<ProposalsPage>
               Expanded(
                 child: Column(
                   children: [
-                    // Header
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
-                      child: _buildHeader(context, app, userRole, chrome),
-                    ),
+                    // Header bar (same style as Manager Dashboard)
+                    _buildHeaderBar(app, userRole, chrome),
 
                     // Content Area
                     Expanded(
@@ -396,8 +414,6 @@ class _ProposalsPageState extends State<ProposalsPage>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildToolbar(chrome),
-                            const SizedBox(height: 24),
                             Expanded(
                               child: CustomScrollbar(
                                 controller: _scrollController,
@@ -407,7 +423,10 @@ class _ProposalsPageState extends State<ProposalsPage>
                                 child: SingleChildScrollView(
                                   controller: _scrollController,
                                   padding: const EdgeInsets.only(bottom: 24),
-                                  child: _buildFilterPanel(filtered, chrome),
+                                  child: _buildOverviewAndListPanel(
+                                    filtered: filtered,
+                                    chrome: chrome,
+                                  ),
                                 ),
                               ),
                             ),
@@ -425,377 +444,342 @@ class _ProposalsPageState extends State<ProposalsPage>
     );
   }
 
-  Widget _buildHeader(BuildContext context, AppState app, String userRole,
-      ManagerChromeTheme chrome) {
+  Widget _buildHeaderBar(
+      AppState app, String userRole, ManagerChromeTheme chrome) {
     return Container(
-      decoration: chrome.floatingPanelDecoration(radius: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 760;
-          final titleBlock = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Proposals',
-                style: TextStyle(
-                  color: chrome.textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
+      height: 96,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        border: Border(
+          bottom: BorderSide(
+            color: chrome.divider,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Manager Proposal Management',
+                  style: TextStyle(
+                    color: const Color(0xFFFFFFFF),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Manage your business proposals and approvals',
-                style: TextStyle(color: chrome.textSecondary, fontSize: 13),
-              ),
-            ],
-          );
-
-          // Ensure the header never overflows when the sidebar expands/collapses.
-          final maxNameWidth = (constraints.maxWidth - 56 - 12 - 40 - 24)
-              .clamp(140.0, isNarrow ? double.infinity : 240.0);
-
-          final userBlock = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ClipOval(
-                child: Image.asset(
-                  'assets/images/User_Profile.png',
-                  width: 56,
-                  height: 56,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              const SizedBox(width: 12),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxNameWidth),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _getUserName(app.currentUser),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: chrome.textPrimary,
-                        fontWeight: FontWeight.w600,
+                const SizedBox(height: 2),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'Hello, ',
+                        style: TextStyle(
+                          color: chrome.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
-                    ),
-                    Text(
-                      userRole,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: chrome.textSecondary, fontSize: 12),
-                    ),
+                      TextSpan(
+                        text: _getUserName(app.currentUser),
+                        style: TextStyle(
+                          color: chrome.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _buildHeaderIconButton(
+            chrome: chrome,
+            assetPath: 'assets/images/new icons for manager/messages.png',
+            onTap: () {},
+          ),
+          const SizedBox(width: 8),
+          _buildHeaderIconButton(
+            chrome: chrome,
+            assetPath: 'assets/images/new icons for manager/notifications.png',
+            onTap: () {},
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFC10D00).withOpacity(0.5),
+                width: 2,
+              ),
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/User_Profile.png',
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: chrome.textSecondary, size: 28),
+            onSelected: (value) {
+              if (value == 'logout') {
+                _handleLogout(context);
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem<String>(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout),
+                    SizedBox(width: 8),
+                    Text('Logout'),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, color: chrome.textSecondary),
-                onSelected: (value) {
-                  if (value == 'logout') {
-                    _handleLogout(context);
-                  }
-                },
-                itemBuilder: (BuildContext context) => [
-                  const PopupMenuItem<String>(
-                    value: 'logout',
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout),
-                        SizedBox(width: 8),
-                        Text('Logout'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
             ],
-          );
-
-          if (isNarrow) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                titleBlock,
-                const SizedBox(height: 14),
-                userBlock,
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              Expanded(child: titleBlock),
-              const SizedBox(width: 16),
-              userBlock,
-            ],
-          );
-        },
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildToolbar(ManagerChromeTheme chrome) {
+  Widget _buildOverviewAndListPanel({
+    required List<Map<String, dynamic>> filtered,
+    required ManagerChromeTheme chrome,
+  }) {
+    return Container(
+      decoration: chrome.floatingPanelDecoration(radius: 12, borderWidth: 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: _buildToolbarContent(chrome),
+          ),
+          Divider(height: 1, color: chrome.divider),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: _buildFilterPanelBody(filtered, chrome),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToolbarContent(ManagerChromeTheme chrome) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        Image.asset(
+          'assets/images/new icons for manager/Draft proposal.png',
+          width: 73,
+          height: 73,
+          fit: BoxFit.contain,
+        ),
+        const SizedBox(width: 16),
         Expanded(
-          flex: 3,
+          flex: 2,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Proposals',
+              Text('Proposals Overview',
                   style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 18,
                       fontWeight: FontWeight.w700,
                       color: chrome.textPrimary)),
-              const SizedBox(height: 6),
-              Text('Manage all your business proposals and SOWs',
-                  style: TextStyle(color: chrome.textSecondary)),
+              const SizedBox(height: 2),
+              Text("Manage all your business proposals & SOW's",
+                  style: TextStyle(fontSize: 12, color: chrome.textSecondary)),
             ],
           ),
         ),
         Expanded(
-          flex: 5,
+          flex: 3,
           child: Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: TextField(
-              controller: _searchController,
-              style: TextStyle(color: chrome.textPrimary),
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search),
-                hintText: 'Search proposals...',
-                filled: true,
-                fillColor: chrome.fieldFill,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: chrome.fieldBorder),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: chrome.fieldBorder),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(
-                    color: PremiumTheme.purple.withValues(alpha: 0.8),
-                  ),
-                ),
-                prefixIconColor: chrome.textSecondary,
-                hintStyle: TextStyle(
-                  color: chrome.textMuted,
-                ),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF3D3D3D),
+                borderRadius: BorderRadius.circular(22),
               ),
-              onChanged: (_) => setState(() {}),
+              child: Row(
+                children: [
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: PremiumTheme.primaryRed,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.search,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        hintText: 'Search Proposals...',
+                        hintStyle: TextStyle(
+                          color: Color(0xFF9CA3AF),
+                          fontSize: 14,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+              ),
             ),
           ),
         ),
-        Expanded(
-          flex: 2,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: ElevatedButton.icon(
-                  onPressed: _showCreateNewDialog,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('New Proposal'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: PremiumTheme.purple,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ],
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF4B5563),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _filterStatus,
+              dropdownColor: const Color(0xFF4B5563),
+              icon: const Icon(Icons.keyboard_arrow_down,
+                  color: Colors.white, size: 20),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              items: [
+                'All Statuses',
+                'Draft',
+                'Sent to Client',
+                'Approval Requested',
+                'Approved',
+                'Declined'
+              ]
+                  .map((String value) => DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      ))
+                  .toList(),
+              onChanged: (String? newValue) =>
+                  setState(() => _filterStatus = newValue ?? 'All Statuses'),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        ElevatedButton.icon(
+          onPressed: _showCreateNewDialog,
+          icon: const Icon(Icons.add, size: 18, color: Colors.white),
+          label:
+              const Text('New Proposal', style: TextStyle(color: Colors.white)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: PremiumTheme.primaryRed,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            elevation: 0,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildFilterPanel(
+  Widget _buildFilterPanelBody(
       List<Map<String, dynamic>> filtered, ManagerChromeTheme chrome) {
-    return Container(
-      decoration: chrome.floatingPanelDecoration(radius: 10),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    if (_isLoading) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(PremiumTheme.primaryRed),
+          ),
+        ),
+      );
+    }
+
+    if (proposals.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 48.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'All Proposals',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: chrome.textPrimary,
+              Icon(Icons.description_outlined,
+                  size: 64, color: chrome.textMuted),
+              const SizedBox(height: 16),
+              Text('No proposals yet',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: chrome.textPrimary)),
+              const SizedBox(height: 8),
+              Text('Create your first proposal to get started',
+                  style: TextStyle(color: chrome.textSecondary)),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: _showCreateNewDialog,
+                icon: const Icon(Icons.add),
+                label: const Text('Create Your First Proposal'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: PremiumTheme.primaryRed,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-              ),
-              Row(
-                children: [
-                  SizedBox(
-                    width: 220,
-                    child: TextField(
-                      controller: _searchController,
-                      style: TextStyle(color: chrome.textPrimary),
-                      decoration: InputDecoration(
-                        hintText: 'Search proposals...',
-                        prefixIcon: const Icon(
-                          Icons.search,
-                          size: 18,
-                        ),
-                        hintStyle: TextStyle(color: chrome.textMuted),
-                        filled: true,
-                        fillColor: chrome.fieldFill,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: chrome.fieldBorder),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: chrome.fieldBorder),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(
-                            color: PremiumTheme.purple.withValues(alpha: 0.8),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: chrome.fieldFill,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: chrome.fieldBorder,
-                      ),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _filterStatus,
-                        dropdownColor: chrome.dropdownSurface,
-                        iconEnabledColor: chrome.textSecondary,
-                        style: TextStyle(
-                            color: chrome.textPrimary, fontSize: 14),
-                        items: [
-                          'All Statuses',
-                          'Draft',
-                          'Sent',
-                          'Approved',
-                          'Declined'
-                        ]
-                            .map((String value) => DropdownMenuItem<String>(
-                                  value: value,
-                                  child: Text(value),
-                                ))
-                            .toList(),
-                        onChanged: (String? newValue) => setState(
-                            () => _filterStatus = newValue ?? 'All Statuses'),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              )
             ],
           ),
-          const SizedBox(height: 16),
-          if (_isLoading)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: CircularProgressIndicator(
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(PremiumTheme.purple),
-                ),
-              ),
-            )
-          else if (proposals.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 48.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.description_outlined,
-                        size: 64, color: chrome.textMuted),
-                    const SizedBox(height: 16),
-                    Text('No proposals yet',
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: chrome.textPrimary)),
-                    const SizedBox(height: 8),
-                    Text('Create your first proposal to get started',
-                        style: TextStyle(color: chrome.textSecondary)),
-                    const SizedBox(height: 20),
-                    ElevatedButton.icon(
-                      onPressed: _showCreateNewDialog,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Create Your First Proposal'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: PremiumTheme.purple,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    )
-                  ],
-                ),
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: filtered.length,
-              separatorBuilder: (context, index) =>
-                  Divider(height: 1, color: chrome.divider),
-              itemBuilder: (context, index) {
-                final proposal = filtered[index];
-                return ProposalItem(
-                    proposal: proposal,
-                    onRefresh: _loadProposals,
-                    chrome: chrome);
-              },
-            ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: filtered.length,
+      separatorBuilder: (context, index) =>
+          Divider(height: 1, color: chrome.divider),
+      itemBuilder: (context, index) {
+        final proposal = filtered[index];
+        return ProposalItem(
+            proposal: proposal, onRefresh: _loadProposals, chrome: chrome);
+      },
     );
   }
 
   String _getUserName(Map<String, dynamic>? user) {
     if (user == null) return 'User';
-
-    // Try different possible field names for the user's name
     String? name = user['full_name'] ??
         user['first_name'] ??
         user['name'] ??
         user['email']?.split('@')[0];
-
     return name ?? 'User';
   }
 }
@@ -865,91 +849,130 @@ class ProposalItem extends StatelessWidget {
       'resubmitted',
     };
     final isEditable = editableStatuses.contains(status);
+
+    // Status colors and labels matching the screenshot
     Color statusColor;
+    Color statusBgColor;
+    String statusLabel;
+
     switch (status) {
       case 'draft':
-        statusColor = PremiumTheme.purple;
+        statusBgColor = const Color(0xFF6095CC); // Blue background
+        statusColor = Colors.white;
+        statusLabel = 'Drafted';
         break;
       case 'pending':
       case 'pending approval':
       case 'pending ceo approval':
-        statusColor = PremiumTheme.orange;
+      case 'approval requested':
+        statusBgColor = const Color(0xFFEA990C); // Orange background
+        statusColor = Colors.white;
+        statusLabel = 'Approval Requested';
         break;
       case 'sent':
       case 'sent to client':
-        statusColor = PremiumTheme.pink;
+        statusColor = const Color(0xFF6CA510); // Green for Sent to Client
+        statusBgColor = const Color(0xFF6CA510).withValues(alpha: 0.2);
+        statusLabel = 'Sent to Client';
         break;
       case 'approved':
-        statusColor = PremiumTheme.teal;
+        statusColor = const Color(0xFF6CA510); // Green for Approved
+        statusBgColor = const Color(0xFF6CA510).withValues(alpha: 0.2);
+        statusLabel = 'Approved';
         break;
       case 'declined':
       case 'rejected':
         statusColor = PremiumTheme.error;
+        statusBgColor = PremiumTheme.error.withValues(alpha: 0.2);
+        statusLabel = 'Declined';
         break;
       default:
         statusColor = chrome.textMuted;
+        statusBgColor = chrome.fieldFill;
+        statusLabel = proposal['status'] ?? 'Unknown';
     }
 
-    const knownStatuses = {
-      'draft',
-      'pending',
-      'pending approval',
-      'pending ceo approval',
-      'sent',
-      'sent to client',
-      'approved',
-      'declined',
-      'rejected',
-    };
-    final isNeutralStatus = !knownStatuses.contains(status);
-
-    final Color statusBgColor = isNeutralStatus
-        ? chrome.fieldFill
-        : statusColor.withValues(alpha: chrome.isDark ? 0.2 : 0.18);
+    final title = proposal['title'] ?? 'Untitled Proposal';
+    final clientName =
+        proposal['client_name'] ?? proposal['client'] ?? 'Unknown Client';
+    final description =
+        proposal['description'] ?? 'Short description for detail';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(proposal['title'] ?? 'Untitled Proposal',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: chrome.textPrimary)),
-              const SizedBox(height: 8),
-              Wrap(spacing: 16, children: [
-                Text(
-                    'Last modified: ${_formatDate(proposal['updated_at'] ?? proposal['updatedAt'])}',
-                    style:
-                        TextStyle(fontSize: 13, color: chrome.textSecondary)),
-                if (proposal['client_name'] != null ||
-                    proposal['client'] != null)
-                  Text(
-                      'Client: ${proposal['client_name'] ?? proposal['client']}',
-                      style:
-                          TextStyle(fontSize: 13, color: chrome.textSecondary)),
-              ])
-            ]),
+          // Document Icon
+          Image.asset(
+            'assets/images/new icons for manager/Project Management_Red Badge_White.png',
+            width: 40,
+            height: 40,
+            fit: BoxFit.contain,
           ),
-          Row(children: [
+          const SizedBox(width: 16),
+          // Title and Description
+          Expanded(
+            flex: 3,
+            child: RichText(
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              text: TextSpan(
+                style: TextStyle(
+                  fontSize: 14,
+                  color: chrome.textPrimary,
+                ),
+                children: [
+                  TextSpan(
+                    text: title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  TextSpan(
+                    text: ' - $clientName - ',
+                    style: TextStyle(color: chrome.textSecondary),
+                  ),
+                  TextSpan(
+                    text: description,
+                    style: TextStyle(color: chrome.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Last Modified
+          Expanded(
+            flex: 1,
+            child: Text(
+              'Last Modified: ${_formatDate(proposal['updated_at'] ?? proposal['updatedAt'])}',
+              style: TextStyle(
+                fontSize: 13,
+                color: chrome.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          // Status Badge and Actions
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            // Status Badge
             Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                    color: statusBgColor,
-                    borderRadius: BorderRadius.circular(10)),
-                child: Text(proposal['status'] ?? 'Unknown',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: isNeutralStatus
-                            ? chrome.textPrimary
-                            : statusColor))),
-            const SizedBox(width: 8),
-            ElevatedButton(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: statusBgColor,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                statusLabel,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: statusColor,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // View Button (Gray outline)
+            OutlinedButton(
               onPressed: () {
                 if (isEditable) {
                   Navigator.pushNamed(context, '/compose', arguments: proposal)
@@ -957,7 +980,6 @@ class ProposalItem extends StatelessWidget {
                     if (onRefresh != null) onRefresh!();
                   });
                 } else {
-                  // Ensure preview page knows which proposal to show
                   try {
                     context
                         .read<AppState>()
@@ -969,92 +991,114 @@ class ProposalItem extends StatelessWidget {
                   });
                 }
               },
-              child: Text(isEditable ? 'Edit' : 'View'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: PremiumTheme.purple,
-                foregroundColor: Colors.white,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: chrome.textSecondary,
+                side: BorderSide(color: chrome.divider),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                elevation: 0,
+              ),
+              child: const Text(
+                'VIEW',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             const SizedBox(width: 8),
-            IconButton(
-                icon: Icon(Icons.delete_outline, color: chrome.textSecondary),
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                              title: const Text('Delete proposal?'),
-                              content: const Text(
-                                  'Are you sure you want to delete this proposal?'),
-                              actions: [
-                                TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, false),
-                                    child: const Text('Cancel')),
-                                TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, true),
-                                    child: const Text('Delete'))
-                              ]));
-                  if (confirm == true) {
-                    // Use AuthService token (same as document editor)
-                    final token = AuthService.token;
-                    if (token != null && token.isNotEmpty) {
-                      final idVal = proposal['id'];
-                      final intId = idVal is int
-                          ? idVal
-                          : int.tryParse(idVal.toString()) ?? 0;
-                      if (intId != 0) {
-                        final success = await ApiService.deleteProposal(
-                            token: token, id: intId);
+            // Delete Button (Red pill)
+            ElevatedButton(
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                            title: const Text('Delete proposal?'),
+                            content: const Text(
+                                'Are you sure you want to delete this proposal?'),
+                            actions: [
+                              TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  child: const Text('Cancel')),
+                              TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Delete'))
+                            ]));
+                if (confirm == true) {
+                  // Use AuthService token (same as document editor)
+                  final token = AuthService.token;
+                  if (token != null && token.isNotEmpty) {
+                    final idVal = proposal['id'];
+                    final intId = idVal is int
+                        ? idVal
+                        : int.tryParse(idVal.toString()) ?? 0;
+                    if (intId != 0) {
+                      final success = await ApiService.deleteProposal(
+                          token: token, id: intId);
 
-                        if (success) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Proposal deleted successfully'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          }
-                          if (onRefresh != null) onRefresh!();
-                        } else {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'Failed to delete proposal. Please try again.'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
+                      if (success) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Proposal deleted successfully'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
                         }
+                        if (onRefresh != null) onRefresh!();
                       } else {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Invalid proposal ID'),
+                              content: Text(
+                                  'Failed to delete proposal. Please try again.'),
                               backgroundColor: Colors.red,
                             ),
                           );
                         }
                       }
                     } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content:
-                              Text('Authentication required. Please log in.'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Invalid proposal ID'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
                     }
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content:
+                            Text('Authentication required. Please log in.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
                   }
-                })
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: PremiumTheme.primaryRed,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'DELETE',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )
           ])
         ],
       ),
