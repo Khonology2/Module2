@@ -2,10 +2,18 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../config/app_constants.dart';
 
-class CinematicSequencePage extends StatelessWidget {
+class CinematicSequencePage extends StatefulWidget {
   const CinematicSequencePage({super.key});
 
+  @override
+  State<CinematicSequencePage> createState() => _CinematicSequencePageState();
+}
+
+class _CinematicSequencePageState extends State<CinematicSequencePage> {
+  bool _isLightMode = false;
+
   static const Color _white = Color(0xFFFFFFFF);
+  static const Color _lightText = Color(0xFF090812);
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +30,9 @@ class CinematicSequencePage extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 Image.asset(
-                  'assets/images/client_dashboard_bg.png',
+                  _isLightMode
+                      ? 'assets/images/light_mode_bg.png'
+                      : 'assets/images/client_dashboard_bg.png',
                   fit: BoxFit.cover,
                 ),
                 Container(color: Colors.black.withValues(alpha: 0.48)),
@@ -44,11 +54,11 @@ class CinematicSequencePage extends StatelessWidget {
                           'assets/images/2026.png',
                           fit: BoxFit.contain,
                           filterQuality: FilterQuality.high,
-                          errorBuilder: (_, __, ___) => const Text(
+                          errorBuilder: (_, __, ___) => Text(
                             'KHONOLOGY',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: _white,
+                              color: _isLightMode ? _lightText : _white,
                               fontFamily: 'Poppins',
                               fontSize: 38,
                               fontWeight: FontWeight.w700,
@@ -58,7 +68,10 @@ class CinematicSequencePage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 0),
-                      _HeroPanel(isMobile: isMobile),
+                      _HeroPanel(
+                        isMobile: isMobile,
+                        isLightMode: _isLightMode,
+                      ),
                     ],
                   ),
                 ),
@@ -94,21 +107,58 @@ class CinematicSequencePage extends StatelessWidget {
                 height: 25.2,
                 child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.72),
+                  color: _isLightMode
+                      ? Colors.white.withValues(alpha: 0.78)
+                      : Colors.black.withValues(alpha: 0.72),
                   borderRadius: BorderRadius.circular(4.3),
-                  border: Border.all(color: const Color(0xFF333333)),
+                  border: Border.all(
+                    color: _isLightMode ? _lightText : const Color(0xFF333333),
+                  ),
                 ),
                   child: Center(
                     child: Text(
                       AppConstants.fullVersion,
-                      style: const TextStyle(
-                        color: Color(0xFF9CA3AF),
+                      style: TextStyle(
+                        color: _isLightMode ? _lightText : const Color(0xFF9CA3AF),
                         fontSize: 10.5,
                         fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: SizedBox(
+              width: 84,
+              height: 25.2,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _isLightMode = !_isLightMode;
+                  });
+                },
+                icon: Icon(_isLightMode ? Icons.dark_mode : Icons.light_mode, size: 12),
+                label: Text(_isLightMode ? 'Dark' : 'Light'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _isLightMode ? _lightText : const Color(0xFFFFFFFF),
+                  side: BorderSide(
+                    color: _isLightMode ? _lightText : const Color(0xFFFFFFFF),
+                    width: 1,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  textStyle: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -122,9 +172,11 @@ class CinematicSequencePage extends StatelessWidget {
 
 class _HeroPanel extends StatelessWidget {
   final bool isMobile;
-  const _HeroPanel({required this.isMobile});
+  final bool isLightMode;
+  const _HeroPanel({required this.isMobile, required this.isLightMode});
 
   static const Color _white = Color(0xFFFFFFFF);
+  static const Color _lightText = Color(0xFF090812);
   static const Color _accentRed = Color(0xFFC10D00);
 
   @override
@@ -137,7 +189,7 @@ class _HeroPanel extends StatelessWidget {
             'Proposal & SOW Builder',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: _white,
+              color: isLightMode ? _lightText : _white,
               fontFamily: 'Poppins',
               fontSize: isMobile ? 19 : 24.59,
               fontWeight: FontWeight.w600,
@@ -149,7 +201,7 @@ class _HeroPanel extends StatelessWidget {
             'Craft refined requirement into polished execution proposal.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: _white.withValues(alpha: 0.95),
+              color: isLightMode ? _lightText : _white.withValues(alpha: 0.95),
               fontFamily: 'Poppins',
               fontSize: isMobile ? 13 : 17.5,
               fontWeight: FontWeight.w500,
@@ -193,9 +245,9 @@ class _HeroPanel extends StatelessWidget {
                   onPressed: () {},
                   style: OutlinedButton.styleFrom(
                     backgroundColor: const Color(0x00C10D00),
-                    foregroundColor: _white,
-                    side: const BorderSide(
-                      color: Color(0xFFFFFFFF),
+                    foregroundColor: isLightMode ? _lightText : _white,
+                    side: BorderSide(
+                      color: isLightMode ? _lightText : const Color(0xFFFFFFFF),
                       width: 1.23,
                     ),
                     padding: EdgeInsets.zero,
