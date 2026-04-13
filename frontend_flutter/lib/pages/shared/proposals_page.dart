@@ -682,10 +682,10 @@ class _ProposalsPageState extends State<ProposalsPage>
         ),
         const SizedBox(width: 12),
         SizedBox(
-          width: 121.00000762939453,
-          height: 23.998628616333008,
+          width: 150,
+          height: 32,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: const Color(0xFF7F7F7F),
               borderRadius: BorderRadius.circular(20),
@@ -699,11 +699,11 @@ class _ProposalsPageState extends State<ProposalsPage>
                   icon: const Icon(
                     Icons.keyboard_arrow_down,
                     color: Colors.white,
-                    size: 18,
+                    size: 20,
                   ),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: 13,
                     height: 1,
                   ),
                   items: [
@@ -728,16 +728,16 @@ class _ProposalsPageState extends State<ProposalsPage>
         ),
         const SizedBox(width: 12),
         SizedBox(
-          width: 108.00390625,
-          height: 23.99840545654297,
+          width: 140,
+          height: 32,
           child: ElevatedButton.icon(
             onPressed: _showCreateNewDialog,
-            icon: const Icon(Icons.add, size: 14, color: Colors.white),
+            icon: const Icon(Icons.add, size: 16, color: Colors.white),
             label: const Text(
               'New Proposal',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white, fontSize: 11),
+              style: TextStyle(color: Colors.white, fontSize: 12),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: PremiumTheme.primaryRed,
@@ -748,7 +748,7 @@ class _ProposalsPageState extends State<ProposalsPage>
               ),
               elevation: 0,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.compact,
+              visualDensity: VisualDensity.standard,
             ),
           ),
         ),
@@ -975,7 +975,7 @@ class ProposalItem extends StatelessWidget {
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   TextSpan(
-                    text: ' - $clientName - ',
+                    text: ' - $clientName',
                     style: TextStyle(color: chrome.textSecondary),
                   ),
                 ],
@@ -983,15 +983,20 @@ class ProposalItem extends StatelessWidget {
             ),
           ),
           // Last Modified
-          Expanded(
-            flex: 1,
-            child: Text(
-              'Last Modified: ${_formatDate(proposal['updated_at'] ?? proposal['updatedAt'])}',
-              style: TextStyle(
-                fontSize: 13,
-                color: chrome.textSecondary,
+          SizedBox(
+            width: 190,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Last Modified: ${_formatDate(proposal['updated_at'] ?? proposal['updatedAt'])}',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: chrome.textSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.left,
               ),
-              textAlign: TextAlign.center,
             ),
           ),
           // Status Badge and Actions
