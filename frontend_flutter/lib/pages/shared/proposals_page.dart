@@ -607,53 +607,66 @@ class _ProposalsPageState extends State<ProposalsPage>
             ],
           ),
         ),
-        Expanded(
-          flex: 3,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF3D3D3D),
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: const BoxDecoration(
-                      color: PremiumTheme.primaryRed,
-                      shape: BoxShape.circle,
+        SizedBox(
+          width: 245,
+          height: 43.060546875,
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 22),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3D3D3D),
+                      borderRadius: BorderRadius.circular(22),
                     ),
-                    child: const Icon(
-                      Icons.search,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        hintText: 'Search Proposals...',
-                        hintStyle: TextStyle(
-                          color: Color(0xFF9CA3AF),
-                          fontSize: 14,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 36, right: 12),
+                      child: Center(
+                        child: TextField(
+                          controller: _searchController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(
+                            hintText: 'Search Proposals...',
+                            hintStyle: TextStyle(
+                              color: Color(0xFF9CA3AF),
+                              fontSize: 14,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
+                          onChanged: (_) => setState(() {}),
                         ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
                       ),
-                      onChanged: (_) => setState(() {}),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                ],
+                ),
               ),
-            ),
+              Container(
+                width: 43,
+                height: 43,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/new icons for manager/Search_Seek_Red Badge_White.png',
+                    width: 43,
+                    height: 43,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         Container(
