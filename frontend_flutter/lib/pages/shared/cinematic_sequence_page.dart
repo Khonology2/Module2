@@ -90,20 +90,25 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
             right: 0,
             bottom: 46,
             child: Center(
-              child: Opacity(
-                opacity: _isLightMode ? 0.8 : 1.0,
-                child: SizedBox(
-                  width: 127.85,
-                  height: 127.85,
-                  child: Transform.rotate(
-                    angle: -180 * (math.pi / 180),
-                    child: Image.asset(
-                      _isLightMode
-                          ? 'assets/images/Red_Discs.png'
-                          : 'assets/images/white_khono_loading.png',
-                      width: 127.85,
-                      height: 127.85,
-                      fit: BoxFit.contain,
+              child: Transform.translate(
+                // Red and white disc assets have slightly different internal padding.
+                // Nudge light-mode discs so both modes align visually.
+                offset: Offset(0, _isLightMode ? 6 : 0),
+                child: Opacity(
+                  opacity: _isLightMode ? 0.8 : 1.0,
+                  child: SizedBox(
+                    width: 127.85,
+                    height: 127.85,
+                    child: Transform.rotate(
+                      angle: -180 * (math.pi / 180),
+                      child: Image.asset(
+                        _isLightMode
+                            ? 'assets/images/Red_Discs.png'
+                            : 'assets/images/white_khono_loading.png',
+                        width: 127.85,
+                        height: 127.85,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
