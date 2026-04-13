@@ -22,7 +22,7 @@ class CinematicSequencePage extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 Image.asset(
-                  'assets/images/Background-Dark..png',
+                  'assets/images/client_dashboard_bg.png',
                   fit: BoxFit.cover,
                 ),
                 Container(color: Colors.black.withValues(alpha: 0.48)),
@@ -62,7 +62,7 @@ class CinematicSequencePage extends StatelessWidget {
                         child: Transform.rotate(
                           angle: -180 * (math.pi / 180),
                           child: Image.asset(
-                            'assets/images/White_khono_loading.png.png',
+                            'assets/images/f65f74_85875a9997aa4107b0ce9b656b80d19b~mv2 1.png',
                             width: 127.85,
                             height: 127.85,
                             fit: BoxFit.contain,
