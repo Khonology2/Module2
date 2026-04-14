@@ -17,6 +17,32 @@ from flask import request, jsonify
 _firebase_app = None
 
 
+def _extract_unverified_payload(id_token):
+    """
+    Decode JWT payload without signature verification.
+    Used only to discover metadata such as project/audience for setup.
+    """
+    if not id_token or len(id_token.split(".")) < 2:
+        return {}
+    try:
+        payload_b64 = id_token.split(".")[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        payload_json = base64.urlsafe_b64decode(payload_b64)
+        payload = json.loads(payload_json)
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
+
+
+def _resolve_firebase_project_id():
+    """Resolve Firebase project id from environment variables."""
+    return (
+        os.getenv("FIREBASE_PROJECT_ID")
+        or os.getenv("GOOGLE_CLOUD_PROJECT")
+        or os.getenv("GCLOUD_PROJECT")
+    )
+
+
 def _decode_unverified_token_for_local_dev(id_token):
     """Local-only fallback: decode JWT payload without signature verification."""
     try:
