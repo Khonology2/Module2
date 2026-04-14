@@ -32,6 +32,7 @@ import 'pages/shared/email_verification_page.dart';
 import 'pages/shared/startup_page.dart';
 import 'pages/shared/proposals_page.dart';
 import 'pages/shared/approved_proposals_page.dart';
+import 'pages/shared/learn_more_page.dart';
 import 'pages/guest/guest_collaboration_page.dart';
 import 'pages/shared/collaboration_router.dart';
 import 'pages/client/client_onboarding_page.dart';
@@ -474,6 +475,7 @@ class MyApp extends StatelessWidget {
         routes: {
           '/login': (context) => const LoginPage(),
           '/register': (context) => const RegisterPage(),
+          '/learn-more': (context) => const LearnMorePage(),
           '/onboard': (context) {
             // This will be handled by onGenerateRoute, but adding as fallback
             final currentUrl = web.window.location.href;
@@ -695,12 +697,15 @@ class MyApp extends StatelessWidget {
               return const FinanceAnalyticsPage();
             }
             if (isAdmin) {
-              return const admin.AnalyticsPage(mode: admin.AnalyticsPageMode.admin);
+              return const admin.AnalyticsPage(
+                  mode: admin.AnalyticsPageMode.admin);
             }
-            return const admin.AnalyticsPage(mode: admin.AnalyticsPageMode.creator);
+            return const admin.AnalyticsPage(
+                mode: admin.AnalyticsPageMode.creator);
           },
           '/admin_analytics': (context) {
-            return const admin.AnalyticsPage(mode: admin.AnalyticsPageMode.admin);
+            return const admin.AnalyticsPage(
+                mode: admin.AnalyticsPageMode.admin);
           },
           '/admin_history': (context) => const AdminHistoryPage(),
           '/approved-proposals': (context) => const ApprovedProposalsPage(),

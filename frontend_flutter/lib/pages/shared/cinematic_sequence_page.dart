@@ -19,7 +19,8 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final bool isMobile = size.width < 900;
-    final double heroFrameWidth = isMobile ? math.min(size.width - 40, 609.02) : 609.02;
+    final double heroFrameWidth =
+        isMobile ? math.min(size.width - 40, 609.02) : 609.02;
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
@@ -48,7 +49,8 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
               child: Transform.translate(
                 offset: Offset(0, isMobile ? -14 : -30),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                   child: SizedBox(
                     width: heroFrameWidth,
                     child: Column(
@@ -123,23 +125,25 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
                 width: 113,
                 height: 23,
                 child: Container(
-                decoration: BoxDecoration(
-                  color: _isLightMode
-                      ? Colors.transparent
-                      : Colors.black.withValues(alpha: 0.72),
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(
+                  decoration: BoxDecoration(
                     color: _isLightMode
-                        ? const Color(0xFF3D3F40)
-                        : const Color(0xFF3D3F40),
-                    width: 1,
+                        ? Colors.transparent
+                        : Colors.black.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(
+                      color: _isLightMode
+                          ? const Color(0xFF3D3F40)
+                          : const Color(0xFF3D3F40),
+                      width: 1,
+                    ),
                   ),
-                ),
                   child: Center(
                     child: Text(
                       AppConstants.fullVersion,
                       style: TextStyle(
-                        color: _isLightMode ? const Color(0xFF3D3F40) : const Color(0xFF9CA3AF),
+                        color: _isLightMode
+                            ? const Color(0xFF3D3F40)
+                            : const Color(0xFF9CA3AF),
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
                       ),
@@ -163,15 +167,18 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
                     _isLightMode = !_isLightMode;
                   });
                 },
-                icon: Icon(_isLightMode ? Icons.dark_mode : Icons.light_mode, size: 12),
+                icon: Icon(_isLightMode ? Icons.dark_mode : Icons.light_mode,
+                    size: 12),
                 label: Text(_isLightMode ? 'Dark' : 'Light'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: _isLightMode ? _lightText : const Color(0xFFFFFFFF),
+                  foregroundColor:
+                      _isLightMode ? _lightText : const Color(0xFFFFFFFF),
                   side: BorderSide(
                     color: _isLightMode ? _lightText : const Color(0xFFFFFFFF),
                     width: 1,
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -262,7 +269,7 @@ class _HeroPanel extends StatelessWidget {
                 width: 201.3,
                 height: 32.58,
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: () => Navigator.pushNamed(context, '/learn-more'),
                   style: OutlinedButton.styleFrom(
                     backgroundColor: const Color(0x00C10D00),
                     foregroundColor: isLightMode ? _lightText : _white,

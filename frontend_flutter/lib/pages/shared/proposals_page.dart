@@ -317,20 +317,41 @@ class _ProposalsPageState extends State<ProposalsPage>
     required ManagerChromeTheme chrome,
     required String assetPath,
     required VoidCallback onTap,
+    int? badge,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        width: 80,
-        height: 80,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: chrome.floatingFill,
-          shape: BoxShape.circle,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            width: 44.86898422241211,
+            height: 44.86898422241211,
+            child: Image.asset(assetPath, fit: BoxFit.contain),
+          ),
         ),
-        child: Image.asset(assetPath, fit: BoxFit.contain),
-      ),
+        if (badge != null && badge > 0)
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: const BoxDecoration(
+                color: Color(0xFFC10D00),
+                borderRadius: BorderRadius.all(Radius.circular(10)),
+              ),
+              child: Text(
+                badge > 99 ? '99+' : badge.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -480,33 +501,34 @@ class _ProposalsPageState extends State<ProposalsPage>
           Text(
             'Manager Proposal Management',
             style: TextStyle(
-              color: const Color(0xFFFFFFFF),
+              color: chrome.textPrimary,
               fontSize: 20,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.2,
             ),
           ),
           const SizedBox(width: 12),
-          RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Hello, ',
-                  style: TextStyle(
-                    color: chrome.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                  ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: RichText(
+              text: TextSpan(
+                text: 'Hello, ',
+                style: TextStyle(
+                  color: chrome.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
                 ),
-                TextSpan(
-                  text: _getUserName(app.currentUser),
-                  style: TextStyle(
-                    color: chrome.textPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                children: [
+                  TextSpan(
+                    text: _getUserName(app.currentUser),
+                    style: TextStyle(
+                      color: chrome.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const Spacer(),
@@ -520,47 +542,7 @@ class _ProposalsPageState extends State<ProposalsPage>
             chrome: chrome,
             assetPath: 'assets/images/new icons for manager/notifications.png',
             onTap: () {},
-          ),
-          const SizedBox(width: 12),
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFC10D00).withOpacity(0.5),
-                width: 2,
-              ),
-            ),
-            child: ClipOval(
-              child: Image.asset(
-                'assets/images/User_Profile.png',
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: chrome.textSecondary, size: 28),
-            onSelected: (value) {
-              if (value == 'logout') {
-                _handleLogout(context);
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem<String>(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout),
-                    SizedBox(width: 8),
-                    Text('Logout'),
-                  ],
-                ),
-              ),
-            ],
+            badge: 2,
           ),
         ],
       ),
@@ -639,12 +621,12 @@ class _ProposalsPageState extends State<ProposalsPage>
                   'Proposals Overview',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Poppins',
                     fontWeight: FontWeight.w700,
                     fontSize: 18,
                     letterSpacing: 0.2,
-                    color: Color(0xFFFFFFFF),
+                    color: chrome.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
