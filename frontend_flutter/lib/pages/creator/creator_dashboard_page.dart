@@ -925,50 +925,6 @@ class _DashboardPageState extends State<DashboardPage>
           const SizedBox(width: 8),
           // Notifications icon (preserves existing functionality)
           _buildNotificationButton(app, chrome),
-          const SizedBox(width: 12),
-          // Profile avatar
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFC10D00).withOpacity(0.5),
-                width: 2,
-              ),
-            ),
-            child: ClipOval(
-              child: Image.asset(
-                'assets/images/User_Profile.png',
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: chrome.textSecondary, size: 28),
-            onSelected: (value) {
-              if (value == 'logout') {
-                app.logout();
-                AuthService.logout();
-                Navigator.pushNamed(context, '/login');
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem<String>(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout),
-                    SizedBox(width: 8),
-                    Text('Logout'),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
