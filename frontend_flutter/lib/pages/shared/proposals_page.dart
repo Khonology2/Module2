@@ -558,17 +558,50 @@ class _ProposalsPageState extends State<ProposalsPage>
     required ManagerChromeTheme chrome,
   }) {
     return Container(
-      decoration: chrome.floatingPanelDecoration(radius: 12, borderWidth: 0),
+      width: 946.2045288461986,
+      decoration: BoxDecoration(
+        color: const Color(0x24FFFFFF), // #FFFFFF24 with opacity
+        borderRadius: BorderRadius.circular(5.32),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0x40000000), // #00000040
+            blurRadius: 3.55,
+            offset: const Offset(0, 3.55),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
             padding: const EdgeInsets.all(20),
             child: _buildToolbarContent(chrome),
           ),
           Padding(
-            padding: const EdgeInsets.all(24),
-            child: _buildFilterPanelBody(filtered, chrome),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Divider(
+              color: chrome.divider,
+              height: 1,
+              thickness: 1,
+            ),
+          ),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 330),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+              child: _buildFilterPanelBody(filtered, chrome),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+            child: Text(
+              'Ver 2026.03.AA1_SIT',
+              style: TextStyle(
+                fontSize: 10,
+                color: chrome.textMuted,
+              ),
+            ),
           ),
         ],
       ),
@@ -781,8 +814,6 @@ class _ProposalsPageState extends State<ProposalsPage>
     }
 
     return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
       itemCount: filtered.length,
       itemBuilder: (context, index) {
         final proposal = filtered[index];
@@ -877,6 +908,12 @@ class ProposalItem extends StatelessWidget {
     String statusLabel;
 
     switch (status) {
+      case 'pricing':
+      case 'pricing in progress':
+        statusBgColor = const Color(0xFF5C389D); // Purple background
+        statusColor = Colors.white;
+        statusLabel = 'Pricing In Progress';
+        break;
       case 'draft':
         statusBgColor = const Color(0xFF6095CC); // Blue background
         statusColor = Colors.white;
