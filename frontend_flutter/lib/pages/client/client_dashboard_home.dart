@@ -55,6 +55,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   };
   bool _isSidebarCollapsed = false;
   int? _hoverSidebarIndex;
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _proposalsScrollController = ScrollController();
 
   static const List<Map<String, dynamic>> _clientNavItems = [
     {'index': 0, 'label': 'Dashboard', 'icon': Icons.dashboard_outlined},
@@ -524,9 +526,25 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   List<Map<String, dynamic>> _filteredDocuments() {
     final idx = _selectedNavIndex;
     final docs = List<Map<String, dynamic>>.from(_proposals);
+
+    // Apply search filtering if search text is present
+    final searchText = _searchController.text.toLowerCase().trim();
+    List<Map<String, dynamic>> filteredDocs = docs;
+    if (searchText.isNotEmpty) {
+      filteredDocs = docs.where((d) {
+        final title = (d['title'] ?? '').toString().toLowerCase();
+        final client =
+            (d['client_name'] ?? d['client'] ?? '').toString().toLowerCase();
+        final id = d['id']?.toString() ?? '';
+        return title.contains(searchText) ||
+            client.contains(searchText) ||
+            id.contains(searchText);
+      }).toList();
+    }
+
     if (idx == 0) {
-      if (_dashboardDocFilter == 'all') return docs;
-      return docs.where((d) {
+      if (_dashboardDocFilter == 'all') return filteredDocs;
+      return filteredDocs.where((d) {
         final status = (d['status'] ?? '').toString().toLowerCase();
         switch (_dashboardDocFilter) {
           case 'draft':
@@ -548,12 +566,12 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       }).toList();
     }
     if (idx == 1) {
-      return docs.where(_isAwaitingSignature).toList();
+      return filteredDocs.where(_isAwaitingSignature).toList();
     }
     if (idx == 2) {
-      return docs.where(_isSignedDocument).toList();
+      return filteredDocs.where(_isSignedDocument).toList();
     }
-    return docs;
+    return filteredDocs;
   }
 
   String _documentLabel(Map<String, dynamic> doc) {
@@ -2000,6 +2018,581 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     );
   }
 
+  Widget _buildProposalsHeaderBar() {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Title
+          const Text(
+            'Client Portal Proposals',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Greeting
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: RichText(
+              text: TextSpan(
+                text: 'Hello, ',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.70),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                ),
+                children: [
+                  TextSpan(
+                    text: _getClientDisplayName(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          // Message icon
+          _buildHeaderIconButton(
+            assetPath: 'assets/images/new icons for manager/messages.png',
+            onTap: () {},
+          ),
+          const SizedBox(width: 8),
+          // Notification bell with badge
+          _buildHeaderIconButton(
+            assetPath: 'assets/images/new icons for manager/notifications.png',
+            onTap: () {},
+            badge: 2,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderIconButton({
+    required String assetPath,
+    required VoidCallback onTap,
+    int? badge,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            width: 44.87,
+            height: 44.87,
+            child: Image.asset(assetPath, fit: BoxFit.contain),
+          ),
+        ),
+        if (badge != null && badge > 0)
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: const BoxDecoration(
+                color: Color(0xFFC10D00),
+                borderRadius: BorderRadius.all(Radius.circular(10)),
+              ),
+              child: Text(
+                badge > 99 ? '99+' : badge.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _getClientDisplayName() {
+    if (_clientEmail != null && _clientEmail!.isNotEmpty) {
+      final namePart = _clientEmail!.split('@')[0];
+      // Convert email username to title case (e.g., "john.doe" -> "John Doe")
+      final parts = namePart.split('.');
+      return parts
+          .map((p) =>
+              p.isNotEmpty ? '${p[0].toUpperCase()}${p.substring(1)}' : '')
+          .join(' ');
+    }
+    return 'Client';
+  }
+
+  Widget _buildChatSupportButton() {
+    return FloatingActionButton(
+      onPressed: () {
+        // Open chat support
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chat support coming soon!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      },
+      backgroundColor: const Color(0xFFC10D00),
+      mini: true,
+      child: const Icon(
+        Icons.support_agent,
+        color: Colors.white,
+        size: 24,
+      ),
+    );
+  }
+
+  Widget _buildProposalsContentCard() {
+    final docs = _filteredDocuments();
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0x24FFFFFF),
+        borderRadius: BorderRadius.circular(5.32),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0x40000000),
+            blurRadius: 3.55,
+            offset: const Offset(0, 3.55),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header with handshake icon, title, subtitle, and search
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: _buildProposalsSectionHeader(),
+          ),
+          // Divider
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Divider(
+              color: Colors.white.withValues(alpha: 0.15),
+              height: 1,
+              thickness: 1,
+            ),
+          ),
+          // List
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 400),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+              child: _buildProposalsList(docs),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProposalsContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header bar with title, greeting, and notification icons
+        _buildProposalsHeaderBar(),
+        const SizedBox(height: 20),
+        // Main content card
+        _buildProposalsContentCard(),
+        const SizedBox(height: 12),
+        // Version label outside the card
+        Container(
+          width: 115,
+          height: 18,
+          decoration: BoxDecoration(
+            color: const Color(0xFF3D3D3D),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          alignment: Alignment.center,
+          child: const Text(
+            'Ver 2025.03.AA1_SIT',
+            style: TextStyle(
+              fontSize: 9,
+              color: Colors.white70,
+              height: 1,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProposalsSectionHeader() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Proposal icon (matching manager design)
+        Image.asset(
+          'assets/images/new icons for manager/Draft proposal.png',
+          width: 56,
+          height: 56,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: const Icon(
+              Icons.handshake_outlined,
+              color: Colors.white,
+              size: 32,
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        // Title and subtitle
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Proposals Awaiting Signature',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  letterSpacing: 0.2,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'The following proposal documents are waiting on your attention and action.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.70),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 18),
+        // Search bar with red magnifying glass
+        _buildSearchBar(),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return SizedBox(
+      width: 245,
+      height: 43,
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 22),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3D3D3D),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 36, right: 12),
+                  child: Center(
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        hintText: 'Search Proposals...',
+                        hintStyle: TextStyle(
+                          color: Color(0xFF9CA3AF),
+                          fontSize: 14,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                        isDense: true,
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Red magnifying glass icon
+          Container(
+            width: 43,
+            height: 43,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/new icons for manager/Search_Seek_Red Badge_White.png',
+                width: 43,
+                height: 43,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProposalsList(List<Map<String, dynamic>> docs) {
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFC10D00)),
+          ),
+        ),
+      );
+    }
+
+    if (docs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.description_outlined,
+                size: 64, color: Colors.white.withValues(alpha: 0.5)),
+            const SizedBox(height: 16),
+            Text(
+              'No proposals are currently awaiting signature.',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white.withValues(alpha: 0.70),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scrollbar(
+      controller: _proposalsScrollController,
+      thumbVisibility: true,
+      trackVisibility: true,
+      thickness: 6,
+      radius: const Radius.circular(3),
+      child: ListView.builder(
+        controller: _proposalsScrollController,
+        itemCount: docs.length,
+        itemBuilder: (context, index) {
+          final doc = docs[index];
+          return _buildProposalListItem(doc);
+        },
+      ),
+    );
+  }
+
+  Widget _buildProposalListItem(Map<String, dynamic> doc) {
+    final status = (doc['status'] ?? '').toString();
+    final title = (doc['title'] ?? 'Untitled Proposal').toString();
+    final clientName =
+        (doc['client_name'] ?? _clientEmail ?? 'Unknown Client').toString();
+    final proposalId = doc['id']?.toString() ?? '';
+
+    // Status colors and labels matching manager design
+    Color statusBgColor;
+    Color statusColor = Colors.white;
+    String statusLabel;
+
+    final lowerStatus = status.toLowerCase();
+    if (lowerStatus.contains('sent for approval') ||
+        lowerStatus.contains('approval requested')) {
+      statusBgColor = const Color(0xFF6CA510); // Green
+      statusLabel = 'Sent for Approval';
+    } else if (lowerStatus.contains('awaiting signature') ||
+        lowerStatus.contains('sent to client')) {
+      statusBgColor = const Color(0xFF6095CC); // Blue
+      statusLabel = 'Awaiting Signature';
+    } else if (lowerStatus.contains('released') ||
+        lowerStatus.contains('sent')) {
+      statusBgColor = const Color(0xFFEA990C); // Orange
+      statusLabel = 'Released';
+    } else if (lowerStatus.contains('draft')) {
+      statusBgColor = const Color(0xFF5C389D); // Purple
+      statusLabel = 'Drafted';
+    } else if (lowerStatus.contains('signed') ||
+        lowerStatus.contains('approved')) {
+      statusBgColor = const Color(0xFF6CA510); // Green
+      statusLabel = 'Signed';
+    } else if (lowerStatus.contains('declined') ||
+        lowerStatus.contains('rejected')) {
+      statusBgColor = const Color(0xFFE74C3C); // Red
+      statusLabel = 'Declined';
+    } else {
+      statusBgColor = const Color(0xFF4B5563); // Gray
+      statusLabel = status.isEmpty ? 'Unknown' : status;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Document Icon
+          Image.asset(
+            'assets/images/new icons for manager/Project Management_Red Badge_White.png',
+            width: 40,
+            height: 40,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFC10D00).withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child:
+                  const Icon(Icons.description, color: Colors.white, size: 20),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Title and Description
+          Expanded(
+            flex: 3,
+            child: RichText(
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              text: TextSpan(
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                  height: 9.38 / 11,
+                  letterSpacing: 0.11,
+                  color: Colors.white,
+                ),
+                children: [
+                  TextSpan(
+                    text: title,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      height: 9.38 / 13,
+                      letterSpacing: 0.13,
+                      color: Colors.white,
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' - $clientName',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                      height: 9.38 / 13,
+                      letterSpacing: 0.13,
+                      color: Colors.white.withValues(alpha: 0.70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Last Modified
+          SizedBox(
+            width: 160,
+            child: Text(
+              'Last Modified: ${_formatDate(doc['updated_at'] ?? doc['updatedAt'])}',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w500,
+                fontSize: 10.5,
+                height: 9.38 / 10.5,
+                letterSpacing: 0.105,
+                color: Colors.white.withValues(alpha: 0.70),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.left,
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Status badge
+          SizedBox(
+            width: 130,
+            height: 26,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusBgColor,
+                borderRadius: BorderRadius.circular(26),
+              ),
+              child: Center(
+                child: Text(
+                  statusLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // VIEW button
+          SizedBox(
+            width: 80,
+            height: 32,
+            child: OutlinedButton(
+              onPressed: () {
+                setState(() {
+                  _selectedDocument = doc;
+                });
+                _openSigningUrl(doc);
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: const Color(0xFF4B5563),
+                side: BorderSide.none,
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: const Text(
+                'VIEW',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMainLeftContent() {
     if (_isOverviewDashboard) {
       return Column(
@@ -2059,29 +2652,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     }
 
     if (!widget.showSummary && _selectedNavIndex == 1) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Proposals',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Review and sign documents awaiting your signature',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.70),
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _buildRecentDocuments(),
-        ],
-      );
+      return _buildProposalsContent();
     }
 
     if (_selectedNavIndex == 0 ||
@@ -3222,6 +3793,13 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    _proposalsScrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
@@ -3272,6 +3850,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         final scaffold = Scaffold(
           backgroundColor: Colors.transparent,
           drawer: useDrawer ? _buildSidebarDrawer() : null,
+          // floatingActionButton: _buildChatSupportButton(), // Removed per user request
           body: Stack(
             fit: StackFit.expand,
             children: [
@@ -3302,7 +3881,10 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       left: false,
                       child: Column(
                         children: [
-                          _buildTopHeader(useDrawer: useDrawer),
+                          // Hide top header on proposals page (has its own header)
+                          if (!(widget.showSummary == false &&
+                              _selectedNavIndex == 1))
+                            _buildTopHeader(useDrawer: useDrawer),
                           Expanded(
                             child: SingleChildScrollView(
                               padding: const EdgeInsets.all(18),
