@@ -67,6 +67,7 @@ class _ProposalsPageState extends State<ProposalsPage>
   }
 
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _listScrollController = ScrollController();
 
   @override
   void initState() {
@@ -89,6 +90,7 @@ class _ProposalsPageState extends State<ProposalsPage>
   @override
   void dispose() {
     _searchController.dispose();
+    _listScrollController.dispose();
     super.dispose();
   }
 
@@ -432,6 +434,24 @@ class _ProposalsPageState extends State<ProposalsPage>
                                 ),
                               ),
                             ),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: 114.93836212158203,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                color: chrome.fieldFill,
+                                borderRadius: BorderRadius.circular(4.3),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                'Ver 2026.03.AA1_SIT',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: chrome.textMuted,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -455,47 +475,41 @@ class _ProposalsPageState extends State<ProposalsPage>
         color: Colors.transparent,
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Text(
+            'Manager Proposal Management',
+            style: TextStyle(
+              color: const Color(0xFFFFFFFF),
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(width: 12),
+          RichText(
+            text: TextSpan(
               children: [
-                Text(
-                  'Manager Proposal Management',
+                TextSpan(
+                  text: 'Hello, ',
                   style: TextStyle(
-                    color: const Color(0xFFFFFFFF),
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.2,
+                    color: chrome.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
-                const SizedBox(height: 2),
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: 'Hello, ',
-                        style: TextStyle(
-                          color: chrome.textSecondary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                      TextSpan(
-                        text: _getUserName(app.currentUser),
-                        style: TextStyle(
-                          color: chrome.textPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                TextSpan(
+                  text: _getUserName(app.currentUser),
+                  style: TextStyle(
+                    color: chrome.textPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
           ),
+          const Spacer(),
           _buildHeaderIconButton(
             chrome: chrome,
             assetPath: 'assets/images/new icons for manager/messages.png',
@@ -598,24 +612,6 @@ class _ProposalsPageState extends State<ProposalsPage>
                 ),
               ),
             ],
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          width: 114.93836212158203,
-          height: 18,
-          decoration: BoxDecoration(
-            color: chrome.fieldFill,
-            borderRadius: BorderRadius.circular(4.3),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            'Ver 2026.03.AA1_SIT',
-            style: TextStyle(
-              fontSize: 9,
-              color: chrome.textMuted,
-              height: 1,
-            ),
           ),
         ),
       ],
@@ -828,8 +824,10 @@ class _ProposalsPageState extends State<ProposalsPage>
     }
 
     return Scrollbar(
+      controller: _listScrollController,
       thumbVisibility: true,
       child: ListView.builder(
+        controller: _listScrollController,
         itemCount: filtered.length,
         itemBuilder: (context, index) {
           final proposal = filtered[index];
@@ -946,24 +944,24 @@ class ProposalItem extends StatelessWidget {
         break;
       case 'sent':
       case 'sent to client':
-        statusColor = const Color(0xFF6CA510); // Green for Sent to Client
-        statusBgColor = const Color(0xFF6CA510).withValues(alpha: 0.2);
+        statusBgColor = const Color(0xFF6CA510); // Green background
+        statusColor = Colors.white;
         statusLabel = 'Sent to Client';
         break;
       case 'approved':
-        statusColor = const Color(0xFF6CA510); // Green for Approved
-        statusBgColor = const Color(0xFF6CA510).withValues(alpha: 0.2);
+        statusBgColor = const Color(0xFF6CA510); // Green background
+        statusColor = Colors.white;
         statusLabel = 'Approved';
         break;
       case 'declined':
       case 'rejected':
-        statusColor = PremiumTheme.error;
-        statusBgColor = PremiumTheme.error.withValues(alpha: 0.2);
+        statusBgColor = PremiumTheme.error;
+        statusColor = Colors.white;
         statusLabel = 'Declined';
         break;
       default:
-        statusColor = chrome.textMuted;
         statusBgColor = chrome.fieldFill;
+        statusColor = Colors.white;
         statusLabel = proposal['status'] ?? 'Unknown';
     }
 
@@ -1007,9 +1005,9 @@ class ProposalItem extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w700,
-                      fontSize: 11,
-                      height: 9.38 / 11,
-                      letterSpacing: 0.11,
+                      fontSize: 13,
+                      height: 9.38 / 13,
+                      letterSpacing: 0.13,
                       fontFeatures: const [FontFeature.enable('smcp')],
                       color: chrome.textPrimary,
                     ),
@@ -1019,9 +1017,9 @@ class ProposalItem extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w700,
-                      fontSize: 11,
-                      height: 9.38 / 11,
-                      letterSpacing: 0.11,
+                      fontSize: 13,
+                      height: 9.38 / 13,
+                      letterSpacing: 0.13,
                       fontFeatures: const [FontFeature.enable('smcp')],
                       color: chrome.textSecondary,
                     ),
