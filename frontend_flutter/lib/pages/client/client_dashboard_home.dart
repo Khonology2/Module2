@@ -37,6 +37,9 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   String? _clientEmail;
   String? _deviceId;
   String? _clientSessionToken;
+  /// Incremented when the persisted client session token changes (e.g. after OTP).
+  /// Used to ignore in-flight proposal HTTP responses that used a superseded session.
+  int _clientSessionEpoch = 0;
   bool _verificationInProgress = false;
   bool _otpDialogOpen = false;
   Future<void>? _loadProposalsFuture;
@@ -247,6 +250,9 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   void _persistClientSessionToken(String token) {
     final clean = token.trim();
     if (clean.isEmpty) return;
+    if ((_clientSessionToken ?? '').trim() != clean) {
+      _clientSessionEpoch++;
+    }
     _clientSessionToken = clean;
     if (!kIsWeb) return;
     try {
@@ -2206,6 +2212,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       _error = null;
     });
 
+    final epochAtSend = _clientSessionEpoch;
     try {
       final uri = Uri.parse('$baseUrl/api/client/proposals').replace(
         queryParameters: {
@@ -2232,6 +2239,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
       print(
           '[ClientPortal] proposals status=${response.statusCode} device_id=${_deviceId ?? ""} session_token_present=${(_clientSessionToken ?? "").isNotEmpty}');
+
+      if (!mounted) return;
+      if (epochAtSend != _clientSessionEpoch) {
+        // OTP (or another tab) rotated the session while this request was in flight.
+        if ((_clientSessionToken ?? '').trim().isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _loadClientProposals();
+          });
+        }
+        return;
+      }
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
@@ -2371,6 +2389,15 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       }
     } catch (e) {
       if (!mounted) return;
+      // Ignore errors from superseded session fetches (e.g. OTP completed in parallel).
+      if (epochAtSend != _clientSessionEpoch) {
+        if ((_clientSessionToken ?? '').trim().isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _loadClientProposals();
+          });
+        }
+        return;
+      }
       setState(() {
         _error = e is TimeoutException
             ? 'This link timed out. Please retry or ask the sender to resend it.'
