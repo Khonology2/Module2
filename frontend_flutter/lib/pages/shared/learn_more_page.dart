@@ -25,7 +25,7 @@ class LearnMorePage extends StatelessWidget {
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -53,7 +53,7 @@ class LearnMorePage extends StatelessWidget {
                       alignment: Alignment.topCenter,
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxWidth: isMobile ? double.infinity : 860,
+                          maxWidth: isMobile ? double.infinity : 1040,
                         ),
                         child: Container(
                           padding: const EdgeInsets.all(22),
@@ -78,9 +78,201 @@ class LearnMorePage extends StatelessWidget {
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                SizedBox(height: 8),
+                                SizedBox(height: 10),
                                 Text(
-                                  "Khonology helps you create polished proposals and Statements of Work (SOWs) faster, with consistent structure and professional formatting.\n\nUse it to draft, review, and manage proposals end-to-end—from the first outline to client-ready documents.\n\nKey capabilities:\n- Build proposals and SOWs with reusable sections\n- Manage and track proposal status across your pipeline\n- Collaborate on documents and keep a clear change history\n- Centralize templates and client information for faster turnaround",
+                                  'Create high-quality proposals and Statements of Work (SOWs) faster with a guided, all-in-one platform designed for consistency, collaboration, and control.',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                SizedBox(height: 12),
+                                Text(
+                                  'Stop juggling documents, emails, and templates. Everything you need to draft, review, and finalize proposals lives in one place—from the first outline to client sign-off.',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                SizedBox(height: 18),
+                                Text(
+                                  'What You Can Do',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'Poppins',
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 10),
+                                Text(
+                                  '• Build proposals and SOWs using structured templates and reusable content blocks',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  '• Automatically manage and track proposal status across your pipeline',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  '• Collaborate seamlessly with comments, edits, and version history',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  '• Ensure consistency with centralized templates and client data',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                SizedBox(height: 18),
+                                Text(
+                                  'How It Works',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'Poppins',
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 10),
+                                Text(
+                                  'Compose',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  'Create proposals using guided templates and pre-approved sections. Quickly assemble documents with consistent structure and auto-filled client details.',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                SizedBox(height: 12),
+                                Text(
+                                  'Govern',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  'Maintain quality with built-in checks. Identify missing sections, ensure completeness, and reduce risk before sharing with clients.',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                SizedBox(height: 12),
+                                Text(
+                                  'Sign-Off',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  'Streamline approvals and capture secure client signatures. Track progress and finalize proposals without leaving the platform.',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                SizedBox(height: 18),
+                                Text(
+                                  'Why It Matters',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'Poppins',
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 10),
+                                Text(
+                                  '• Save time by eliminating manual formatting and scattered content',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  '• Reduce errors with built-in governance and structure',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  '• Maintain professional, consistent proposals every time',
+                                  style: TextStyle(
+                                    color: Color(0xFFE5E7EB),
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w400,
+                                    height: 1.45,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  '• Accelerate deal closure with faster approvals and sign-off',
                                   style: TextStyle(
                                     color: Color(0xFFE5E7EB),
                                     fontFamily: 'Poppins',
@@ -101,7 +293,7 @@ class LearnMorePage extends StatelessWidget {
                                 ),
                                 SizedBox(height: 10),
                                 Text(
-                                  'Sign in to create a new proposal or explore your dashboard to manage existing work.',
+                                  'Create a new proposal or head to your dashboard to manage and track your work.',
                                   style: TextStyle(
                                     color: Color(0xFFE5E7EB),
                                     fontFamily: 'Poppins',
