@@ -1,3 +1,5 @@
+import 'dart:ui' show FontFeature;
+
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
@@ -451,12 +453,6 @@ class _ProposalsPageState extends State<ProposalsPage>
       padding: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         color: Colors.transparent,
-        border: Border(
-          bottom: BorderSide(
-            color: chrome.divider,
-            width: 1,
-          ),
-        ),
       ),
       child: Row(
         children: [
@@ -570,7 +566,6 @@ class _ProposalsPageState extends State<ProposalsPage>
             padding: const EdgeInsets.all(20),
             child: _buildToolbarContent(chrome),
           ),
-          Divider(height: 1, color: chrome.divider),
           Padding(
             padding: const EdgeInsets.all(24),
             child: _buildFilterPanelBody(filtered, chrome),
@@ -629,7 +624,7 @@ class _ProposalsPageState extends State<ProposalsPage>
                   padding: const EdgeInsets.only(left: 22),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF7F7F7F),
+                      color: const Color(0xFF3D3D3D),
                       borderRadius: BorderRadius.circular(22),
                     ),
                     child: Padding(
@@ -668,12 +663,12 @@ class _ProposalsPageState extends State<ProposalsPage>
                     ),
                   ],
                 ),
-                child: Center(
+                child: ClipOval(
                   child: Image.asset(
                     'assets/images/new icons for manager/Search_Seek_Red Badge_White.png',
-                    width: 40,
-                    height: 40,
-                    fit: BoxFit.contain,
+                    width: 43,
+                    height: 43,
+                    fit: BoxFit.cover,
                   ),
                 ),
               ),
@@ -681,75 +676,52 @@ class _ProposalsPageState extends State<ProposalsPage>
           ),
         ),
         const SizedBox(width: 12),
-        SizedBox(
-          width: 150,
-          height: 32,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF7F7F7F),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Center(
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  isDense: true,
-                  value: _filterStatus,
-                  dropdownColor: const Color(0xFF7F7F7F),
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    height: 1,
-                  ),
-                  items: [
-                    'All Statuses',
-                    'Draft',
-                    'Sent to Client',
-                    'Approval Requested',
-                    'Approved',
-                    'Declined'
-                  ]
-                      .map((String value) => DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value, overflow: TextOverflow.ellipsis),
-                          ))
-                      .toList(),
-                  onChanged: (String? newValue) => setState(
-                      () => _filterStatus = newValue ?? 'All Statuses'),
-                ),
-              ),
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF4B5563),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _filterStatus,
+              dropdownColor: const Color(0xFF4B5563),
+              icon: const Icon(Icons.keyboard_arrow_down,
+                  color: Colors.white, size: 20),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              items: [
+                'All Statuses',
+                'Draft',
+                'Sent to Client',
+                'Approval Requested',
+                'Approved',
+                'Declined'
+              ]
+                  .map((String value) => DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      ))
+                  .toList(),
+              onChanged: (String? newValue) =>
+                  setState(() => _filterStatus = newValue ?? 'All Statuses'),
             ),
           ),
         ),
         const SizedBox(width: 12),
-        SizedBox(
-          width: 140,
-          height: 32,
-          child: ElevatedButton.icon(
-            onPressed: _showCreateNewDialog,
-            icon: const Icon(Icons.add, size: 16, color: Colors.white),
-            label: const Text(
-              'New Proposal',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white, fontSize: 12),
+        ElevatedButton.icon(
+          onPressed: _showCreateNewDialog,
+          icon: const Icon(Icons.add, size: 18, color: Colors.white),
+          label:
+              const Text('New Proposal', style: TextStyle(color: Colors.white)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: PremiumTheme.primaryRed,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: PremiumTheme.primaryRed,
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              elevation: 0,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.standard,
-            ),
+            elevation: 0,
           ),
         ),
       ],
@@ -808,16 +780,17 @@ class _ProposalsPageState extends State<ProposalsPage>
       );
     }
 
-    return ListView.separated(
+    return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: filtered.length,
-      separatorBuilder: (context, index) =>
-          Divider(height: 1, color: chrome.divider),
       itemBuilder: (context, index) {
         final proposal = filtered[index];
         return ProposalItem(
-            proposal: proposal, onRefresh: _loadProposals, chrome: chrome);
+          proposal: proposal,
+          chrome: chrome,
+          onRefresh: _loadProposals,
+        );
       },
     );
   }
@@ -947,7 +920,7 @@ class ProposalItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Document Icon
@@ -966,22 +939,44 @@ class ProposalItem extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               text: TextSpan(
                 style: TextStyle(
-                  fontSize: 14,
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                  height: 9.38 / 11,
+                  letterSpacing: 0.11,
+                  fontFeatures: const [FontFeature.enable('smcp')],
                   color: chrome.textPrimary,
                 ),
                 children: [
                   TextSpan(
                     text: title,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                      height: 9.38 / 11,
+                      letterSpacing: 0.11,
+                      fontFeatures: const [FontFeature.enable('smcp')],
+                      color: chrome.textPrimary,
+                    ),
                   ),
                   TextSpan(
                     text: ' - $clientName',
-                    style: TextStyle(color: chrome.textSecondary),
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                      height: 9.38 / 11,
+                      letterSpacing: 0.11,
+                      fontFeatures: const [FontFeature.enable('smcp')],
+                      color: chrome.textSecondary,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
+          const SizedBox(width: 16),
           // Last Modified
           SizedBox(
             width: 190,
@@ -990,8 +985,13 @@ class ProposalItem extends StatelessWidget {
               child: Text(
                 'Last Modified: ${_formatDate(proposal['updated_at'] ?? proposal['updatedAt'])}',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w500,
+                  fontSize: 10.5,
+                  height: 9.38 / 10.5,
+                  letterSpacing: 0.105,
                   color: chrome.textSecondary,
+                  fontFeatures: const [FontFeature.enable('smcp')],
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -999,27 +999,41 @@ class ProposalItem extends StatelessWidget {
               ),
             ),
           ),
-          // Status Badge and Actions
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            // Status Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: statusBgColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                statusLabel,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: statusColor,
+          const SizedBox(width: 16),
+          SizedBox(
+            width: 190,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: 121.00000762939453,
+                height: 23.000001907348633,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(15.69, 0, 15.69, 0),
+                  decoration: BoxDecoration(
+                    color: statusBgColor,
+                    borderRadius: BorderRadius.circular(26.06),
+                  ),
+                  child: Center(
+                    child: Text(
+                      statusLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
+                        height: 1,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            // View Button (Gray outline)
-            OutlinedButton(
+          ),
+          const SizedBox(width: 16),
+          SizedBox(
+            width: 92,
+            child: OutlinedButton(
               onPressed: () {
                 if (isEditable) {
                   Navigator.pushNamed(context, '/compose', arguments: proposal)
@@ -1040,7 +1054,7 @@ class ProposalItem extends StatelessWidget {
               },
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.white,
-                backgroundColor: const Color(0xFF7F7F7F),
+                backgroundColor: const Color(0xFF4B5563),
                 side: BorderSide.none,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -1056,9 +1070,11 @@ class ProposalItem extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            // Delete Button (Red pill)
-            ElevatedButton(
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 104,
+            child: ElevatedButton(
               onPressed: () async {
                 final confirm = await showDialog<bool>(
                     context: context,
@@ -1076,7 +1092,6 @@ class ProposalItem extends StatelessWidget {
                                   child: const Text('Delete'))
                             ]));
                 if (confirm == true) {
-                  // Use AuthService token (same as document editor)
                   final token = AuthService.token;
                   if (token != null && token.isNotEmpty) {
                     final idVal = proposal['id'];
@@ -1146,8 +1161,8 @@ class ProposalItem extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-            )
-          ])
+            ),
+          ),
         ],
       ),
     );
