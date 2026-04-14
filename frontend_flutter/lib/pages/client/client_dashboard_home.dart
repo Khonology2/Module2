@@ -1474,6 +1474,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     final docs = _filteredDocuments();
     final isDocumentsTab = _selectedNavIndex == 2;
     final isProposalsTab = _selectedNavIndex == 1;
+    const managerBadgeAsset =
+        'assets/images/Project Management_Red Badge_White.png';
     final listTitle = isDocumentsTab
         ? 'Signed Documents'
         : isProposalsTab
@@ -1571,8 +1573,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   ),
                   itemBuilder: (context, index) {
                     final doc = docs[index];
-                    final selected = _selectedDocument?['id']?.toString() ==
-                        doc['id']?.toString();
                     final status = (doc['status'] ?? '').toString();
 
                     Widget _statusChip(String rawStatus) {
@@ -1658,6 +1658,24 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       );
                     }
 
+                    Widget _documentLeadingBadge() {
+                      return SizedBox(
+                        width: 33,
+                        height: 33,
+                        child: Image.asset(
+                          managerBadgeAsset,
+                          width: 33,
+                          height: 33,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Icon(
+                            Icons.check_box_outline_blank,
+                            color: Colors.white70,
+                            size: 18,
+                          ),
+                        ),
+                      );
+                    }
+
                     return InkWell(
                       onTap: () {
                         setState(() {
@@ -1666,15 +1684,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       },
                       child: Row(
                         children: [
-                          Icon(
-                            selected
-                                ? Icons.check_box
-                                : Icons.check_box_outline_blank,
-                            color: selected
-                                ? Colors.lightBlueAccent
-                                : Colors.white70,
-                            size: 18,
-                          ),
+                          _documentLeadingBadge(),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Builder(

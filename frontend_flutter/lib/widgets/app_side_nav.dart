@@ -337,58 +337,6 @@ class _AppSideNavState extends State<AppSideNav> {
               height: 1,
               color: chrome.divider,
             ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            child: InkWell(
-              onTap: () =>
-                  context.read<ManagerThemeController>().toggle(),
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isCollapsed ? 0 : 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: chrome.sidebarHoverFill,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: isCollapsed
-                    ? Center(
-                        child: Icon(
-                          chrome.isDark
-                              ? Icons.wb_sunny_rounded
-                              : Icons.dark_mode_rounded,
-                          color: chrome.textPrimary,
-                          size: 22,
-                        ),
-                      )
-                    : Row(
-                        children: [
-                          Icon(
-                            chrome.isDark
-                                ? Icons.wb_sunny_rounded
-                                : Icons.dark_mode_rounded,
-                            color: chrome.textPrimary,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              chrome.isDark ? 'Light mode' : 'Dark mode',
-                              style: TextStyle(
-                                color: chrome.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
           _buildNavItem(
             label: 'Account Profile',
             assetPath: 'assets/images/User_Profile.png',

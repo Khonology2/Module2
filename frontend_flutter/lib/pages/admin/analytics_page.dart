@@ -2410,6 +2410,7 @@ class _AnalyticsPageState extends State<AnalyticsPage>
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final chrome = context.watch<ManagerThemeController>().chrome;
     final sidebarCollapsed = app.isAdminSidebarCollapsed;
     final filtered = _filterProposals(app.proposals);
     final analytics = _calculateAnalytics(filtered);
@@ -2760,6 +2761,7 @@ class _AnalyticsPageState extends State<AnalyticsPage>
           AdminSidebar(
             isCollapsed: sidebarCollapsed,
             currentPage: 'Analytics',
+            managerChrome: chrome,
             onToggle: app.toggleAdminSidebar,
             onSelect: (label) {
               app.setAdminNavLabel(label);
@@ -2780,9 +2782,7 @@ class _AnalyticsPageState extends State<AnalyticsPage>
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: isAdminUser
-          ? Container(color: Colors.transparent, child: body)
-          : ManagerPageBackground(child: body),
+      body: ManagerPageBackground(child: body),
     );
   }
 
