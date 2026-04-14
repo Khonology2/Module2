@@ -2299,8 +2299,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   DateTime _toSast(DateTime dt) {
     final utc = dt.isUtc
         ? dt
-        : DateTime.utc(dt.year, dt.month, dt.day, dt.hour, dt.minute,
-            dt.second, dt.millisecond, dt.microsecond);
+        : DateTime.utc(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second,
+            dt.millisecond, dt.microsecond);
     return utc.add(const Duration(hours: 2));
   }
 
