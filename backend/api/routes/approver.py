@@ -119,11 +119,13 @@ def get_pending_approvals(username=None, user_id=None, email=None):
             else:
                 budget_expr = 'NULL::numeric'
 
+            # Do not SELECT body text here — large JSON/HTML columns make this endpoint
+            # exceed typical client timeouts; review pages load full content by id.
             query = f'''
                 SELECT 
                     id,
                     title,
-                    content,
+                    NULL::text AS content,
                     {client_expr} AS client,
                     {client_email_expr} AS client_email,
                     {owner_expr} AS user_id,

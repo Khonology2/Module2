@@ -10,6 +10,7 @@ import '../../services/local_profile_avatar_store.dart';
 import '../../theme/manager_theme_controller.dart';
 import '../../theme/premium_theme.dart';
 import '../../utils/manager_session_actions.dart';
+import '../../widgets/admin/admin_sidebar.dart';
 import '../../widgets/app_side_nav.dart';
 import '../../widgets/manager_page_background.dart';
 
@@ -31,7 +32,11 @@ class _ManagerAccountProfilePageState extends State<ManagerAccountProfilePage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<AppState>().setCurrentNavLabel('Account Profile');
+      final app = context.read<AppState>();
+      app.setCurrentNavLabel('Account Profile');
+      if (_isAdminUser()) {
+        app.setAdminNavLabel('Account Profile');
+      }
       _reloadProfile();
     });
   }
@@ -100,6 +105,15 @@ class _ManagerAccountProfilePageState extends State<ManagerAccountProfilePage> {
       case 'Proposals':
         Navigator.pushReplacementNamed(context, '/proposals');
         break;
+      case 'Approvals':
+        Navigator.pushReplacementNamed(context, '/admin_approvals');
+        break;
+      case 'Analytics':
+        Navigator.pushReplacementNamed(context, '/admin_analytics');
+        break;
+      case 'History':
+        Navigator.pushReplacementNamed(context, '/admin_history');
+        break;
       case 'Templates':
         Navigator.pushReplacementNamed(context, '/templates');
         break;
@@ -117,6 +131,7 @@ class _ManagerAccountProfilePageState extends State<ManagerAccountProfilePage> {
         break;
       case 'Account Profile':
         break;
+      case 'Sign Out':
       case 'Logout':
         ManagerSessionActions.showLogoutDialog(context);
         break;
@@ -339,6 +354,18 @@ class _ManagerAccountProfilePageState extends State<ManagerAccountProfilePage> {
                     r == 'manager' ||
                     r == 'creator' ||
                     r == 'financial manager';
+                final usesAdminSidebar = r == 'admin' || r == 'ceo';
+                if (usesAdminSidebar) {
+                  return AdminSidebar(
+                    isCollapsed: appState.isAdminSidebarCollapsed,
+                    currentPage: 'Account Profile',
+                    onToggle: appState.toggleAdminSidebar,
+                    onSelect: (label) {
+                      appState.setAdminNavLabel(label);
+                      _navigateToPage(context, label);
+                    },
+                  );
+                }
                 return AppSideNav(
                   isCollapsed: appState.isSidebarCollapsed,
                   currentLabel: appState.currentNavLabel,

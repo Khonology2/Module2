@@ -2,7 +2,7 @@
 Authentication routes - Registration, login, password reset, user profile
 Supports both Firebase authentication and legacy JWT tokens
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 import os
 import json
 import traceback
@@ -35,6 +35,22 @@ def _normalize_role(raw_role, default='manager'):
     if role_key in {'manager', 'creator', 'user'}:
         return 'manager'
     return default
+
+
+def _firebase_can_skip_database() -> bool:
+    """
+    True when login should proceed without Postgres (explicit dev bypass, or
+    schema init failed and ALLOW_FIREBASE_WITHOUT_DB is not disabled).
+    """
+    if os.getenv("DEV_BYPASS_DB_FOR_FIREBASE", "false").lower() == "true":
+        return True
+    if current_app.config.get("PG_SCHEMA_AVAILABLE", False):
+        return False
+    return os.getenv("ALLOW_FIREBASE_WITHOUT_DB", "true").lower() not in (
+        "0",
+        "false",
+        "no",
+    )
 
 
 def _is_finance_requested(requested_role) -> bool:
@@ -520,12 +536,17 @@ def firebase_auth():
         name = firebase_user.get('name') or email.split('@')[0]  # Use email prefix if no name
 
         # ------------------------------------------------------------------
-        # DEV SHORT-CIRCUIT: allow Firebase auth without Postgres
+        # DEV / outage SHORT-CIRCUIT: allow Firebase auth without Postgres
         # ------------------------------------------------------------------
-        # When DEV_BYPASS_DB_FOR_FIREBASE=true, we skip all database access
-        # and return a synthetic user object. This is handy for local UI
-        # work when the cloud Postgres instance is unreachable.
-        if os.getenv("DEV_BYPASS_DB_FOR_FIREBASE", "false").lower() == "true":
+        # When DEV_BYPASS_DB_FOR_FIREBASE=true, or PG schema is unavailable and
+        # ALLOW_FIREBASE_WITHOUT_DB is not false, skip DB and return a synthetic
+        # user so the app stays usable when Render SSL/Postgres is down locally.
+        if _firebase_can_skip_database():
+            if os.getenv("DEV_BYPASS_DB_FOR_FIREBASE", "false").lower() != "true":
+                print(
+                    "[INFO] Firebase login: using no-DB fallback (Postgres unavailable). "
+                    "Set ALLOW_FIREBASE_WITHOUT_DB=false to refuse logins when the DB is down."
+                )
             username = email.split("@")[0]
             backend_token = generate_token(username)
             save_tokens(get_valid_tokens())
