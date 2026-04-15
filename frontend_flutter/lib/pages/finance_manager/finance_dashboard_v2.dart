@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:html' as html;
 
 import '../../api.dart';
+import '../../config/app_constants.dart';
 import '../../services/auth_service.dart';
 import '../../theme/manager_theme_controller.dart';
 import '../../theme/premium_theme.dart';
@@ -40,7 +41,16 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   String _statusFilter = 'all';
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _proposalsListScrollController = ScrollController();
   String _currentTab = 'dashboard'; // dashboard, proposals, clients
+
+  static const String _managerIconDir = 'assets/images/new icons for manager';
+  static const String _proposalsOverviewIcon =
+      '$_managerIconDir/Draft proposal.png';
+  static const String _searchIcon =
+      '$_managerIconDir/Search_Seek_Red Badge_White.png';
+  static const String _rowDocIcon =
+      '$_managerIconDir/Project Management_Red Badge_White.png';
 
   int _selectedYear = DateTime.now().year;
   Future<Map<String, dynamic>>? _financeSummaryFuture;
@@ -68,16 +78,18 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
 
   static const String _financeIconDir =
       'assets/images/finance_manager_new_icons';
-  static const String _kpiPipelineIcon = '$_financeIconDir/Total_Pipeline_Value.png';
-  static const String _kpiExpectedIcon = '$_financeIconDir/Expected_Revenue.png';
+  static const String _kpiPipelineIcon =
+      '$_financeIconDir/Total_Pipeline_Value.png';
+  static const String _kpiExpectedIcon =
+      '$_financeIconDir/Expected_Revenue.png';
   static const String _kpiSignedIcon = '$_financeIconDir/Signe_Revenue.png';
   static const String _kpiWinRateIcon = '$_financeIconDir/Win_Rate.png';
   static const String _kpiAvgDealIcon = '$_financeIconDir/Av_Deal_Size.png';
-  static const String _pipelineChartIcon = '$_financeIconDir/Proposal_Pipeline.png';
+  static const String _pipelineChartIcon =
+      '$_financeIconDir/Proposal_Pipeline.png';
   static const String _forecastChartIcon =
       '$_financeIconDir/Revenue_forecast_chart.png';
-  static const String _signedGrowthIcon =
-      '$_financeIconDir/Signe_Revenue.png';
+  static const String _signedGrowthIcon = '$_financeIconDir/Signe_Revenue.png';
   static const String _aiUsageIcon = '$_financeIconDir/AI_Usage.png';
   static const String _byEndpointIcon = '$_financeIconDir/By_Endpoint.png';
   static const String _includeDataIcon = '$_financeIconDir/include_data.png';
@@ -110,7 +122,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       decoration: BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.22), width: 1),
+        border:
+            Border.all(color: Colors.white.withValues(alpha: 0.22), width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.28),
@@ -119,9 +132,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
           ),
         ],
       ),
-      padding: EdgeInsets.all(size == _adminLikeIconDiameter
-          ? _adminLikeIconPadding
-          : 6),
+      padding: EdgeInsets.all(
+          size == _adminLikeIconDiameter ? _adminLikeIconPadding : 6),
       child: Image.asset(
         path,
         fit: BoxFit.contain,
@@ -241,6 +253,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     _aiUsageRefreshTimer?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
+    _proposalsListScrollController.dispose();
     _auditUserController.dispose();
     _auditEntityTypeController.dispose();
     _auditActionTypeController.dispose();
@@ -461,8 +474,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style:
-                      PremiumTheme.bodySmall.copyWith(color: Colors.white54),
+                  style: PremiumTheme.bodySmall.copyWith(color: Colors.white54),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -514,7 +526,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             label: 'Total Pipeline Value',
             value: loading ? '--' : _formatCurrency(pipeline),
             iconPath: _kpiPipelineIcon,
-            subtitle: '${_getFilteredProposals(context.read<AppState>(), ignoreStatusFilter: true).length} Proposals',
+            subtitle:
+                '${_getFilteredProposals(context.read<AppState>(), ignoreStatusFilter: true).length} Proposals',
           ),
           _buildKpiCard(
             label: 'Expected Revenue',
@@ -586,10 +599,12 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
         final shown = items.take(4).toList();
 
         Widget alertRow(Map<String, dynamic> item, {required bool checked}) {
-          final type = (item['type'] ?? 'Alert Title').toString().replaceAll('_', ' ');
-          final details = (item['client'] ?? item['message'] ?? item['detail'] ?? '')
-              .toString()
-              .trim();
+          final type =
+              (item['type'] ?? 'Alert Title').toString().replaceAll('_', ' ');
+          final details =
+              (item['client'] ?? item['message'] ?? item['detail'] ?? '')
+                  .toString()
+                  .trim();
           final line = details.isEmpty ? type : '$type - $details';
           return Row(
             children: [
@@ -618,7 +633,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                 style: TextButton.styleFrom(
                   backgroundColor: Colors.white.withValues(alpha: 0.35),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   shape: const StadiumBorder(),
                 ),
                 child: const Text(
@@ -647,11 +663,13 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Financial Alerts', style: PremiumTheme.titleMedium),
+                        Text('Financial Alerts',
+                            style: PremiumTheme.titleMedium),
                         const SizedBox(height: 4),
                         Text(
                           'Items requiring financial attention.',
-                          style: PremiumTheme.bodyMedium.copyWith(color: Colors.white70),
+                          style: PremiumTheme.bodyMedium
+                              .copyWith(color: Colors.white70),
                         ),
                       ],
                     ),
@@ -674,7 +692,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       '$count',
-                      style: PremiumTheme.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                      style: PremiumTheme.titleMedium
+                          .copyWith(fontWeight: FontWeight.w800),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -688,12 +707,14 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.white,
                       backgroundColor: const Color(0xFFC10D00),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
                       shape: const StadiumBorder(),
                     ),
                     child: const Text(
                       'VIEW ALL',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                      style:
+                          TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ],
@@ -717,7 +738,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   child: Center(
                     child: Text(
                       'No alerts requiring attention.',
-                      style: PremiumTheme.bodyMedium.copyWith(color: Colors.white60),
+                      style: PremiumTheme.bodyMedium
+                          .copyWith(color: Colors.white60),
                     ),
                   ),
                 )
@@ -1048,8 +1070,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                     const SizedBox(height: 6),
                     Text(
                       subtitle,
-                      style:
-                          PremiumTheme.bodyMedium.copyWith(color: Colors.white70),
+                      style: PremiumTheme.bodyMedium
+                          .copyWith(color: Colors.white70),
                     ),
                   ],
                 ),
@@ -1174,7 +1196,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                 Expanded(
                   child: Text(
                     label,
-                    style: PremiumTheme.labelMedium.copyWith(color: Colors.white70),
+                    style: PremiumTheme.labelMedium
+                        .copyWith(color: Colors.white70),
                   ),
                 ),
                 Text(
@@ -1260,7 +1283,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   statTile('Success', n(totals['success_count']).toString()),
                   statTile('Failed', n(totals['failed_count']).toString()),
                   statTile('Blocked', n(totals['blocked_count']).toString()),
-                  statTile('Acceptance', '${acceptanceRate.toStringAsFixed(1)}%'),
+                  statTile(
+                      'Acceptance', '${acceptanceRate.toStringAsFixed(1)}%'),
                   statTile('Tokens', totalTokens),
                   statTile('Cost', totalCost),
                   statTile(
@@ -1330,8 +1354,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                     const SizedBox(height: 6),
                     Text(
                       'Endpoints: $endpointCount | Users: $usersCount',
-                      style:
-                          PremiumTheme.bodySmall.copyWith(color: Colors.white54),
+                      style: PremiumTheme.bodySmall
+                          .copyWith(color: Colors.white54),
                     ),
                   ],
                 );
@@ -2701,185 +2725,224 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
         ),
       ),
       body: ManagerPageBackground(
-        child: Column(
+        child: Row(
           children: [
-            _buildHeader(app, isMobile),
+            FinanceSidebar(
+              isCollapsed: isSidebarCollapsed,
+              currentPage: _currentTab == 'dashboard'
+                  ? 'Dashboard'
+                  : _currentTab == 'proposals'
+                      ? 'Proposals'
+                      : _currentTab == 'clients'
+                          ? 'Client Management'
+                          : _currentTab == 'audit'
+                              ? 'Audit'
+                              : 'Dashboard',
+              showAudit: _canAccessAudit(app),
+              pendingBadge: pendingBadge > 0 ? pendingBadge : null,
+              onToggle: app.toggleFinanceSidebar,
+              onSelect: (label) {
+                if (label == 'Dashboard') {
+                  setState(() => _currentTab = 'dashboard');
+                  return;
+                }
+                if (label == 'Proposals') {
+                  setState(() => _currentTab = 'proposals');
+                  return;
+                }
+                if (label == 'Client Management') {
+                  setState(() => _currentTab = 'clients');
+                  return;
+                }
+                if (label == 'Audit') {
+                  setState(() => _currentTab = 'audit');
+                  _loadAuditLogs();
+                  return;
+                }
+                if (label == 'Analytics') {
+                  Navigator.pushNamed(context, '/analytics');
+                  return;
+                }
+                if (label == 'Settings') {
+                  Navigator.pushNamed(context, '/settings');
+                  return;
+                }
+                if (label == 'Sign Out') {
+                  app.logout();
+                  AuthService.logout();
+                  Navigator.pushNamed(context, '/login');
+                  return;
+                }
+              },
+            ),
             Expanded(
-              child: Row(
+              child: Column(
                 children: [
-                  FinanceSidebar(
-                    isCollapsed: isSidebarCollapsed,
-                    currentPage: _currentTab == 'dashboard'
-                        ? 'Dashboard'
-                        : _currentTab == 'proposals'
-                            ? 'Proposals'
-                            : _currentTab == 'clients'
-                                ? 'Client Management'
-                                : _currentTab == 'audit'
-                                    ? 'Audit'
-                                    : 'Dashboard',
-                    showAudit: _canAccessAudit(app),
-                    pendingBadge: pendingBadge > 0 ? pendingBadge : null,
-                    onToggle: app.toggleFinanceSidebar,
-                    onSelect: (label) {
-                      if (label == 'Dashboard') {
-                        setState(() => _currentTab = 'dashboard');
-                        return;
-                      }
-                      if (label == 'Proposals') {
-                        setState(() => _currentTab = 'proposals');
-                        return;
-                      }
-                      if (label == 'Client Management') {
-                        setState(() => _currentTab = 'clients');
-                        return;
-                      }
-                      if (label == 'Audit') {
-                        setState(() => _currentTab = 'audit');
-                        _loadAuditLogs();
-                        return;
-                      }
-                      if (label == 'Analytics') {
-                        Navigator.pushNamed(context, '/analytics');
-                        return;
-                      }
-                      if (label == 'Settings') {
-                        Navigator.pushNamed(context, '/settings');
-                        return;
-                      }
-                      if (label == 'Sign Out') {
-                        app.logout();
-                        AuthService.logout();
-                        Navigator.pushNamed(context, '/login');
-                        return;
-                      }
-                    },
-                  ),
+                  _buildHeader(app, isMobile, chrome),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
                       child: _currentTab == 'clients'
                           ? const FinanceClientManagementPage()
-                          : CustomScrollbar(
-                              controller: _scrollController,
-                              child: SingleChildScrollView(
-                                controller: _scrollController,
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    _buildBreadcrumb(),
-                                    const SizedBox(height: 16),
-                                    if (_currentTab == 'dashboard') ...[
-                                      _buildDashboardTitle(),
-                                      const SizedBox(height: 16),
-                                      _buildFinanceKpis(),
-                                      const SizedBox(height: 16),
-                                      _buildChartsRow(),
-                                      const SizedBox(height: 12),
-                                      LayoutBuilder(
-                                        builder: (context, constraints) {
-                                          final isNarrow =
-                                              constraints.maxWidth < 1100;
-                                          const panelHeight = 330.0;
-                                          final left = _buildSimpleListPanel(
-                                            title: 'Top Clients by Revenue',
-                                            subtitle: 'Highest revenue clients',
-                                            iconPath: _topClientsIcon,
-                                            child: _buildTopClientsPanel(),
-                                          );
-                                          final mid = _buildSimpleListPanel(
-                                            title: 'Recent Signed Deals',
-                                            subtitle: 'Latest signed proposals',
-                                            iconPath: _recentSignedIcon,
-                                            child: _buildRecentSignedPanel(),
-                                          );
-                                          final right = _buildSimpleListPanel(
-                                            title: 'Pipeline Aging Report',
-                                            subtitle: 'Deals stuck > 30 days',
-                                            iconPath: _agingReportIcon,
-                                            child: _buildAgingPanel(),
-                                          );
-
-                                          if (isNarrow) {
-                                            return Column(
-                                              children: [
-                                                SizedBox(
-                                                  height: panelHeight,
-                                                  child: left,
-                                                ),
-                                                const SizedBox(height: 12),
-                                                SizedBox(
-                                                  height: panelHeight,
-                                                  child: mid,
-                                                ),
-                                                const SizedBox(height: 12),
-                                                SizedBox(
-                                                  height: panelHeight,
-                                                  child: right,
-                                                ),
-                                              ],
-                                            );
-                                          }
-
-                                          return Row(
-                                            children: [
-                                              Expanded(
-                                                child: SizedBox(
-                                                  height: panelHeight,
-                                                  child: left,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: SizedBox(
-                                                  height: panelHeight,
-                                                  child: mid,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: SizedBox(
-                                                  height: panelHeight,
-                                                  child: right,
-                                                ),
-                                              ),
-                                            ],
-                                          );
-                                        },
+                          : (_currentTab == 'proposals'
+                              ? SingleChildScrollView(
+                                  controller: _scrollController,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      _buildProposalsOverviewPanel(
+                                        chrome: chrome,
+                                        proposals: proposalsTabProposals,
                                       ),
-                                      const SizedBox(height: 12),
-                                      _buildSimpleListPanel(
-                                        title: 'AI Usage',
-                                        subtitle:
-                                            'Live usage for AI Assistant + Risk Gate (last 30 days, auto-refresh)',
-                                        iconPath: _aiUsageIcon,
-                                        child: _buildAiUsageDashboardPanel(),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _buildFinancialAlertsPanel(),
-                                      const SizedBox(height: 12),
-                                      _buildRequiresAttention(
-                                          requiresAttention),
-                                      const SizedBox(height: 24),
-                                      const Footer(),
-                                    ] else if (_currentTab == 'audit') ...[
-                                      _buildAuditPanel(),
-                                      const SizedBox(height: 24),
-                                      const Footer(),
-                                    ] else ...[
-                                      _buildFilters(),
-                                      const SizedBox(height: 16),
-                                      _buildTable(proposalsTabProposals),
                                       const SizedBox(height: 24),
                                       const Footer(),
                                     ],
-                                  ],
-                                ),
-                              ),
-                            ),
+                                  ),
+                                )
+                              : CustomScrollbar(
+                                  controller: _scrollController,
+                                  child: SingleChildScrollView(
+                                    controller: _scrollController,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        if (_currentTab == 'dashboard') ...[
+                                          _buildDashboardTitle(),
+                                          const SizedBox(height: 16),
+                                          _buildFinanceKpis(),
+                                          const SizedBox(height: 16),
+                                          _buildChartsRow(),
+                                          const SizedBox(height: 12),
+                                          LayoutBuilder(
+                                            builder: (context, constraints) {
+                                              final isNarrow =
+                                                  constraints.maxWidth < 1100;
+                                              const panelHeight = 330.0;
+                                              final left =
+                                                  _buildSimpleListPanel(
+                                                title: 'Top Clients by Revenue',
+                                                subtitle:
+                                                    'Highest revenue clients',
+                                                iconPath: _topClientsIcon,
+                                                child: _buildTopClientsPanel(),
+                                              );
+                                              final mid = _buildSimpleListPanel(
+                                                title: 'Recent Signed Deals',
+                                                subtitle:
+                                                    'Latest signed proposals',
+                                                iconPath: _recentSignedIcon,
+                                                child:
+                                                    _buildRecentSignedPanel(),
+                                              );
+                                              final right =
+                                                  _buildSimpleListPanel(
+                                                title: 'Pipeline Aging Report',
+                                                subtitle:
+                                                    'Deals stuck > 30 days',
+                                                iconPath: _agingReportIcon,
+                                                child: _buildAgingPanel(),
+                                              );
+
+                                              if (isNarrow) {
+                                                return Column(
+                                                  children: [
+                                                    SizedBox(
+                                                      height: panelHeight,
+                                                      child: left,
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    SizedBox(
+                                                      height: panelHeight,
+                                                      child: mid,
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    SizedBox(
+                                                      height: panelHeight,
+                                                      child: right,
+                                                    ),
+                                                  ],
+                                                );
+                                              }
+
+                                              return Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: SizedBox(
+                                                      height: panelHeight,
+                                                      child: left,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: SizedBox(
+                                                      height: panelHeight,
+                                                      child: mid,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: SizedBox(
+                                                      height: panelHeight,
+                                                      child: right,
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(height: 12),
+                                          _buildSimpleListPanel(
+                                            title: 'AI Usage',
+                                            subtitle:
+                                                'Live usage for AI Assistant + Risk Gate (last 30 days, auto-refresh)',
+                                            iconPath: _aiUsageIcon,
+                                            child:
+                                                _buildAiUsageDashboardPanel(),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          _buildFinancialAlertsPanel(),
+                                          const SizedBox(height: 12),
+                                          _buildRequiresAttention(
+                                              requiresAttention),
+                                          const SizedBox(height: 24),
+                                          const Footer(),
+                                        ] else ...[
+                                          _buildAuditPanel(),
+                                          const SizedBox(height: 24),
+                                          const Footer(),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                )),
                     ),
                   ),
+                  if (_currentTab == 'proposals')
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          width: 114.93836212158203,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            color: chrome.fieldFill,
+                            borderRadius: BorderRadius.circular(4.3),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            AppConstants.fullVersion,
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: chrome.textMuted,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -2887,6 +2950,417 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
         ),
       ),
     );
+  }
+
+  Widget _buildProposalsOverviewPanel({
+    required ManagerChromeTheme chrome,
+    required List<Map<String, dynamic>> proposals,
+  }) {
+    final filtered = proposals.where((p) {
+      final title = (p['title'] ?? '').toString().toLowerCase();
+      final client =
+          (p['client_name'] ?? p['client'] ?? '').toString().toLowerCase();
+      final q = _searchController.text.toLowerCase();
+      final matchesSearch = title.contains(q) || client.contains(q);
+
+      final effectiveStatusFilter =
+          _validStatusFilters.contains(_statusFilter) ? _statusFilter : 'all';
+      final matchesStatus = effectiveStatusFilter == 'all'
+          ? true
+          : _financePipelineBucket((p['status'] ?? '').toString()) ==
+              _financeBucketForFilter(effectiveStatusFilter);
+
+      return matchesSearch && matchesStatus;
+    }).toList();
+
+    final panelWidth = MediaQuery.of(context).size.width;
+    final targetWidth = panelWidth > 1100 ? 946.2045288461986 : double.infinity;
+
+    return Container(
+      width: targetWidth,
+      decoration: BoxDecoration(
+        color: const Color(0x24FFFFFF),
+        borderRadius: BorderRadius.circular(5.32),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x40000000),
+            blurRadius: 3.55,
+            offset: Offset(0, 3.55),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: _buildManagerLikeToolbar(chrome),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Divider(
+              color: chrome.divider,
+              height: 1,
+              thickness: 1,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: _buildManagerLikeProposalList(
+              chrome: chrome,
+              filtered: filtered,
+              all: proposals,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildManagerLikeToolbar(ManagerChromeTheme chrome) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Image.asset(
+          _proposalsOverviewIcon,
+          width: 73,
+          height: 73,
+          fit: BoxFit.contain,
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Proposals Overview',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    letterSpacing: 0.2,
+                    color: chrome.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "Manage all your business proposals & SOW's",
+                  style: TextStyle(fontSize: 12, color: chrome.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 18),
+        SizedBox(
+          width: 245,
+          height: 43.060546875,
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 22),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3D3D3D),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 36, right: 12),
+                      child: Center(
+                        child: TextField(
+                          controller: _searchController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(
+                            hintText: 'Search Proposals or Clients...',
+                            hintStyle: TextStyle(
+                              color: Color(0xFF9CA3AF),
+                              fontSize: 14,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                width: 43,
+                height: 43,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    _searchIcon,
+                    width: 43,
+                    height: 43,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF4B5563),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _validStatusFilters.contains(_statusFilter)
+                  ? _statusFilter
+                  : 'all',
+              dropdownColor: const Color(0xFF4B5563),
+              icon: const Icon(
+                Icons.keyboard_arrow_down,
+                color: Colors.white,
+                size: 20,
+              ),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('All Statuses')),
+                DropdownMenuItem(
+                    value: 'pending_review', child: Text('Pending Review')),
+                DropdownMenuItem(
+                    value: 'in_pricing', child: Text('In Pricing')),
+                DropdownMenuItem(value: 'released', child: Text('Released')),
+                DropdownMenuItem(value: 'signed', child: Text('Signed')),
+              ],
+              onChanged: (v) => setState(() => _statusFilter = v ?? 'all'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildManagerLikeProposalList({
+    required ManagerChromeTheme chrome,
+    required List<Map<String, dynamic>> filtered,
+    required List<Map<String, dynamic>> all,
+  }) {
+    if (_isLoading) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(PremiumTheme.teal),
+          ),
+        ),
+      );
+    }
+
+    if (all.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 48.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.description_outlined,
+                  size: 64, color: chrome.textMuted),
+              const SizedBox(height: 16),
+              Text(
+                'No proposals yet',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: chrome.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Proposals will appear here once created.',
+                style: TextStyle(color: chrome.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 48.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off_outlined,
+                  size: 64, color: chrome.textMuted),
+              const SizedBox(height: 16),
+              Text(
+                'No proposals match your filters',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: chrome.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Try adjusting your search or status.',
+                style: TextStyle(color: chrome.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    const rowExtent = 64.0;
+    const visibleRows = 6;
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: rowExtent * visibleRows),
+      child: ListView.builder(
+        controller: _proposalsListScrollController,
+        itemExtent: rowExtent,
+        itemCount: filtered.length,
+        itemBuilder: (context, index) {
+          final proposal = filtered[index];
+          return _FinanceProposalRow(
+            proposal: proposal,
+            chrome: chrome,
+            formatCurrency: _formatCurrency,
+            extractAmount: _extractAmount,
+            formatLastModified: _formatLastModified,
+            statusLabel: _financeStatusLabel,
+            statusColor: _financeStatusColor,
+            onView: () {
+              final proposalId = proposal['id']?.toString();
+              final title =
+                  (proposal['title'] ?? 'Untitled Proposal').toString();
+              if (proposalId == null || proposalId.isEmpty) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => BlankDocumentEditorPage(
+                    proposalId: proposalId,
+                    proposalTitle: title,
+                    readOnly: false,
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  String _financeBucketForFilter(String filter) {
+    switch (filter) {
+      case 'pending_review':
+        return 'Pending Review';
+      case 'in_pricing':
+        return 'In Pricing';
+      case 'released':
+        return 'Released';
+      case 'signed':
+        return 'Signed';
+      default:
+        return 'All';
+    }
+  }
+
+  String _financeStatusLabel(String statusRaw) {
+    final bucket = _financePipelineBucket(statusRaw);
+    switch (bucket) {
+      case 'In Pricing':
+        return 'Pricing In Progress';
+      case 'Pending Review':
+        return 'Sent for Approval';
+      case 'Released':
+        return 'Released';
+      case 'Signed':
+        return 'Awaiting Signature';
+      default:
+        final s = statusRaw.trim();
+        return s.isEmpty ? 'Drafted' : s;
+    }
+  }
+
+  Color _financeStatusColor(String statusRaw) {
+    final bucket = _financePipelineBucket(statusRaw);
+    switch (bucket) {
+      case 'In Pricing':
+        return const Color(0xFF5C389D);
+      case 'Pending Review':
+        return const Color(0xFFEA990C);
+      case 'Released':
+        return const Color(0xFF6CA510);
+      case 'Signed':
+        return const Color(0xFF6095CC);
+      default:
+        return const Color(0xFF4B5563);
+    }
+  }
+
+  String _formatLastModified(dynamic date) {
+    if (date == null) return 'Unknown';
+    if (date is String) {
+      try {
+        final hasTimezone = RegExp(r'(Z|[+-]\\d{2}:\\d{2})$').hasMatch(date);
+        final parsedRaw = DateTime.parse(date);
+        final parsed = hasTimezone
+            ? parsedRaw.toLocal()
+            : DateTime.utc(
+                parsedRaw.year,
+                parsedRaw.month,
+                parsedRaw.day,
+                parsedRaw.hour,
+                parsedRaw.minute,
+                parsedRaw.second,
+                parsedRaw.millisecond,
+                parsedRaw.microsecond,
+              ).toLocal();
+        final now = DateTime.now();
+
+        bool isSameDay(DateTime a, DateTime b) {
+          return a.year == b.year && a.month == b.month && a.day == b.day;
+        }
+
+        final today = DateTime(now.year, now.month, now.day);
+        final parsedDay = DateTime(parsed.year, parsed.month, parsed.day);
+
+        if (isSameDay(parsedDay, today)) {
+          return 'Today, ${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
+        }
+
+        final yesterday = today.subtract(const Duration(days: 1));
+        if (isSameDay(parsedDay, yesterday)) {
+          return 'Yesterday, ${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
+        }
+
+        return '${parsed.day}/${parsed.month}/${parsed.year}';
+      } catch (_) {
+        return date.toString();
+      }
+    }
+
+    return date.toString();
   }
 
   Widget _buildBreadcrumb() {
@@ -3347,7 +3821,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     );
   }
 
-  Widget _buildHeader(AppState app, bool isMobile) {
+  Widget _buildHeader(AppState app, bool isMobile, ManagerChromeTheme chrome) {
     final userName = app.currentUser?['full_name'] ??
         app.currentUser?['first_name'] ??
         app.currentUser?['email'] ??
@@ -3375,8 +3849,15 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
               child: Row(
                 children: [
                   Text(
-                    'Finance Dashboard',
-                    style: PremiumTheme.titleLarge.copyWith(fontSize: 22),
+                    _currentTab == 'proposals'
+                        ? 'Finance Proposal Management'
+                        : 'Finance Dashboard',
+                    style: TextStyle(
+                      color: chrome.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -3385,8 +3866,11 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                     Flexible(
                       child: Text(
                         'Hello, ${userName.toString()}',
-                        style: PremiumTheme.bodyMedium
-                            .copyWith(color: Colors.white70),
+                        style: TextStyle(
+                          color: chrome.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -3397,16 +3881,9 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
+                SizedBox(
                   width: _adminLikeIconDiameter,
                   height: _adminLikeIconDiameter,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      width: 2,
-                    ),
-                  ),
                   child: IconButton(
                     tooltip: 'Messages',
                     padding: const EdgeInsets.all(_adminLikeIconPadding),
@@ -3427,14 +3904,9 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    Container(
+                    SizedBox(
                       width: _adminLikeIconDiameter,
                       height: _adminLikeIconDiameter,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border:
-                            Border.all(color: Colors.white.withValues(alpha: 0.9), width: 2),
-                      ),
                       child: IconButton(
                         tooltip: 'Notifications',
                         padding: const EdgeInsets.all(_adminLikeIconPadding),
@@ -3717,7 +4189,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.white,
                   backgroundColor: const Color(0xFFC10D00),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   shape: const StadiumBorder(),
                 ),
                 child: const Text(
@@ -4104,6 +4577,187 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
           fontWeight: FontWeight.w600,
         ),
         overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+class _FinanceProposalRow extends StatelessWidget {
+  const _FinanceProposalRow({
+    required this.proposal,
+    required this.chrome,
+    required this.extractAmount,
+    required this.formatCurrency,
+    required this.formatLastModified,
+    required this.statusLabel,
+    required this.statusColor,
+    required this.onView,
+  });
+
+  final Map<String, dynamic> proposal;
+  final ManagerChromeTheme chrome;
+  final double Function(Map<String, dynamic>) extractAmount;
+  final String Function(double) formatCurrency;
+  final String Function(dynamic) formatLastModified;
+  final String Function(String) statusLabel;
+  final Color Function(String) statusColor;
+  final VoidCallback onView;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = (proposal['title'] ?? 'Untitled Proposal').toString();
+    final client =
+        (proposal['client_name'] ?? proposal['client'] ?? 'Unknown Client')
+            .toString();
+    final statusRaw = (proposal['status'] ?? '').toString();
+    final amount = extractAmount(proposal);
+    final lastModified =
+        formatLastModified(proposal['updated_at'] ?? proposal['updatedAt']);
+
+    final pillLabel = statusLabel(statusRaw);
+    final pillColor = statusColor(statusRaw);
+
+    return SizedBox(
+      height: 64,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Image.asset(
+              _FinanceDashboardPageState._rowDocIcon,
+              width: 40,
+              height: 40,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 3,
+              child: RichText(
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: title,
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 0.13,
+                        color: chrome.textPrimary,
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' - $client',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 0.13,
+                        color: chrome.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            SizedBox(
+              width: 190,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Last Modified: $lastModified',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w500,
+                    fontSize: 10.5,
+                    letterSpacing: 0.105,
+                    color: chrome.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.left,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            SizedBox(
+              width: 190,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: 160,
+                  height: 23.0,
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(15.69, 0, 15.69, 0),
+                    decoration: BoxDecoration(
+                      color: pillColor,
+                      borderRadius: BorderRadius.circular(26.06),
+                    ),
+                    child: Center(
+                      child: Text(
+                        pillLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 1,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  formatCurrency(amount),
+                  style: PremiumTheme.bodyMedium.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            SizedBox(
+              width: 92,
+              child: OutlinedButton(
+                onPressed: onView,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: const Color(0xFF4B5563),
+                  side: BorderSide.none,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: const Text(
+                  'VIEW',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
