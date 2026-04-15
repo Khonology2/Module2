@@ -1272,12 +1272,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   Widget _buildTopHeader({required bool useDrawer}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0B1220).withValues(alpha: 0.55),
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-      ),
       child: Row(
         children: [
           if (useDrawer)
@@ -1291,8 +1285,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
             ),
           if (useDrawer) const SizedBox(width: 6),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
                 const Text(
                   'Client Portal',
@@ -1302,20 +1295,33 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(width: 8),
                 Text(
-                  'Welcome back, ${_clientEmail ?? 'Client'}',
+                  'Hello, ${_getClientDisplayName()}',
                   style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontSize: 12),
+                    color: Colors.white.withValues(alpha: 0.75),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_none, color: Colors.white70),
-            tooltip: 'Notifications',
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHeaderIconButton(
+                assetPath: 'assets/images/new icons for manager/messages.png',
+                onTap: () {},
+              ),
+              const SizedBox(width: 8),
+              _buildHeaderIconButton(
+                assetPath:
+                    'assets/images/new icons for manager/notifications.png',
+                onTap: () {},
+                badge: 2,
+              ),
+            ],
           ),
         ],
       ),
@@ -1814,6 +1820,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       required Widget child,
       double? fixedHeight,
     }) {
+      final showTitle = title.trim().isNotEmpty;
       final card = Container(
         clipBehavior: Clip.antiAlias,
         padding: const EdgeInsets.all(16),
@@ -1832,15 +1839,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+            if (showTitle) ...[
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             child,
           ],
         ),
@@ -1927,47 +1936,122 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           const SizedBox(height: 12),
         ],
         panelCard(
-          title: 'Project Chat',
-          fixedHeight: 145.17,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          title: '',
+          fixedHeight: 120,
+          child: Row(
             children: [
-              Text(
-                'Open a document to view and post comments.',
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.70), fontSize: 12),
-              ),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed:
-                      doc == null ? null : () => _openProposalComments(doc),
-                  icon: const Icon(Icons.forum_outlined, size: 18),
-                  label: const Text('Open Comments'),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(28),
                 ),
+                child: Icon(
+                  Icons.forum_outlined,
+                  color: Colors.white.withValues(alpha: 0.8),
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Project Chat',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Open a document to view and post comments as required.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.70),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton(
+                onPressed:
+                    doc == null ? null : () => _openProposalComments(doc),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFC10D00),
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: const Text('OPEN COMMENTS'),
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
         panelCard(
-          title: 'Documents & Downloads',
-          fixedHeight: 145.17,
-          child: Column(
+          title: '',
+          fixedHeight: 120,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: doc == null
-                          ? null
-                          : () => _downloadPdfForDocument(doc),
-                      icon: const Icon(Icons.download_outlined, size: 18),
-                      label: const Text('Download PDF'),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Icon(
+                  Icons.download_outlined,
+                  color: Colors.white.withValues(alpha: 0.8),
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Download Document',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Additional description information can be included if required and or as deemed necessary.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.70),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton(
+                onPressed:
+                    doc == null ? null : () => _downloadPdfForDocument(doc),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFC10D00),
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ],
+                ),
+                child: const Text('DOWNLOAD PDF'),
               ),
             ],
           ),
@@ -2604,29 +2688,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Dashboard',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildTopCornerAssetIcon('assets/images/Group 391 (2).png'),
-                  const SizedBox(width: 8),
-                  _buildTopCornerAssetIcon('assets/images/Group 398 (1).png'),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
           _buildSummaryTiles(),
           const SizedBox(height: 14),
           LayoutBuilder(
@@ -3987,8 +4048,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           const Icon(Icons.dashboard, color: Colors.white, size: 28),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
                 const Text(
                   'Client Portal',
@@ -3998,12 +4058,13 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(width: 8),
                 Text(
-                  'Welcome back, ${_clientEmail ?? 'Client'}',
+                  'Hello, ${_getClientDisplayName()}',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
