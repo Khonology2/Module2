@@ -35,6 +35,24 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   int _currentFrameIndex = 0;
   bool _framesPrecached = false;
 
+  String? _toBackendRole(dynamic rawRole) {
+    final value = (rawRole ?? '').toString().trim().toLowerCase();
+    if (value.isEmpty) return null;
+    if (value == 'admin' || value == 'ceo' || value == 'approver') {
+      return 'admin';
+    }
+    if (value.startsWith('finance') ||
+        value == 'financial_manager' ||
+        value == 'finance manager' ||
+        value == 'financial manager') {
+      return 'finance_manager';
+    }
+    if (value == 'manager' || value == 'creator' || value == 'user') {
+      return 'manager';
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -135,11 +153,19 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         return;
       }
 
+      String? requestedRole;
+      try {
+        final firestoreData =
+            await FirebaseService.getUserData(firebaseCredential.user!.uid);
+        requestedRole = _toBackendRole(firestoreData?['role']);
+      } catch (_) {}
+
       final response = await http.post(
         Uri.parse('${AuthService.baseUrl}/api/firebase'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'id_token': firebaseIdToken,
+          if (requestedRole != null) 'role': requestedRole,
         }),
       );
 
@@ -301,8 +327,16 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       // sent to finance dashboard). Backend uses DB role for existing users.
       print('📡 Sending Firebase token to backend...');
 
+      String? requestedRole;
+      try {
+        final firestoreData =
+            await FirebaseService.getUserData(firebaseCredential.user!.uid);
+        requestedRole = _toBackendRole(firestoreData?['role']);
+      } catch (_) {}
+
       final requestBody = {
         'id_token': firebaseIdToken,
+        if (requestedRole != null) 'role': requestedRole,
       };
 
       final response = await http.post(

@@ -43,5 +43,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/images/admin_side bar/
+    - assets/images/Admin_new_icons/
     - assets/images/new icons for manager/
     - assets/

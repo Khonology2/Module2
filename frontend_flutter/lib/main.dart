@@ -47,6 +47,7 @@ import 'services/role_service.dart';
 import 'api.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme/manager_theme_controller.dart';
+import 'config/app_constants.dart';
 
 const String _buildSha =
     String.fromEnvironment('BUILD_SHA', defaultValue: 'dev');
@@ -130,6 +131,7 @@ Future<void> main() async {
   // Restore persisted auth session on startup (web)
   AuthService.restoreSessionFromStorage();
   print('🧩 Build SHA: $_buildSha');
+  print('MODULE2_UI_STAMP ${AppConstants.fullVersion}');
   runApp(const MyApp());
 }
 
@@ -458,18 +460,13 @@ class MyApp extends StatelessWidget {
           scaffoldBackgroundColor: Colors.transparent,
         ),
         builder: (context, child) {
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Image.asset(
-                    'assets/images/Global BG.jpg',
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              if (child != null) child,
-            ],
+          // Do not paint Global BG here: it sat behind every route and made
+          // screens that bring their own full-bleed background (manager/admin
+          // shell, login carousel, etc.) look unchanged. Use a neutral fallback
+          // only where a route leaves the scaffold transparent.
+          return ColoredBox(
+            color: const Color(0xFF0A0C10),
+            child: child ?? const SizedBox.shrink(),
           );
         },
         home: const AuthWrapper(),
