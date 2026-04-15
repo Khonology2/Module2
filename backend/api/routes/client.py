@@ -345,6 +345,27 @@ def _create_client_session(cursor, invitation_token: str, device_id: str):
     }
 
 
+def _revoke_other_client_sessions(cursor, invitation_token: str, device_id: str, keep_session_id: str):
+    """
+    Only one active browser session per (invitation_token, device_id).
+    Revoke older rows so stale tokens fail fast and cannot race the UI after OTP.
+    """
+    try:
+        cursor.execute(
+            """
+            UPDATE client_device_sessions
+            SET revoked_at = NOW()
+            WHERE invitation_token = %s
+              AND device_id = %s
+              AND id <> %s
+              AND revoked_at IS NULL
+            """,
+            (invitation_token, device_id, keep_session_id),
+        )
+    except Exception as exc:
+        print(f"[CLIENT_PORTAL] WARN: could not revoke prior device sessions: {exc}")
+
+
 def _require_client_device_session(cursor, invitation_token: str, device_id: str | None, session_token: str | None):
     if not device_id or not session_token:
         return False, {
@@ -765,6 +786,9 @@ def start_client_device_session():
                     (invitation_token, device_id),
                 )
                 session = _create_client_session(cursor, invitation_token, device_id)
+                _revoke_other_client_sessions(
+                    cursor, invitation_token, device_id, session['session_id']
+                )
                 conn.commit()
                 return {
                     'otp_required': False,
@@ -933,6 +957,9 @@ def verify_client_device_otp():
                 (invitation_token, device_id),
             )
             session = _create_client_session(cursor, invitation_token, device_id)
+            _revoke_other_client_sessions(
+                cursor, invitation_token, device_id, session['session_id']
+            )
             conn.commit()
 
             return {
