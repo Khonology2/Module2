@@ -2650,21 +2650,22 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     required String label,
     required VoidCallback onTap,
   }) {
+    // Do not use [Center] here: inside a tall [Row] it expands to the row height and
+    // makes fixed-width pills (ACTION / VIEW ALL) nearly square — reads as a circle.
     final pillBody = Padding(
       padding: _pendingPillPadding,
-      child: Center(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            label,
-            maxLines: 1,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.15,
-              fontFamily: 'Poppins',
-            ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          maxLines: 1,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.15,
+            fontFamily: 'Poppins',
           ),
         ),
       ),
