@@ -32,11 +32,13 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   static Future<void>? _globalVerificationFuture;
 
   bool _isLoading = true;
+  DateTime? _loadingStartedAt;
   String? _error;
   String? _accessToken;
   String? _clientEmail;
   String? _deviceId;
   String? _clientSessionToken;
+
   /// Incremented when the persisted client session token changes (e.g. after OTP).
   /// Used to ignore in-flight proposal HTTP responses that used a superseded session.
   int _clientSessionEpoch = 0;
@@ -74,6 +76,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
             .toString()
             .toLowerCase();
     return t.contains('sow');
+  }
+
+  Future<void> _ensureMinLoadingTime(Duration minDuration) async {
+    final startedAt = _loadingStartedAt;
+    if (startedAt == null) return;
+
+    final elapsed = DateTime.now().difference(startedAt);
+    final remaining = minDuration - elapsed;
+    if (remaining.isNegative) return;
+
+    await Future.delayed(remaining);
   }
 
   Widget _filterChip(String label, String value) {
@@ -465,59 +478,242 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                 }
               }
 
-              return AlertDialog(
-                title: const Text('Verify your device'),
-                content: SizedBox(
-                  width: 420,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Enter the code sent to your email'),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: controller,
-                        decoration: const InputDecoration(
-                          labelText: 'OTP code',
-                          border: OutlineInputBorder(),
-                        ),
-                        enabled: !submitting,
-                        keyboardType: TextInputType.number,
-                        onSubmitted: (_) => verify(),
+              final w = MediaQuery.sizeOf(context).width;
+              final h = MediaQuery.sizeOf(context).height;
+              final logoHeight = (w * 0.10).clamp(56.0, 120.0);
+              final loaderHeight = (w * 0.08).clamp(40.0, 90.0);
+              final cardWidth = (w * 0.42).clamp(320.0, 520.0);
+
+              return Dialog(
+                insetPadding: EdgeInsets.zero,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Positioned.fill(
+                      child: Image.asset(
+                        'assets/images/client_dashboard_bg.png',
+                        fit: BoxFit.cover,
                       ),
-                      if (error != null) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          error!,
-                          style: TextStyle(color: Colors.red.shade300),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.black.withValues(alpha: 0.65),
+                            Colors.black.withValues(alpha: 0.35),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
                         ),
-                      ],
-                    ],
-                  ),
+                      ),
+                    ),
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 14,
+                        ),
+                        child: Stack(
+                          children: [
+                            Align(
+                              alignment: Alignment.topCenter,
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 18),
+                                child: Image.asset(
+                                  'assets/images/Landingscreen.png',
+                                  height: logoHeight,
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.high,
+                                ),
+                              ),
+                            ),
+                            Center(
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: cardWidth,
+                                  maxHeight: h * 0.72,
+                                ),
+                                child: Material(
+                                  color: Colors.black.withValues(alpha: 0.55),
+                                  borderRadius: BorderRadius.circular(18),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(18),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        const Text(
+                                          'Proposal & SOW Builder',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        const Text(
+                                          'Verify your device',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 14),
+                                        const Text(
+                                          'Enter the code sent to your email address:',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 14),
+                                        TextField(
+                                          controller: controller,
+                                          enabled: !submitting,
+                                          keyboardType: TextInputType.number,
+                                          onSubmitted: (_) => verify(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                          ),
+                                          decoration: InputDecoration(
+                                            hintText: 'OTP code',
+                                            hintStyle: const TextStyle(
+                                              color: Colors.white54,
+                                            ),
+                                            filled: true,
+                                            fillColor: Colors.white
+                                                .withValues(alpha: 0.10),
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                              borderSide: BorderSide.none,
+                                            ),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 14,
+                                            ),
+                                          ),
+                                        ),
+                                        if (error != null) ...[
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            error!,
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: error ==
+                                                      'A new code has been sent.'
+                                                  ? Colors.white70
+                                                  : Colors.red.shade300,
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 18),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: OutlinedButton(
+                                                onPressed: submitting
+                                                    ? null
+                                                    : () => Navigator.of(
+                                                            dialogContext,
+                                                            rootNavigator: true)
+                                                        .pop(),
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor: Colors.white,
+                                                  side: BorderSide(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                            alpha: 0.55),
+                                                  ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            22),
+                                                  ),
+                                                ),
+                                                child: const Text('CANCEL'),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: OutlinedButton(
+                                                onPressed:
+                                                    submitting ? null : resend,
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor: Colors.white,
+                                                  side: BorderSide(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                            alpha: 0.55),
+                                                  ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            22),
+                                                  ),
+                                                ),
+                                                child: const Text('RESEND'),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                onPressed:
+                                                    submitting ? null : verify,
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      const Color(0xFFC10D00),
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            22),
+                                                  ),
+                                                ),
+                                                child: submitting
+                                                    ? const SizedBox(
+                                                        width: 18,
+                                                        height: 18,
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          color: Colors.white,
+                                                        ),
+                                                      )
+                                                    : const Text('VERIFY'),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: Image.asset(
+                                  'assets/images/White_khono_loading.png.png',
+                                  height: loaderHeight,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: submitting
-                        ? null
-                        : () =>
-                            Navigator.of(context, rootNavigator: true).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: submitting ? null : resend,
-                    child: const Text('Resend'),
-                  ),
-                  ElevatedButton(
-                    onPressed: submitting ? null : verify,
-                    child: submitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Verify'),
-                  ),
-                ],
               );
             },
           );
@@ -2841,6 +3037,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
+      _loadingStartedAt = DateTime.now();
       _error = null;
     });
 
@@ -2962,8 +3159,11 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           if (!mounted) return;
           setState(() {
             _isLoading = true;
+            _loadingStartedAt = DateTime.now();
             _error = null;
           });
+
+          await _ensureMinLoadingTime(const Duration(milliseconds: 1200));
           await _ensureDeviceVerifiedAndRetry(token: token);
 
           // Verification may have completed in another widget instance.
@@ -3890,17 +4090,78 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
+      final w = MediaQuery.sizeOf(context).width;
+      final logoHeight = (w * 0.10).clamp(56.0, 120.0);
+      final loaderHeight = (w * 0.08).clamp(40.0, 90.0);
       return Scaffold(
         backgroundColor: Colors.transparent,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Loading your proposals...'),
-            ],
-          ),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/client_dashboard_bg.png',
+                fit: BoxFit.cover,
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withValues(alpha: 0.65),
+                    Colors.black.withValues(alpha: 0.35),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
+                child: Stack(
+                  children: [
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 18),
+                        child: Image.asset(
+                          'assets/images/Landingscreen.png',
+                          height: logoHeight,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
+                    ),
+                    const Center(
+                      child: Text(
+                        'Loading your proposals ...',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Image.asset(
+                          'assets/images/White_khono_loading.png.png',
+                          height: loaderHeight,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -3908,25 +4169,48 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     if (_error != null) {
       return Scaffold(
         backgroundColor: Colors.transparent,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-              const SizedBox(height: 16),
-              Text(
-                _error!,
-                style: const TextStyle(fontSize: 18, color: Colors.red),
-                textAlign: TextAlign.center,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/client_dashboard_bg.png',
+                fit: BoxFit.cover,
               ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () => _loadClientProposals(),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withValues(alpha: 0.65),
+                    Colors.black.withValues(alpha: 0.35),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
               ),
-            ],
-          ),
+            ),
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                  const SizedBox(height: 16),
+                  Text(
+                    _error!,
+                    style: const TextStyle(fontSize: 18, color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => _loadClientProposals(),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       );
     }
