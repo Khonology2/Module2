@@ -2809,8 +2809,6 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                                           CrossAxisAlignment.stretch,
                                       children: [
                                         if (_currentTab == 'dashboard') ...[
-                                          _buildDashboardTitle(),
-                                          const SizedBox(height: 16),
                                           _buildFinanceKpis(),
                                           const SizedBox(height: 16),
                                           _buildChartsRow(),
@@ -3023,8 +3021,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       children: [
         Image.asset(
           _proposalsOverviewIcon,
-          width: 73,
-          height: 73,
+          width: 86,
+          height: 86,
           fit: BoxFit.contain,
         ),
         const SizedBox(width: 16),
@@ -3886,7 +3884,11 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   height: _adminLikeIconDiameter,
                   child: IconButton(
                     tooltip: 'Messages',
-                    padding: const EdgeInsets.all(_adminLikeIconPadding),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    hoverColor: Colors.transparent,
                     onPressed: () async {
                       await app.fetchNotifications();
                       if (!mounted) return;
@@ -3900,7 +3902,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 0),
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -3909,7 +3911,11 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                       height: _adminLikeIconDiameter,
                       child: IconButton(
                         tooltip: 'Notifications',
-                        padding: const EdgeInsets.all(_adminLikeIconPadding),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                        hoverColor: Colors.transparent,
                         onPressed: () async {
                           await app.fetchNotifications();
                           if (!mounted) return;
