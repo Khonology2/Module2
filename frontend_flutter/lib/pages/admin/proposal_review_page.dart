@@ -5,9 +5,11 @@ import 'dart:convert';
 import '../../api.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
+import '../../theme/manager_theme_controller.dart';
 import '../../theme/premium_theme.dart';
 import '../../widgets/header.dart';
 import '../../widgets/admin/admin_sidebar.dart';
+import '../../widgets/manager_page_background.dart';
 import 'package:intl/intl.dart';
 import '../../document_editor/models/document_table.dart';
 import '../../document_editor/models/positioned_pricing_table.dart';
@@ -1095,6 +1097,7 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final chrome = context.watch<ManagerThemeController>().chrome;
     final role = (AuthService.currentUser?['role'] ?? '')
         .toString()
         .toLowerCase()
@@ -1455,33 +1458,33 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
                   );
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E27),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: chrome.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Review Proposal',
-          style: PremiumTheme.titleMedium.copyWith(color: Colors.white),
+          style: PremiumTheme.titleMedium.copyWith(color: chrome.textPrimary),
         ),
         actions: [
           if (_proposal != null) ...[
             IconButton(
-              icon: const Icon(Icons.edit, color: Colors.white),
+              icon: Icon(Icons.edit, color: chrome.textPrimary),
               onPressed: _openInEditor,
               tooltip: 'Edit in Editor',
             ),
             IconButton(
-              icon: const Icon(Icons.history, color: Colors.white),
+              icon: Icon(Icons.history, color: chrome.textPrimary),
               onPressed: () =>
                   _safeSetState(() => _showVersions = !_showVersions),
               tooltip: 'Versions',
             ),
             IconButton(
-              icon: const Icon(Icons.comment, color: Colors.white),
+              icon: Icon(Icons.comment, color: chrome.textPrimary),
               onPressed: () {
                 // Scroll to comments section
                 if (_scrollController.hasClients) {
@@ -1532,22 +1535,25 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
           ],
         ],
       ),
-      body: Row(
-        children: [
-          if (isAdmin)
-            Material(
-              child: AdminSidebar(
-                isCollapsed: appState.isAdminSidebarCollapsed,
-                currentPage: _currentPage,
-                onToggle: () => appState.toggleAdminSidebar(),
-                onSelect: (label) {
-                  if (label != 'Sign Out') setState(() => _currentPage = label);
-                  _navigateAdminToPage(context, label);
-                },
+      body: ManagerPageBackground(
+        child: Row(
+          children: [
+            if (isAdmin)
+              Material(
+                child: AdminSidebar(
+                  isCollapsed: appState.isAdminSidebarCollapsed,
+                  currentPage: _currentPage,
+                  managerChrome: chrome,
+                  onToggle: () => appState.toggleAdminSidebar(),
+                  onSelect: (label) {
+                    if (label != 'Sign Out') setState(() => _currentPage = label);
+                    _navigateAdminToPage(context, label);
+                  },
+                ),
               ),
-            ),
-          Expanded(child: mainContent),
-        ],
+            Expanded(child: mainContent),
+          ],
+        ),
       ),
     );
   }
@@ -1570,7 +1576,14 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
       case 'History':
         Navigator.pushReplacementNamed(context, '/admin_history');
         break;
+      case 'Content Library':
+        Navigator.pushReplacementNamed(context, '/content_library');
+        break;
+      case 'Account Profile':
+        Navigator.pushReplacementNamed(context, '/manager_account_profile');
+        break;
       case 'Sign Out':
+      case 'Logout':
         AuthService.logout();
         Navigator.pushNamedAndRemoveUntil(
             context, '/login', (Route<dynamic> route) => false);
