@@ -2776,7 +2776,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
               },
             ),
             Expanded(
-              child: Column(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildHeader(app, isMobile, chrome),
                   Expanded(

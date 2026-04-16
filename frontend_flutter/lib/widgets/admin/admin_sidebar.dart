@@ -75,10 +75,18 @@ class AdminSidebar extends StatelessWidget {
   Color _dividerLine(ManagerChromeTheme? c) =>
       c?.divider ?? Colors.white.withOpacity(0.14);
 
-  Widget _buildHeader(bool effectiveCollapsed, ManagerChromeTheme? c) {
+  Widget _buildHeader(
+    bool effectiveCollapsed,
+    bool compact,
+    bool veryCompact,
+    ManagerChromeTheme? c,
+  ) {
     if (effectiveCollapsed) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+        padding: EdgeInsets.symmetric(
+          vertical: veryCompact ? 10 : (compact ? 12 : 20),
+          horizontal: 10,
+        ),
         child: InkWell(
           onTap: onToggle,
           borderRadius: BorderRadius.circular(10),
@@ -99,8 +107,77 @@ class AdminSidebar extends StatelessWidget {
       );
     }
 
+    if (veryCompact) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              right: 0,
+              child: InkWell(
+                onTap: onToggle,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: _subtleFill(c),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.keyboard_arrow_left,
+                    color: _iconFg(c),
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+            Column(
+              children: [
+                const SizedBox(height: 2),
+                Image.asset(
+                  'assets/images/new icons for manager/khonology_logo.png',
+                  height: 26,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Welcome to',
+                  style: TextStyle(
+                    color: c?.textSecondary ?? Colors.white.withOpacity(0.7),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Proposal & SOW Builder',
+                  style: TextStyle(
+                    color: _iconFg(c),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  height: 1,
+                  color: _dividerLine(c),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 30, 16, 20),
+      padding:
+          EdgeInsets.fromLTRB(16, compact ? 18 : 30, 16, compact ? 12 : 20),
       child: Stack(
         children: [
           Positioned(
@@ -127,13 +204,13 @@ class AdminSidebar extends StatelessWidget {
           ),
           Column(
             children: [
-              const SizedBox(height: 4),
+              SizedBox(height: compact ? 2 : 4),
               Image.asset(
                 'assets/images/new icons for manager/khonology_logo.png',
-                height: 36,
+                height: compact ? 30 : 36,
                 fit: BoxFit.contain,
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: compact ? 12 : 20),
               Text(
                 'Welcome to',
                 style: TextStyle(
@@ -143,18 +220,18 @@ class AdminSidebar extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: compact ? 2 : 4),
               Text(
                 'Proposal & SOW Builder',
                 style: TextStyle(
                   color: _iconFg(c),
-                  fontSize: 18,
+                  fontSize: compact ? 16 : 18,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.3,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 22),
+              SizedBox(height: compact ? 14 : 22),
               Container(
                 height: 1,
                 color: _dividerLine(c),
@@ -169,6 +246,9 @@ class AdminSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = managerChrome;
+    final height = MediaQuery.sizeOf(context).height;
+    final compact = height < 820;
+    final veryCompact = height < 720;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       width: isCollapsed ? 90.0 : 250.0,
@@ -187,9 +267,12 @@ class AdminSidebar extends StatelessWidget {
 
           return Column(
             children: [
-              _buildHeader(effectiveCollapsed, c),
+              _buildHeader(effectiveCollapsed, compact, veryCompact, c),
               Expanded(
                 child: SingleChildScrollView(
+                  physics: height < 640
+                      ? const AlwaysScrollableScrollPhysics()
+                      : const NeverScrollableScrollPhysics(),
                   child: Column(
                     children: [
                       for (final item in _items)
@@ -201,8 +284,10 @@ class AdminSidebar extends StatelessWidget {
                           onTap: () => onSelect(item.pageLabel),
                           accent: _adminAccent,
                           managerChrome: c,
+                          compact: compact,
+                          veryCompact: veryCompact,
                         ),
-                      const SizedBox(height: 20),
+                      SizedBox(height: veryCompact ? 10 : 20),
                     ],
                   ),
                 ),
@@ -213,7 +298,7 @@ class AdminSidebar extends StatelessWidget {
                   height: 1,
                   color: _dividerLine(c),
                 ),
-              const SizedBox(height: 12),
+              SizedBox(height: veryCompact ? 8 : 12),
               _AdminSidebarNavItem(
                 label: 'Account Profile',
                 assetPath: 'assets/images/User_Profile.png',
@@ -222,8 +307,10 @@ class AdminSidebar extends StatelessWidget {
                 onTap: () => onSelect('Account Profile'),
                 accent: _adminAccent,
                 managerChrome: c,
+                compact: compact,
+                veryCompact: veryCompact,
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: veryCompact ? 2 : 4),
               _AdminSidebarNavItem(
                 label: bottomLabel == 'Sign Out' ? 'Logout' : bottomLabel,
                 assetPath: 'assets/images/Logout_KhonoBuzz.png',
@@ -232,9 +319,11 @@ class AdminSidebar extends StatelessWidget {
                 onTap: () => onSelect(bottomLabel),
                 accent: _adminAccent,
                 managerChrome: c,
+                compact: compact,
+                veryCompact: veryCompact,
               ),
               if (!effectiveCollapsed) ...[
-                const SizedBox(height: 8),
+                SizedBox(height: veryCompact ? 4 : 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Container(
@@ -248,7 +337,7 @@ class AdminSidebar extends StatelessWidget {
                       AppConstants.fullVersion,
                       style: TextStyle(
                         color: _iconFg(c),
-                        fontSize: 10,
+                        fontSize: veryCompact ? 9 : 10,
                         fontWeight: FontWeight.w500,
                       ),
                       textAlign: TextAlign.center,
@@ -256,7 +345,7 @@ class AdminSidebar extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: 20),
+              SizedBox(height: veryCompact ? 12 : 20),
             ],
           );
         },
@@ -287,6 +376,8 @@ class _AdminSidebarNavItem extends StatelessWidget {
     this.assetPath,
     this.iconData,
     this.managerChrome,
+    this.compact = false,
+    this.veryCompact = false,
   }) : assert(assetPath != null || iconData != null);
 
   final String label;
@@ -297,6 +388,8 @@ class _AdminSidebarNavItem extends StatelessWidget {
   final VoidCallback onTap;
   final Color accent;
   final ManagerChromeTheme? managerChrome;
+  final bool compact;
+  final bool veryCompact;
   static const Color _lightTabFill = Color(0x4D838383);
   static const double _iconWidth = 33.988162994384766;
   static const double _iconHeight = 33.998130798339844;
@@ -345,7 +438,7 @@ class _AdminSidebarNavItem extends StatelessWidget {
     final c = managerChrome;
     if (isCollapsed) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.symmetric(vertical: veryCompact ? 4 : 8),
         child: Tooltip(
           message: label,
           child: Material(
@@ -370,14 +463,20 @@ class _AdminSidebarNavItem extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: veryCompact ? 3 : (compact ? 4 : 6),
+      ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: veryCompact ? 7 : (compact ? 8 : 10),
+            ),
             decoration: BoxDecoration(
               color: isActive ? accent : _idleRail(c),
               borderRadius:
@@ -386,8 +485,8 @@ class _AdminSidebarNavItem extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: veryCompact ? 38 : (compact ? 40 : 42),
+                  height: veryCompact ? 38 : (compact ? 40 : 42),
                   decoration: BoxDecoration(
                     color: isActive
                         ? Colors.white.withOpacity(0.22)
@@ -403,7 +502,7 @@ class _AdminSidebarNavItem extends StatelessWidget {
                     label,
                     style: TextStyle(
                       color: _labelColor(c, onAccent: isActive),
-                      fontSize: 14,
+                      fontSize: veryCompact ? 13 : 14,
                       fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                     ),
                     overflow: TextOverflow.ellipsis,

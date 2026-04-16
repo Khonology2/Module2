@@ -788,64 +788,67 @@ class _DashboardPageState extends State<DashboardPage>
             )
           : null,
       body: ManagerPageBackground(
-        child: Row(
-          children: [
-            // Sidebar
-            Consumer<AppState>(
-              builder: (context, app, child) {
-                final role = (app.currentUser?['role'] ?? '')
-                    .toString()
-                    .toLowerCase()
-                    .trim();
-                final isAdmin =
-                    role == 'admin' || role == 'ceo' || role == 'approver';
-                return AppSideNav(
-                  isCollapsed: app.isSidebarCollapsed,
-                  currentLabel: app.currentNavLabel,
-                  isAdmin: isAdmin,
-                  onToggle: app.toggleSidebar,
-                  onSelect: (label) {
-                    app.setCurrentNavLabel(label);
-                    _navigateToPage(context, label);
-                  },
-                );
-              },
-            ),
+        child: SafeArea(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Sidebar
+              Consumer<AppState>(
+                builder: (context, app, child) {
+                  final role = (app.currentUser?['role'] ?? '')
+                      .toString()
+                      .toLowerCase()
+                      .trim();
+                  final isAdmin =
+                      role == 'admin' || role == 'ceo' || role == 'approver';
+                  return AppSideNav(
+                    isCollapsed: app.isSidebarCollapsed,
+                    currentLabel: app.currentNavLabel,
+                    isAdmin: isAdmin,
+                    onToggle: app.toggleSidebar,
+                    onSelect: (label) {
+                      app.setCurrentNavLabel(label);
+                      _navigateToPage(context, label);
+                    },
+                  );
+                },
+              ),
 
-            // Main Content Area
-            Expanded(
-              child: Column(
-                children: [
-                  // ── Header bar ────────────────────────────────────────────
-                  _buildHeaderBar(app, userRole, chrome),
+              // Main Content Area
+              Expanded(
+                child: Column(
+                  children: [
+                    // ── Header bar ────────────────────────────────────────────
+                    _buildHeaderBar(app, userRole, chrome),
 
-                  // ── Scrollable body ───────────────────────────────────────
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: CustomScrollbar(
-                        controller: _scrollController,
-                        child: RefreshIndicator(
-                          onRefresh: _refreshData,
-                          color: const Color(0xFFC10D00),
-                          child: SingleChildScrollView(
-                            controller: _scrollController,
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: _buildRoleSpecificContent(
-                                userRole, counts, app, chrome),
+                    // ── Scrollable body ───────────────────────────────────────
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                        child: CustomScrollbar(
+                          controller: _scrollController,
+                          child: RefreshIndicator(
+                            onRefresh: _refreshData,
+                            color: const Color(0xFFC10D00),
+                            child: SingleChildScrollView(
+                              controller: _scrollController,
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: _buildRoleSpecificContent(
+                                  userRole, counts, app, chrome),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
 
-                  // Footer
-                  const Footer(),
-                ],
+                    // Footer
+                    const Footer(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -2101,6 +2104,8 @@ class _DashboardPageState extends State<DashboardPage>
   Widget _buildRecentProposals(
       List<dynamic> proposals, ManagerChromeTheme chrome) {
     final filteredProposals = _getFilteredProposals(proposals);
+    final size = MediaQuery.sizeOf(context);
+    final listMaxHeight = size.height < 800 ? 200.0 : 260.0;
 
     filteredProposals.sort((a, b) {
       DateTime? parseDate(dynamic value) {
@@ -2227,19 +2232,26 @@ class _DashboardPageState extends State<DashboardPage>
             ),
           )
         else
-          ...filteredProposals.take(5).map((proposal) {
-            String status = proposal['status'] ?? 'Draft';
-            Color statusColor = _getStatusColor(status);
-            Color textColor = _getStatusTextColor(status);
-
-            return _buildProposalItem(
-              proposal,
-              status,
-              statusColor,
-              textColor,
-              chrome,
-            );
-          }).toList(),
+          SizedBox(
+            height: listMaxHeight,
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount: filteredProposals.length > 5 ? 5 : filteredProposals.length,
+              itemBuilder: (context, index) {
+                final proposal = filteredProposals[index];
+                String status = proposal['status'] ?? 'Draft';
+                Color statusColor = _getStatusColor(status);
+                Color textColor = _getStatusTextColor(status);
+                return _buildProposalItem(
+                  proposal,
+                  status,
+                  statusColor,
+                  textColor,
+                  chrome,
+                );
+              },
+            ),
+          ),
       ],
     );
   }
