@@ -33,6 +33,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
   bool _isLoading = true;
   DateTime? _loadingStartedAt;
+  bool _isLightMode = false;
   String? _error;
   String? _accessToken;
   String? _clientEmail;
@@ -483,6 +484,32 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               final logoHeight = (w * 0.10).clamp(56.0, 120.0);
               final loaderHeight = (w * 0.08).clamp(40.0, 90.0);
               final cardWidth = (w * 0.42).clamp(320.0, 520.0);
+              final isLightMode = _isLightMode;
+              final bgAsset = isLightMode
+                  ? 'assets/images/light_mode_bg.png'
+                  : 'assets/images/client_dashboard_bg.png';
+              final loaderAsset = isLightMode
+                  ? 'assets/images/Red_Discs.png'
+                  : 'assets/images/White_khono_loading.png.png';
+              final overlayGradient = isLightMode
+                  ? LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.50),
+                        Colors.white.withValues(alpha: 0.15),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    )
+                  : LinearGradient(
+                      colors: [
+                        Colors.black.withValues(alpha: 0.65),
+                        Colors.black.withValues(alpha: 0.35),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    );
+              final titleColor = Colors.white;
+              final subtitleColor = Colors.white70;
 
               return Dialog(
                 insetPadding: EdgeInsets.zero,
@@ -493,20 +520,13 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   children: [
                     Positioned.fill(
                       child: Image.asset(
-                        'assets/images/client_dashboard_bg.png',
+                        bgAsset,
                         fit: BoxFit.cover,
                       ),
                     ),
                     Container(
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.black.withValues(alpha: 0.65),
-                            Colors.black.withValues(alpha: 0.35),
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
+                        gradient: overlayGradient,
                       ),
                     ),
                     SafeArea(
@@ -545,29 +565,29 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.stretch,
                                       children: [
-                                        const Text(
+                                        Text(
                                           'Proposal & SOW Builder',
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
-                                            color: Colors.white,
+                                            color: titleColor,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                         const SizedBox(height: 4),
-                                        const Text(
+                                        Text(
                                           'Verify your device',
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
-                                            color: Colors.white,
+                                            color: titleColor,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                         const SizedBox(height: 14),
-                                        const Text(
+                                        Text(
                                           'Enter the code sent to your email address:',
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
-                                            color: Colors.white70,
+                                            color: subtitleColor,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -577,12 +597,12 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                           enabled: !submitting,
                                           keyboardType: TextInputType.number,
                                           onSubmitted: (_) => verify(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
+                                          style: TextStyle(
+                                            color: titleColor,
                                           ),
                                           decoration: InputDecoration(
                                             hintText: 'OTP code',
-                                            hintStyle: const TextStyle(
+                                            hintStyle: TextStyle(
                                               color: Colors.white54,
                                             ),
                                             filled: true,
@@ -608,7 +628,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                             style: TextStyle(
                                               color: error ==
                                                       'A new code has been sent.'
-                                                  ? Colors.white70
+                                                  ? subtitleColor
                                                   : Colors.red.shade300,
                                             ),
                                           ),
@@ -617,20 +637,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                         Row(
                                           children: [
                                             Expanded(
-                                              child: OutlinedButton(
+                                              child: ElevatedButton(
                                                 onPressed: submitting
                                                     ? null
                                                     : () => Navigator.of(
                                                             dialogContext,
                                                             rootNavigator: true)
                                                         .pop(),
-                                                style: OutlinedButton.styleFrom(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.grey
+                                                      .withValues(alpha: 0.65),
                                                   foregroundColor: Colors.white,
-                                                  side: BorderSide(
-                                                    color: Colors.white
-                                                        .withValues(
-                                                            alpha: 0.55),
-                                                  ),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius:
                                                         BorderRadius.circular(
@@ -698,11 +715,84 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                               ),
                             ),
                             Align(
+                              alignment: Alignment.bottomLeft,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.only(left: 10, bottom: 10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.35),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.18),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Ver 2025.03.AA1_SIT',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.bottomRight,
+                              child: Padding(
+                                padding: const EdgeInsets.only(
+                                  right: 10,
+                                  bottom: 10,
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _isLightMode = !_isLightMode;
+                                      });
+                                      setModalState(() {});
+                                    },
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: (isLightMode
+                                                ? Colors.white
+                                                : Colors.black)
+                                            .withValues(alpha: 0.35),
+                                        borderRadius: BorderRadius.circular(18),
+                                        border: Border.all(
+                                          color: (isLightMode
+                                                  ? Colors.black
+                                                  : Colors.white)
+                                              .withValues(alpha: 0.18),
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        isLightMode
+                                            ? Icons.dark_mode_outlined
+                                            : Icons.light_mode_outlined,
+                                        size: 16,
+                                        color: isLightMode
+                                            ? Colors.black
+                                            : Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Align(
                               alignment: Alignment.bottomCenter,
                               child: Padding(
                                 padding: const EdgeInsets.only(bottom: 10),
                                 child: Image.asset(
-                                  'assets/images/White_khono_loading.png.png',
+                                  loaderAsset,
                                   height: loaderHeight,
                                   fit: BoxFit.contain,
                                 ),
@@ -4093,6 +4183,30 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       final w = MediaQuery.sizeOf(context).width;
       final logoHeight = (w * 0.10).clamp(56.0, 120.0);
       final loaderHeight = (w * 0.08).clamp(40.0, 90.0);
+      final isLightMode = _isLightMode;
+      final bgAsset = isLightMode
+          ? 'assets/images/light_mode_bg.png'
+          : 'assets/images/client_dashboard_bg.png';
+      final loaderAsset = isLightMode
+          ? 'assets/images/Red_Discs.png'
+          : 'assets/images/White_khono_loading.png.png';
+      final overlayGradient = isLightMode
+          ? LinearGradient(
+              colors: [
+                Colors.white.withValues(alpha: 0.50),
+                Colors.white.withValues(alpha: 0.15),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            )
+          : LinearGradient(
+              colors: [
+                Colors.black.withValues(alpha: 0.65),
+                Colors.black.withValues(alpha: 0.35),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            );
       return Scaffold(
         backgroundColor: Colors.transparent,
         body: Stack(
@@ -4100,20 +4214,13 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           children: [
             Positioned.fill(
               child: Image.asset(
-                'assets/images/client_dashboard_bg.png',
+                bgAsset,
                 fit: BoxFit.cover,
               ),
             ),
             Container(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.black.withValues(alpha: 0.65),
-                    Colors.black.withValues(alpha: 0.35),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
+                gradient: overlayGradient,
               ),
             ),
             SafeArea(
@@ -4136,13 +4243,81 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                         ),
                       ),
                     ),
-                    const Center(
+                    Center(
                       child: Text(
                         'Loading your proposals ...',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: isLightMode ? Colors.black : Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 10, bottom: 10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: const Text(
+                            'Ver 2025.03.AA1_SIT',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          right: 10,
+                          bottom: 10,
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _isLightMode = !_isLightMode;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(18),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color:
+                                    (isLightMode ? Colors.white : Colors.black)
+                                        .withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: (isLightMode
+                                          ? Colors.black
+                                          : Colors.white)
+                                      .withValues(alpha: 0.18),
+                                ),
+                              ),
+                              child: Icon(
+                                isLightMode
+                                    ? Icons.dark_mode_outlined
+                                    : Icons.light_mode_outlined,
+                                size: 16,
+                                color:
+                                    isLightMode ? Colors.black : Colors.white,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -4151,7 +4326,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: Image.asset(
-                          'assets/images/White_khono_loading.png.png',
+                          loaderAsset,
                           height: loaderHeight,
                           fit: BoxFit.contain,
                         ),
@@ -4167,6 +4342,42 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     }
 
     if (_error != null) {
+      final w = MediaQuery.sizeOf(context).width;
+      final loaderHeight = (w * 0.08).clamp(40.0, 90.0);
+      final isLightMode = _isLightMode;
+      final bgAsset = isLightMode
+          ? 'assets/images/light_mode_bg.png'
+          : 'assets/images/client_dashboard_bg.png';
+      final loaderAsset = isLightMode
+          ? 'assets/images/Red_Discs.png'
+          : 'assets/images/White_khono_loading.png.png';
+      final overlayGradient = isLightMode
+          ? LinearGradient(
+              colors: [
+                Colors.white.withValues(alpha: 0.50),
+                Colors.white.withValues(alpha: 0.15),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            )
+          : LinearGradient(
+              colors: [
+                Colors.black.withValues(alpha: 0.65),
+                Colors.black.withValues(alpha: 0.35),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            );
+
+      final errorText = _error ?? '';
+      final lower = errorText.toLowerCase();
+      final headline = lower.contains('timed') || lower.contains('expired')
+          ? 'Link Timed Out!'
+          : 'Device Verification Required';
+      final subtitle = lower.contains('timed') || lower.contains('expired')
+          ? 'Please retry, alternatively contact the sender for a refreshed link.'
+          : 'Please retry, alternatively contact the sender for a refreshed link.';
+
       return Scaffold(
         backgroundColor: Colors.transparent,
         body: Stack(
@@ -4174,40 +4385,170 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           children: [
             Positioned.fill(
               child: Image.asset(
-                'assets/images/client_dashboard_bg.png',
+                bgAsset,
                 fit: BoxFit.cover,
               ),
             ),
             Container(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.black.withValues(alpha: 0.65),
-                    Colors.black.withValues(alpha: 0.35),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
+                gradient: overlayGradient,
               ),
             ),
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-                  const SizedBox(height: 16),
-                  Text(
-                    _error!,
-                    style: const TextStyle(fontSize: 18, color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () => _loadClientProposals(),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                  ),
-                ],
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
+                child: Stack(
+                  children: [
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 640),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              'assets/images/client_icons/Warning Error_White Badge_Red.png',
+                              width: 88,
+                              height: 88,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.warning_amber_rounded,
+                                size: 88,
+                                color: Color(0xFFC10D00),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              headline,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color:
+                                    isLightMode ? Colors.black : Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              subtitle,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: isLightMode
+                                    ? Colors.black87
+                                    : Colors.white70,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 22),
+                            SizedBox(
+                              width: 160,
+                              height: 40,
+                              child: ElevatedButton(
+                                onPressed: () => _loadClientProposals(),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFC10D00),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'RETRY',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 10, bottom: 10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: const Text(
+                            'Ver 2025.03.AA1_SIT',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          right: 10,
+                          bottom: 10,
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _isLightMode = !_isLightMode;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(18),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color:
+                                    (isLightMode ? Colors.white : Colors.black)
+                                        .withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: (isLightMode
+                                          ? Colors.black
+                                          : Colors.white)
+                                      .withValues(alpha: 0.18),
+                                ),
+                              ),
+                              child: Icon(
+                                isLightMode
+                                    ? Icons.dark_mode_outlined
+                                    : Icons.light_mode_outlined,
+                                size: 16,
+                                color:
+                                    isLightMode ? Colors.black : Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Image.asset(
+                          loaderAsset,
+                          height: loaderHeight,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
