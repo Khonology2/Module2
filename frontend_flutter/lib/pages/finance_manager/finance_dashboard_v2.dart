@@ -2055,38 +2055,81 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   }
 
   Widget _buildAuditPanel() {
+    final chrome = context.watch<ManagerThemeController>().chrome;
     final dateFmt = DateFormat('yyyy-MM-dd');
     final fromLabel = _auditFrom == null ? 'From' : dateFmt.format(_auditFrom!);
     final toLabel = _auditTo == null ? 'To' : dateFmt.format(_auditTo!);
+    final panelFill = chrome.isDark
+        ? Colors.white.withOpacity(0.04)
+        : Colors.white.withValues(alpha: 0.88);
+    final panelBorder = chrome.isDark
+        ? Colors.white.withOpacity(0.08)
+        : Colors.black.withValues(alpha: 0.10);
+    final fieldFill = chrome.isDark
+        ? Colors.white.withValues(alpha: 0.03)
+        : Colors.white.withValues(alpha: 0.96);
+    final fieldBorder = chrome.isDark
+        ? Colors.white24
+        : Colors.black.withValues(alpha: 0.18);
+    final labelColor = chrome.isDark ? Colors.white70 : chrome.textSecondary;
+    final valueColor = chrome.textPrimary;
+    final subtleText = chrome.isDark ? Colors.white70 : chrome.textSecondary;
+    final headingColor = chrome.textPrimary;
+    final tableHeadingColor = chrome.isDark
+        ? Colors.white.withValues(alpha: 0.92)
+        : chrome.textPrimary;
+    final tableRowColor =
+        chrome.isDark ? Colors.white70 : chrome.textPrimary.withValues(alpha: 0.92);
+    final buttonBorder = chrome.isDark
+        ? Colors.white.withValues(alpha: 0.16)
+        : Colors.black.withValues(alpha: 0.12);
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withOpacity(0.04),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: panelFill,
+        border: Border.all(color: panelBorder),
+        boxShadow: chrome.isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Text('Audit Logs', style: PremiumTheme.titleMedium),
+              Text(
+                'Audit Logs',
+                style: PremiumTheme.titleMedium.copyWith(color: headingColor),
+              ),
               const Spacer(),
               TextButton.icon(
                 onPressed: () => _exportAuditLogs('csv'),
-                icon:
-                    const Icon(Icons.download, color: Colors.white70, size: 18),
-                label:
-                    const Text('CSV', style: TextStyle(color: Colors.white70)),
+                style: TextButton.styleFrom(
+                  foregroundColor: subtleText,
+                  side: BorderSide(color: buttonBorder),
+                  backgroundColor: fieldFill,
+                ),
+                icon: Icon(Icons.download, color: subtleText, size: 18),
+                label: Text('CSV', style: TextStyle(color: subtleText)),
               ),
               const SizedBox(width: 8),
               TextButton.icon(
                 onPressed: () => _exportAuditLogs('pdf'),
-                icon: const Icon(Icons.picture_as_pdf,
-                    color: Colors.white70, size: 18),
-                label:
-                    const Text('PDF', style: TextStyle(color: Colors.white70)),
+                style: TextButton.styleFrom(
+                  foregroundColor: subtleText,
+                  side: BorderSide(color: buttonBorder),
+                  backgroundColor: fieldFill,
+                ),
+                icon: Icon(Icons.picture_as_pdf, color: subtleText, size: 18),
+                label: Text('PDF', style: TextStyle(color: subtleText)),
               ),
             ],
           ),
@@ -2096,6 +2139,11 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             runSpacing: 12,
             children: [
               OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: subtleText,
+                  backgroundColor: fieldFill,
+                  side: BorderSide(color: fieldBorder),
+                ),
                 onPressed: () async {
                   final picked = await showDatePicker(
                     context: context,
@@ -2107,11 +2155,15 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   setState(() => _auditFrom = picked);
                   _loadAuditLogs();
                 },
-                icon: const Icon(Icons.date_range, color: Colors.white70),
-                label: Text(fromLabel,
-                    style: const TextStyle(color: Colors.white70)),
+                icon: Icon(Icons.date_range, color: subtleText),
+                label: Text(fromLabel, style: TextStyle(color: subtleText)),
               ),
               OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: subtleText,
+                  backgroundColor: fieldFill,
+                  side: BorderSide(color: fieldBorder),
+                ),
                 onPressed: () async {
                   final picked = await showDatePicker(
                     context: context,
@@ -2123,22 +2175,23 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   setState(() => _auditTo = picked);
                   _loadAuditLogs();
                 },
-                icon: const Icon(Icons.date_range, color: Colors.white70),
-                label: Text(toLabel,
-                    style: const TextStyle(color: Colors.white70)),
+                icon: Icon(Icons.date_range, color: subtleText),
+                label: Text(toLabel, style: TextStyle(color: subtleText)),
               ),
               SizedBox(
                 width: 220,
                 child: TextField(
                   controller: _auditUserController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: valueColor),
+                  decoration: InputDecoration(
                     labelText: 'User',
-                    labelStyle: TextStyle(color: Colors.white70),
+                    labelStyle: TextStyle(color: labelColor),
+                    filled: true,
+                    fillColor: fieldFill,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24),
+                      borderSide: BorderSide(color: fieldBorder),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(color: PremiumTheme.teal),
                     ),
                   ),
@@ -2149,14 +2202,16 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                 width: 220,
                 child: TextField(
                   controller: _auditEntityTypeController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: valueColor),
+                  decoration: InputDecoration(
                     labelText: 'Entity Type',
-                    labelStyle: TextStyle(color: Colors.white70),
+                    labelStyle: TextStyle(color: labelColor),
+                    filled: true,
+                    fillColor: fieldFill,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24),
+                      borderSide: BorderSide(color: fieldBorder),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(color: PremiumTheme.teal),
                     ),
                   ),
@@ -2167,14 +2222,16 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                 width: 220,
                 child: TextField(
                   controller: _auditActionTypeController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: valueColor),
+                  decoration: InputDecoration(
                     labelText: 'Action Type',
-                    labelStyle: TextStyle(color: Colors.white70),
+                    labelStyle: TextStyle(color: labelColor),
+                    filled: true,
+                    fillColor: fieldFill,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24),
+                      borderSide: BorderSide(color: fieldBorder),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(color: PremiumTheme.teal),
                     ),
                   ),
@@ -2195,14 +2252,21 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('Time')),
-                  DataColumn(label: Text('User')),
-                  DataColumn(label: Text('Entity')),
-                  DataColumn(label: Text('Action')),
-                  DataColumn(label: Text('Field')),
-                  DataColumn(label: Text('Old')),
-                  DataColumn(label: Text('New')),
+                headingRowColor: WidgetStatePropertyAll(
+                  chrome.isDark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.black.withValues(alpha: 0.04),
+                ),
+                dataRowColor: WidgetStatePropertyAll(fieldFill),
+                dividerThickness: 0.6,
+                columns: [
+                  DataColumn(label: Text('Time', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(label: Text('User', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(label: Text('Entity', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(label: Text('Action', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(label: Text('Field', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(label: Text('Old', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(label: Text('New', style: TextStyle(color: tableHeadingColor))),
                 ],
                 rows: _auditItems.map((r) {
                   final createdAt = (r['created_at'] ?? '').toString();
@@ -2217,7 +2281,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   Text cell(String v) => Text(
                         v,
                         style: PremiumTheme.bodySmall
-                            .copyWith(color: Colors.white70),
+                            .copyWith(color: tableRowColor),
                         overflow: TextOverflow.ellipsis,
                       );
 
@@ -2740,6 +2804,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                               : 'Dashboard',
               showAudit: _canAccessAudit(app),
               pendingBadge: pendingBadge > 0 ? pendingBadge : null,
+              managerChrome: chrome,
               onToggle: app.toggleFinanceSidebar,
               onSelect: (label) {
                 if (label == 'Dashboard') {
@@ -2763,11 +2828,12 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   Navigator.pushNamed(context, '/analytics');
                   return;
                 }
-                if (label == 'Settings') {
-                  Navigator.pushNamed(context, '/settings');
+                if (label == 'Account Profile') {
+                  Navigator.pushReplacementNamed(
+                      context, '/manager_account_profile');
                   return;
                 }
-                if (label == 'Sign Out') {
+                if (label == 'Sign Out' || label == 'Logout') {
                   app.logout();
                   AuthService.logout();
                   Navigator.pushNamed(context, '/login');
