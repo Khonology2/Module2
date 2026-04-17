@@ -993,16 +993,9 @@ class _DashboardPageState extends State<DashboardPage>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
+            SizedBox(
               width: 44.87,
               height: 44.87,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: chrome.isDark
-                    ? null
-                    : Border.all(color: chrome.divider, width: 1),
-              ),
               child: Image.asset(
                 'assets/images/group_398.png',
                 width: 44.87,
@@ -1499,20 +1492,13 @@ class _DashboardPageState extends State<DashboardPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (iconAsset != null) ...[
-                Container(
+                SizedBox(
                   width: 80,
                   height: 80,
-                  decoration: BoxDecoration(
-                    color: iconOnWhiteCircle
-                        ? Colors.white
-                        : const Color(0xFFC10D00).withOpacity(0.15),
-                    shape: BoxShape.circle,
-                    border: iconOnWhiteCircle && !chrome.isDark
-                        ? Border.all(color: chrome.divider, width: 1)
-                        : null,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Image.asset(iconAsset, fit: BoxFit.contain),
                   ),
-                  padding: const EdgeInsets.all(12),
-                  child: Image.asset(iconAsset, fit: BoxFit.contain),
                 ),
                 const SizedBox(width: 14),
               ],
@@ -1655,6 +1641,7 @@ class _DashboardPageState extends State<DashboardPage>
         padding: const EdgeInsets.all(16),
         decoration: chrome.floatingPanelDecoration(radius: 10),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             // Text info
             Expanded(
@@ -1693,19 +1680,17 @@ class _DashboardPageState extends State<DashboardPage>
             ),
             const SizedBox(width: 8),
             // Icon (~2× for visual prominence)
-            Container(
-              width: 104,
-              height: 104,
-              decoration: BoxDecoration(
-                color: const Color(0xFFC10D00).withOpacity(0.15),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFFC10D00).withOpacity(0.3),
-                  width: 1,
+            Padding(
+              padding: const EdgeInsets.only(right: 2, top: 20),
+              child: SizedBox(
+                width: 52,
+                height: 52,
+                child: Image.asset(
+                  iconAsset,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.bottomRight,
                 ),
               ),
-              padding: const EdgeInsets.all(16),
-              child: Image.asset(iconAsset, fit: BoxFit.contain),
             ),
           ],
         ),
@@ -1722,37 +1707,49 @@ class _DashboardPageState extends State<DashboardPage>
           'Compose',
           context,
           chrome,
+          applyFigmaLabelSpecs: true,
         ),
         _buildWorkflowStep(
           'assets/images/icon2.png',
           'Govern',
           context,
           chrome,
+          applyFigmaLabelSpecs: true,
         ),
         _buildWorkflowStep(
           'assets/images/icon3.png',
           'AI Risk Gate',
           context,
           chrome,
+          applyFigmaLabelSpecs: true,
         ),
         _buildWorkflowStep(
           'assets/images/icon4.png',
           'Preview',
           context,
           chrome,
+          applyFigmaLabelSpecs: true,
         ),
         _buildWorkflowStep(
           'assets/images/icon5.png',
           'Internal Sign-off',
           context,
           chrome,
+          applyFigmaLabelSpecs: true,
+          figmaLabelWidth: 102.03,
         ),
       ],
     );
   }
 
-  Widget _buildWorkflowStep(String iconAssetPath, String label, BuildContext context,
-      ManagerChromeTheme chrome) {
+  Widget _buildWorkflowStep(
+    String iconAssetPath,
+    String label,
+    BuildContext context,
+    ManagerChromeTheme chrome, {
+    bool applyFigmaLabelSpecs = false,
+    double figmaLabelWidth = 79.29,
+  }) {
     return Expanded(
       child: InkWell(
         onTap: () {
@@ -1763,27 +1760,53 @@ class _DashboardPageState extends State<DashboardPage>
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(
             children: [
-              Image.asset(
-                iconAssetPath,
+              SizedBox(
                 width: 51.92,
                 height: 51.92,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => const Icon(
-                  Icons.broken_image,
-                  color: Colors.white70,
-                  size: 28,
+                child: Center(
+                  child: Image.asset(
+                    iconAssetPath,
+                    width: 51.92,
+                    height: 51.92,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.broken_image,
+                      color: Colors.white70,
+                      size: 28,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: chrome.textPrimary,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              applyFigmaLabelSpecs
+                  ? SizedBox(
+                      width: figmaLabelWidth,
+                      height: 18.44,
+                      child: Center(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9.22,
+                            height: 9.38 / 9.22,
+                            letterSpacing: 0.0922,
+                            color: chrome.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  : Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: chrome.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
             ],
           ),
         ),
@@ -2598,15 +2621,13 @@ class _DashboardPageState extends State<DashboardPage>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
+                SizedBox(
                   width: 80,
                   height: 80,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFC10D00).withOpacity(0.12),
-                    shape: BoxShape.circle,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Image.asset(iconAsset, fit: BoxFit.contain),
                   ),
-                  padding: const EdgeInsets.all(14),
-                  child: Image.asset(iconAsset, fit: BoxFit.contain),
                 ),
                 const SizedBox(height: 10),
                 Text(
