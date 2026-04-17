@@ -994,9 +994,8 @@ class _DashboardPageState extends State<DashboardPage>
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 44,
-              height: 44,
-              padding: const EdgeInsets.all(8),
+              width: 44.87,
+              height: 44.87,
               decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
@@ -1005,8 +1004,15 @@ class _DashboardPageState extends State<DashboardPage>
                     : Border.all(color: chrome.divider, width: 1),
               ),
               child: Image.asset(
-                'assets/images/new icons for manager/messages.png',
+                'assets/images/group_398.png',
+                width: 44.87,
+                height: 44.87,
                 fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.notifications_none,
+                  size: 24,
+                  color: Colors.black87,
+                ),
               ),
             ),
             const SizedBox(width: 10),
