@@ -174,21 +174,21 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
             child: isCollapsed
                 ? Center(
                     child: Container(
-                      width: 56,
-                      height: 56,
+                      width: 62,
+                      height: 62,
                       decoration: BoxDecoration(
                         color: Colors.transparent,
                         shape: BoxShape.circle,
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(8),
                         child: Image.asset(
                           assetPath,
                           fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => const Icon(
                             Icons.image_not_supported_outlined,
                             color: Colors.white,
-                            size: 22,
+                            size: 24,
                           ),
                         ),
                       ),
@@ -206,21 +206,21 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                     child: Row(
                       children: [
                         Container(
-                          width: 50,
-                          height: 50,
+                          width: 56,
+                          height: 56,
                           decoration: BoxDecoration(
                             color: Colors.transparent,
                             shape: BoxShape.circle,
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(6),
                             child: Image.asset(
                               assetPath,
                               fit: BoxFit.contain,
                               errorBuilder: (_, __, ___) => const Icon(
                                 Icons.image_not_supported_outlined,
                                 color: Colors.white,
-                                size: 22,
+                                size: 24,
                               ),
                             ),
                           ),
@@ -857,7 +857,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                     ),
                                   ),
                                   child: const Text(
-                                    'Ver 2025.03.AA1_SIT',
+                                    'ver 2026.04.BE7_SIT',
                                     style: TextStyle(
                                       fontSize: 9,
                                       color: Colors.white70,
@@ -1286,7 +1286,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: _isSidebarCollapsed ? 80 : 240,
+      width: _isSidebarCollapsed ? 80 : 270,
       decoration: BoxDecoration(
         color: sidebarBg,
         border: Border(
@@ -1458,8 +1458,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
             child: isCollapsed
                 ? Center(
                     child: Container(
-                      width: 56,
-                      height: 56,
+                      width: 62,
+                      height: 62,
                       decoration: BoxDecoration(
                         color: selected ? activeColor : Colors.transparent,
                         shape: BoxShape.circle,
@@ -1472,7 +1472,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                           errorBuilder: (_, __, ___) => const Icon(
                             Icons.image_not_supported_outlined,
                             color: Colors.white,
-                            size: 22,
+                            size: 24,
                           ),
                         ),
                       ),
@@ -1492,8 +1492,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                     child: Row(
                       children: [
                         Container(
-                          width: 50,
-                          height: 50,
+                          width: 56,
+                          height: 56,
                           decoration: BoxDecoration(
                             color: Colors.transparent,
                             shape: BoxShape.circle,
@@ -1506,7 +1506,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                               errorBuilder: (_, __, ___) => const Icon(
                                 Icons.image_not_supported_outlined,
                                 color: Colors.white,
-                                size: 22,
+                                size: 24,
                               ),
                             ),
                           ),
@@ -1957,8 +1957,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         : isProposalsTab
             ? 'Awaiting Signature'
             : 'Recent Documents';
-    const recentDocsWidth = 520.0;
-    const recentDocsHeight = 330.0;
+    const recentDocsWidth = 580.0;
+    const recentDocsHeight = 370.0;
     final panelWidth = width ?? recentDocsWidth;
     final panelHeight = height ?? recentDocsHeight;
 
@@ -2055,8 +2055,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               Row(
                 children: [
                   SizedBox(
-                    width: 44,
-                    height: 44,
+                    width: 62,
+                    height: 62,
                     child: Image.asset(
                       recentDocumentsIconAsset,
                       fit: BoxFit.contain,
@@ -2404,8 +2404,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       'Project Chat',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -2459,8 +2459,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       maxLines: 2,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                         height: 1.15,
                       ),
                     ),
@@ -2744,7 +2744,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           ),
           alignment: Alignment.center,
           child: const Text(
-            'Ver 2025.03.AA1_SIT',
+            'ver 2026.04.BE7_SIT',
             style: TextStyle(
               fontSize: 9,
               color: Colors.white70,
@@ -3128,8 +3128,10 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
             builder: (context, constraints) {
               const rightPanelWidth = 420.0;
               final leftPanelWidth =
-                  (constraints.maxWidth - rightPanelWidth - 16)
-                      .clamp(520.0, 620.0);
+                  (constraints.maxWidth - rightPanelWidth - 16).clamp(
+                520.0,
+                constraints.maxWidth,
+              );
               final stackLowerCards = constraints.maxWidth < 980;
               if (stackLowerCards) {
                 return Column(
@@ -4442,7 +4444,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                             ),
                           ),
                           child: const Text(
-                            'Ver 2025.03.AA1_SIT',
+                            'ver 2026.04.BE7_SIT',
                             style: TextStyle(
                               fontSize: 9,
                               color: Colors.white70,
@@ -4657,7 +4659,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                             ),
                           ),
                           child: const Text(
-                            'Ver 2025.03.AA1_SIT',
+                            'ver 2026.04.BE7_SIT',
                             style: TextStyle(
                               fontSize: 9,
                               color: Colors.white70,
