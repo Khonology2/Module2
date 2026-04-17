@@ -177,18 +177,18 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: isHovering ? hoverFill : iconCircleIdle,
+                        color: Colors.transparent,
                         shape: BoxShape.circle,
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(10),
                         child: Image.asset(
                           assetPath,
                           fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => const Icon(
                             Icons.image_not_supported_outlined,
                             color: Colors.white,
-                            size: 20,
+                            size: 22,
                           ),
                         ),
                       ),
@@ -209,18 +209,18 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                            color: iconCircleIdle,
+                            color: Colors.transparent,
                             shape: BoxShape.circle,
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(8),
                             child: Image.asset(
                               assetPath,
                               fit: BoxFit.contain,
                               errorBuilder: (_, __, ___) => const Icon(
                                 Icons.image_not_supported_outlined,
                                 color: Colors.white,
-                                size: 20,
+                                size: 22,
                               ),
                             ),
                           ),
@@ -1461,22 +1461,18 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: selected
-                            ? activeColor
-                            : isHovering
-                                ? hoverFill
-                                : iconCircleIdle,
+                        color: selected ? activeColor : Colors.transparent,
                         shape: BoxShape.circle,
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(10),
                         child: Image.asset(
                           assetPath,
                           fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => const Icon(
                             Icons.image_not_supported_outlined,
                             color: Colors.white,
-                            size: 20,
+                            size: 22,
                           ),
                         ),
                       ),
@@ -1499,20 +1495,18 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                            color: selected
-                                ? Colors.white.withValues(alpha: 0.22)
-                                : iconCircleIdle,
+                            color: Colors.transparent,
                             shape: BoxShape.circle,
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(8),
                             child: Image.asset(
                               assetPath,
                               fit: BoxFit.contain,
                               errorBuilder: (_, __, ___) => const Icon(
                                 Icons.image_not_supported_outlined,
                                 color: Colors.white,
-                                size: 20,
+                                size: 22,
                               ),
                             ),
                           ),
@@ -2389,7 +2383,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       children: [
         panelCard(
           title: '',
-          fixedHeight: 128,
+          fixedHeight: 184,
           child: Row(
             children: [
               SizedBox(
@@ -2426,7 +2420,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   foregroundColor: Colors.white,
                   disabledForegroundColor: Colors.white,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -2443,7 +2437,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         const SizedBox(height: 12),
         panelCard(
           title: '',
-          fixedHeight: 136,
+          fixedHeight: 184,
           child: Row(
             children: [
               SizedBox(
@@ -2462,12 +2456,12 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   children: [
                     const Text(
                       'Download Document',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
+                        height: 1.15,
                       ),
                     ),
                   ],
@@ -2482,7 +2476,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   foregroundColor: Colors.white,
                   disabledForegroundColor: Colors.white,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
