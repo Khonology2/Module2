@@ -2299,12 +2299,6 @@ class _DashboardPageState extends State<DashboardPage>
       );
     }
 
-    final checkboxIdleBorder = selected
-        ? const Color(0xFFC10D00)
-        : (chrome.isDark
-            ? Colors.white.withOpacity(0.35)
-            : ManagerChromeTheme.textDark.withOpacity(0.35));
-
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -2324,20 +2318,30 @@ class _DashboardPageState extends State<DashboardPage>
               });
             },
             child: Container(
-              width: 22,
-              height: 22,
-              margin: const EdgeInsets.only(right: 14),
+              width: 34,
+              height: 34,
+              margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: checkboxIdleBorder,
-                  width: 2,
-                ),
-                color: selected ? const Color(0xFFC10D00) : Colors.transparent,
+                border: selected
+                    ? Border.all(
+                        color: const Color(0xFF2D9CFF),
+                        width: 1.8,
+                      )
+                    : null,
               ),
-              child: selected
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : null,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Opacity(
+                  opacity: selected ? 1 : 0.78,
+                  child: Image.asset(
+                    'assets/images/group_187.png',
+                    width: 34,
+                    height: 34,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
             ),
           ),
           Expanded(
