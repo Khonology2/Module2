@@ -1573,7 +1573,16 @@ class _DashboardPageState extends State<DashboardPage>
             ],
           ),
           const SizedBox(height: 16),
-          Container(height: 1, color: chrome.divider),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: double.infinity,
+              height: title == 'Recent Proposals' ? 0.61 : 1,
+              color: title == 'Recent Proposals'
+                  ? const Color(0xFFFFFFFF)
+                  : chrome.divider,
+            ),
+          ),
           const SizedBox(height: 14),
           child,
         ],
@@ -1968,14 +1977,18 @@ class _DashboardPageState extends State<DashboardPage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 112,
-                height: 112,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFC10D00),
-                  shape: BoxShape.circle,
+              SizedBox(
+                width: 60,
+                height: 61,
+                child: Image.asset(
+                  'assets/images/Group tick.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.check_circle,
+                    color: Colors.white,
+                    size: 56,
+                  ),
                 ),
-                child: const Icon(Icons.check, color: Colors.white, size: 56),
               ),
               const SizedBox(height: 14),
               Text(
@@ -2231,7 +2244,7 @@ class _DashboardPageState extends State<DashboardPage>
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         // Filtered Proposals List
         if (filteredProposals.isEmpty)
