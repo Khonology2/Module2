@@ -103,9 +103,9 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
   Widget _filterChip(String label, String value) {
     final selected = _dashboardDocFilter == value;
-    const chipHeight = 18.06;
+    const chipHeight = 26.0;
     const chipRadius = 20.14;
-    const chipBorderWidth = 1.23;
+    const chipBorderWidth = 1.4;
     const chipBorderColor = Color(0xFF6A6A6A);
 
     return InkWell(
@@ -118,7 +118,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       child: SizedBox(
         height: chipHeight,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: selected
                 ? const Color(0xFFC10D00)
@@ -131,14 +131,16 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           child: Center(
             child: Text(
               label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1,
+                color: selected
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.75),
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 7.5,
-                fontWeight: FontWeight.w700,
-                height: 1.0,
-              ),
             ),
           ),
         ),
@@ -1781,7 +1783,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     }).length;
     final pendingApprovalsCount = pendingSignatureCount;
 
-    const tileWidth = 320.0;
     const tileHeight = 102.64;
 
     Widget tile({
@@ -1791,7 +1792,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       required String iconAssetPath,
     }) {
       return Container(
-        width: tileWidth,
         height: tileHeight,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
@@ -1854,26 +1854,12 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               ),
             ),
             const SizedBox(width: 12),
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    offset: const Offset(0, 1),
-                    blurRadius: 2,
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Image.asset(
-                  iconAssetPath,
-                  fit: BoxFit.contain,
-                ),
+            SizedBox(
+              width: 68,
+              height: 68,
+              child: Image.asset(
+                iconAssetPath,
+                fit: BoxFit.contain,
               ),
             ),
           ],
@@ -1903,19 +1889,36 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       ),
     ];
 
-    // Figma: three blocks side-by-side, 306.62 × 102.64 each; scroll horizontally if needed.
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          children[0],
-          const SizedBox(width: 12),
-          children[1],
-          const SizedBox(width: 12),
-          children[2],
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 920;
+        if (!wide) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 320, child: children[0]),
+                const SizedBox(width: 12),
+                SizedBox(width: 320, child: children[1]),
+                const SizedBox(width: 12),
+                SizedBox(width: 320, child: children[2]),
+              ],
+            ),
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: children[0]),
+            const SizedBox(width: 12),
+            Expanded(child: children[1]),
+            const SizedBox(width: 12),
+            Expanded(child: children[2]),
+          ],
+        );
+      },
     );
   }
 
@@ -2340,6 +2343,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     }) {
       final showTitle = title.trim().isNotEmpty;
       final card = Container(
+        width: double.infinity,
         clipBehavior: Clip.antiAlias,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -2374,31 +2378,26 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       );
 
       if (fixedHeight != null) {
-        return SizedBox(height: fixedHeight, child: card);
+        return SizedBox(
+            height: fixedHeight, width: double.infinity, child: card);
       }
       return card;
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         panelCard(
           title: '',
           fixedHeight: 128,
           child: Row(
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Image.asset(
-                    'assets/images/client_icons/HR_Team Management_White Badge_Red.png',
-                    fit: BoxFit.contain,
-                  ),
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: Image.asset(
+                  'assets/images/client_icons/HR_Team Management_White Badge_Red.png',
+                  fit: BoxFit.contain,
                 ),
               ),
               const SizedBox(width: 16),
@@ -2411,7 +2410,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       'Project Chat',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: 17,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -2427,12 +2426,16 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   foregroundColor: Colors.white,
                   disabledForegroundColor: Colors.white,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
-                child: const Text('OPEN COMMENTS'),
+                child: const Text(
+                  'OPEN COMMENTS',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -2440,22 +2443,15 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         const SizedBox(height: 12),
         panelCard(
           title: '',
-          fixedHeight: 120,
+          fixedHeight: 136,
           child: Row(
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Image.asset(
-                    'assets/images/client_icons/Download_Arrow_White Badge_Red.png',
-                    fit: BoxFit.contain,
-                  ),
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: Image.asset(
+                  'assets/images/client_icons/Download_Arrow_White Badge_Red.png',
+                  fit: BoxFit.contain,
                 ),
               ),
               const SizedBox(width: 16),
@@ -2470,7 +2466,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: 17,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -2486,12 +2482,16 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   foregroundColor: Colors.white,
                   disabledForegroundColor: Colors.white,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
-                child: const Text('DOWNLOAD PDF'),
+                child: const Text(
+                  'DOWNLOAD PDF',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
