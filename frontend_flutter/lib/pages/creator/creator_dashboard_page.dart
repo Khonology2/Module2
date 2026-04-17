@@ -1708,16 +1708,41 @@ class _DashboardPageState extends State<DashboardPage>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildWorkflowStep('1', 'Compose', context, chrome),
-        _buildWorkflowStep('2', 'Govern', context, chrome),
-        _buildWorkflowStep('3', 'AI Risk Gate', context, chrome),
-        _buildWorkflowStep('4', 'Preview', context, chrome),
-        _buildWorkflowStep('5', 'Internal Sign-off', context, chrome),
+        _buildWorkflowStep(
+          'assets/images/icon1.png',
+          'Compose',
+          context,
+          chrome,
+        ),
+        _buildWorkflowStep(
+          'assets/images/icon2.png',
+          'Govern',
+          context,
+          chrome,
+        ),
+        _buildWorkflowStep(
+          'assets/images/icon3.png',
+          'AI Risk Gate',
+          context,
+          chrome,
+        ),
+        _buildWorkflowStep(
+          'assets/images/icon4.png',
+          'Preview',
+          context,
+          chrome,
+        ),
+        _buildWorkflowStep(
+          'assets/images/icon5.png',
+          'Internal Sign-off',
+          context,
+          chrome,
+        ),
       ],
     );
   }
 
-  Widget _buildWorkflowStep(String number, String label, BuildContext context,
+  Widget _buildWorkflowStep(String iconAssetPath, String label, BuildContext context,
       ManagerChromeTheme chrome) {
     return Expanded(
       child: InkWell(
@@ -1729,22 +1754,15 @@ class _DashboardPageState extends State<DashboardPage>
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(
             children: [
-              Container(
-                width: 96,
-                height: 96,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFC10D00),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    number,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 34,
-                    ),
-                  ),
+              Image.asset(
+                iconAssetPath,
+                width: 51.92,
+                height: 51.92,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.broken_image,
+                  color: Colors.white70,
+                  size: 28,
                 ),
               ),
               const SizedBox(height: 8),
@@ -2338,14 +2356,11 @@ class _DashboardPageState extends State<DashboardPage>
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: Opacity(
-                  opacity: selected ? 1 : 0.78,
-                  child: Image.asset(
-                    'assets/images/group_187.png',
-                    width: 34,
-                    height: 34,
-                    fit: BoxFit.cover,
-                  ),
+                child: Image.asset(
+                  'assets/images/group_187.png',
+                  width: 34,
+                  height: 34,
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
