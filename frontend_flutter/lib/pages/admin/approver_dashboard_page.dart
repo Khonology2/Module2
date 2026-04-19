@@ -1,6 +1,7 @@
 // ignore_for_file: unused_field, unused_element, unused_local_variable, deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'dart:ui' show FontFeature;
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -440,6 +441,7 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
               'assets/images/Admin_new_icons/Proposal_Pending_Your_Approvals.png',
           titleBadge: _pendingApprovals.length,
           useFigmaSizes: useTwoColumnLayout,
+          showHeaderListDivider: true,
         ),
       ],
     );
@@ -1136,10 +1138,29 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
   static const EdgeInsets _pendingPillPadding =
       EdgeInsets.fromLTRB(15.69, 11.77, 15.69, 11.77);
   static const double _pendingPillGap = 7.84;
+
+  /// Figma: REVIEW / APPROVE / REJECT in each pending-approval row (fixed pill box).
+  static const double _figmaPendingRowActionH = 23;
+  static const double _figmaPendingRowReviewW = 58;
+  static const double _figmaPendingRowApproveW = 68;
+  static const double _figmaPendingRowRejectW = 68;
+
+  /// Figma "Line 23": divider between pending-approval rows.
+  static const double _figmaPendingListDividerThickness = 0.61;
+  static const double _figmaPendingListRowIconSize = 22;
+  static const String _assetPendingApprovalRowIcon =
+      'assets/images/Admin_new_icons/Group522.png';
+  /// Section header bell (Proposals Pending Your Approval) — from Figma asset.
+  static const String _assetSectionNotificationBell =
+      'assets/images/Admin_new_icons/Group3988.png';
   static const double _headerActionPillWidth = 68;
   static const Color _pendingReviewBg = Color(0xFF7F7F7F);
   static const Color _pendingApproveBg = Color(0xFF6CA510);
   static const Color _pendingRejectBg = Color(0xFFC10D00);
+
+  /// Figma: primary line in each pending-approval row ("Name - Short description").
+  static const double _figmaPendingRowTitleSize = 9.22;
+  static const double _figmaPendingRowTitleLineHeight = 9.38;
 
   /// Figma admin left/right panel boxes (wide layout).
   static const double _figmaAdminPanelRadius = 5.32;
@@ -1149,6 +1170,18 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
   static const double _figmaPendingSectionH = 312.6899721020658;
   static const double _figmaRecentPanelW = 468.9003296495665;
   static const double _figmaRecentPanelH = 404.86380012083833;
+
+  TextStyle _pendingApprovalRowTitleStyle(ManagerChromeTheme chrome) {
+    return TextStyle(
+      color: chrome.textPrimary,
+      fontFamily: 'Poppins',
+      fontSize: _figmaPendingRowTitleSize,
+      fontWeight: FontWeight.w700,
+      height: _figmaPendingRowTitleLineHeight / _figmaPendingRowTitleSize,
+      letterSpacing: _figmaPendingRowTitleSize * 0.01,
+      fontFeatures: const [FontFeature.enable('smcp')],
+    );
+  }
 
   Widget _buildDarkGlass({
     required ManagerChromeTheme chrome,
@@ -1164,12 +1197,13 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
   }
 
   /// Mock: coloured asset on a **white** disc (CEO / section / Recent Proposals).
+  /// Inset kept small so the glyph fills the ring like Figma (not dominated by white).
   Widget _buildAdminPanelWhiteIconRing({
     required ManagerChromeTheme chrome,
     required Widget child,
     double diameter = 80,
   }) {
-    final pad = diameter * 0.15;
+    final pad = diameter * 0.07;
     return Container(
       width: diameter,
       height: diameter,
@@ -1217,7 +1251,8 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     ManagerChromeTheme chrome, {
     double size = 48,
   }) {
-    final iconSize = (22 * size / 48).clamp(16.0, 22.0);
+    // Large fraction of the white disc so the raster reads clearly (inscribed square ~70% of ⌀).
+    final iconSize = (size * 0.72).clamp(24.0, 40.0);
     return SizedBox(
       width: size,
       height: size,
@@ -1241,10 +1276,16 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
               ],
             ),
             alignment: Alignment.center,
-            child: Icon(
-              Icons.notifications_none_rounded,
-              color: ManagerChromeTheme.textDark,
-              size: iconSize,
+            child: ClipOval(
+              child: SizedBox(
+                width: iconSize,
+                height: iconSize,
+                child: Image.asset(
+                  _assetSectionNotificationBell,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
+                ),
+              ),
             ),
           ),
           Positioned(
@@ -1989,7 +2030,8 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
           ),
           const SizedBox(width: 4),
           _buildPendingApprovalActionPill(
-            width: 58,
+            width: _figmaPendingRowReviewW,
+            height: _figmaPendingRowActionH,
             backgroundColor: _pendingReviewBg,
             label: 'REVIEW',
             onTap: () => _openProposal(p),
@@ -2293,6 +2335,7 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     String? titleIconAsset,
     int? titleBadge,
     bool useFigmaSizes = false,
+    bool showHeaderListDivider = false,
   }) {
     final compact = MediaQuery.sizeOf(context).height < 860;
     final radius = useFigmaSizes ? _figmaAdminPanelRadius : 24.0;
@@ -2301,6 +2344,10 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
         : EdgeInsets.all(compact ? 18 : 24);
     final sectionIconDiameter = useFigmaSizes ? 52.0 : 72.0;
     final gapAfterHeader = useFigmaSizes ? 10.0 : (compact ? 12.0 : 20.0);
+    final gapBeforeHeaderDivider =
+        useFigmaSizes ? 10.0 : (compact ? 12.0 : 16.0);
+    final gapAfterHeaderDivider =
+        useFigmaSizes ? 10.0 : (compact ? 12.0 : 16.0);
 
     final header = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -2345,6 +2392,16 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
           )
         : content;
 
+    final List<Widget> belowHeader = showHeaderListDivider
+        ? [
+            SizedBox(height: gapBeforeHeaderDivider),
+            _buildPendingListDivider(),
+            SizedBox(height: gapAfterHeaderDivider),
+          ]
+        : [
+            SizedBox(height: gapAfterHeader),
+          ];
+
     Widget inner = _buildDarkGlass(
       chrome: chrome,
       borderRadius: radius,
@@ -2354,7 +2411,7 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 header,
-                SizedBox(height: gapAfterHeader),
+                ...belowHeader,
                 body,
               ],
             )
@@ -2362,7 +2419,7 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 header,
-                SizedBox(height: gapAfterHeader),
+                ...belowHeader,
                 content,
               ],
             ),
@@ -2621,8 +2678,12 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     final shown = _pendingApprovals.take(maxItems).toList();
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ...shown.map((p) => _buildPendingApprovalCard(chrome, p)),
+        for (var i = 0; i < shown.length; i++) ...[
+          if (i > 0) _buildPendingListDivider(),
+          _buildPendingApprovalCard(chrome, shown[i]),
+        ],
         if (_pendingApprovals.length > shown.length)
           Align(
             alignment: Alignment.centerRight,
@@ -2666,45 +2727,75 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
 
   /// Padding inside decoration. If [width] is set, outer width is fixed (border-box).
   /// If [width] is null, width is intrinsic (at least min touch width for short labels).
+  /// When [height] is set with [width], uses compact Figma row buttons (23px tall).
   Widget _buildPendingApprovalActionPill({
     double? width,
+    double? height,
     required Color backgroundColor,
     required String label,
     required VoidCallback onTap,
   }) {
-    final pillBody = Padding(
-      padding: _pendingPillPadding,
-      child: Center(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            label,
-            maxLines: 1,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.15,
-              fontFamily: 'Poppins',
+    final compactRow = width != null && height != null;
+    final double radius;
+    if (width != null && height != null) {
+      radius = height / 2;
+    } else {
+      radius = _pendingPillRadius;
+    }
+
+    // Do not use unbounded [Center] in header pills (no fixed height): see compactRow branch.
+    final Widget pillBody = compactRow
+        ? Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                maxLines: 1,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.08,
+                  height: 1.0,
+                  fontFamily: 'Poppins',
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
-    );
+          )
+        : Padding(
+            padding: _pendingPillPadding,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Text(
+                label,
+                maxLines: 1,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.15,
+                  fontFamily: 'Poppins',
+                ),
+              ),
+            ),
+          );
 
     final inkDecoration = BoxDecoration(
       color: backgroundColor,
-      borderRadius: BorderRadius.circular(_pendingPillRadius),
+      borderRadius: BorderRadius.circular(radius),
     );
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(_pendingPillRadius),
+        borderRadius: BorderRadius.circular(radius),
         child: width != null
             ? Ink(
                 width: width,
+                height: height,
                 decoration: inkDecoration,
                 child: pillBody,
               )
@@ -2721,113 +2812,68 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     );
   }
 
+  Widget _buildPendingListDivider() {
+    return Container(
+      height: _figmaPendingListDividerThickness,
+      width: double.infinity,
+      color: Colors.white,
+    );
+  }
+
+  /// Single-line row on the section panel (no nested glass card — avoids the bulky light panel).
   Widget _buildPendingApprovalCard(
     ManagerChromeTheme chrome,
     Map<String, dynamic> proposal,
   ) {
-    final submittedDate = proposal['updated_at'] != null
-        ? DateTime.tryParse(proposal['updated_at'].toString())
-        : null;
-    final value = proposal['budget'] ??
-        proposal['amount'] ??
-        proposal['value'] ??
-        proposal['proposal_value'] ??
-        proposal['deal_value'] ??
-        proposal['total_value'] ??
-        proposal['pipeline_value'];
-    final client = proposal['client_name'] ?? proposal['client'] ?? 'Unknown';
-
-    final compact = MediaQuery.sizeOf(context).height < 860;
     return Padding(
-      padding: EdgeInsets.only(bottom: compact ? 12 : 16),
-      child: _buildDarkGlass(
-        chrome: chrome,
-        borderRadius: 16,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  margin: const EdgeInsets.only(top: 2, right: 12),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFC10D00),
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    proposal['title'] ?? 'Untitled Proposal',
-                    style: TextStyle(
-                      color: chrome.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                      fontFamily: 'Poppins',
-                    ),
-                  ),
-                ),
-              ],
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: SizedBox(
+              width: _figmaPendingListRowIconSize,
+              height: _figmaPendingListRowIconSize,
+              child: Image.asset(
+                _assetPendingApprovalRowIcon,
+                fit: BoxFit.contain,
+              ),
             ),
-            SizedBox(height: compact ? 10 : 12),
-            Row(
-              children: [
-                _buildInfoChip(chrome, Icons.business, client),
-                SizedBox(width: compact ? 8 : 12),
-                _buildInfoChip(
-                  chrome,
-                  Icons.calendar_today,
-                  submittedDate != null
-                      ? DateFormat('dd MMM yyyy').format(submittedDate)
-                      : 'Unknown',
-                ),
-                if (_parseBudget(value) > 0) ...[
-                  SizedBox(width: compact ? 8 : 12),
-                  _buildInfoChip(
-                    chrome,
-                    Icons.attach_money,
-                    _formatCurrency(_parseBudget(value)),
-                  ),
-                ],
-              ],
+          ),
+          Expanded(
+            child: Text(
+              proposal['title'] ?? 'Untitled Proposal',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: _pendingApprovalRowTitleStyle(chrome),
             ),
-            SizedBox(height: compact ? 12 : 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _buildPendingApprovalActionPill(
-                  width: 58,
-                  backgroundColor: _pendingReviewBg,
-                  label: 'REVIEW',
-                  onTap: () => _openProposal(proposal),
-                ),
-                const SizedBox(width: _pendingPillGap),
-                _buildPendingApprovalActionPill(
-                  width: 68,
-                  backgroundColor: _pendingApproveBg,
-                  label: 'APPROVE',
-                  onTap: () => _approveProposal(proposal),
-                ),
-                const SizedBox(width: _pendingPillGap),
-                _buildPendingApprovalActionPill(
-                  width: 68,
-                  backgroundColor: _pendingRejectBg,
-                  label: 'REJECT',
-                  onTap: () => _rejectProposal(proposal),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          _buildPendingApprovalActionPill(
+            width: _figmaPendingRowReviewW,
+            height: _figmaPendingRowActionH,
+            backgroundColor: _pendingReviewBg,
+            label: 'REVIEW',
+            onTap: () => _openProposal(proposal),
+          ),
+          const SizedBox(width: _pendingPillGap),
+          _buildPendingApprovalActionPill(
+            width: _figmaPendingRowApproveW,
+            height: _figmaPendingRowActionH,
+            backgroundColor: _pendingApproveBg,
+            label: 'APPROVE',
+            onTap: () => _approveProposal(proposal),
+          ),
+          const SizedBox(width: _pendingPillGap),
+          _buildPendingApprovalActionPill(
+            width: _figmaPendingRowRejectW,
+            height: _figmaPendingRowActionH,
+            backgroundColor: _pendingRejectBg,
+            label: 'REJECT',
+            onTap: () => _rejectProposal(proposal),
+          ),
+        ],
       ),
     );
   }
