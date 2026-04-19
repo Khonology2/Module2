@@ -996,20 +996,19 @@ class _DashboardPageState extends State<DashboardPage>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: chrome.isDark
-                    ? null
-                    : Border.all(color: chrome.divider, width: 1),
-              ),
+            SizedBox(
+              width: 44.87,
+              height: 44.87,
               child: Image.asset(
-                'assets/images/new icons for manager/messages.png',
+                'assets/images/group_398.png',
+                width: 44.87,
+                height: 44.87,
                 fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.notifications_none,
+                  size: 24,
+                  color: Colors.black87,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -1496,20 +1495,13 @@ class _DashboardPageState extends State<DashboardPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (iconAsset != null) ...[
-                Container(
+                SizedBox(
                   width: 80,
                   height: 80,
-                  decoration: BoxDecoration(
-                    color: iconOnWhiteCircle
-                        ? Colors.white
-                        : const Color(0xFFC10D00).withOpacity(0.15),
-                    shape: BoxShape.circle,
-                    border: iconOnWhiteCircle && !chrome.isDark
-                        ? Border.all(color: chrome.divider, width: 1)
-                        : null,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Image.asset(iconAsset, fit: BoxFit.contain),
                   ),
-                  padding: const EdgeInsets.all(12),
-                  child: Image.asset(iconAsset, fit: BoxFit.contain),
                 ),
                 const SizedBox(width: 14),
               ],
@@ -1570,7 +1562,16 @@ class _DashboardPageState extends State<DashboardPage>
             ],
           ),
           const SizedBox(height: 16),
-          Container(height: 1, color: chrome.divider),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: double.infinity,
+              height: title == 'Recent Proposals' ? 0.61 : 1,
+              color: title == 'Recent Proposals'
+                  ? const Color(0xFFFFFFFF)
+                  : chrome.divider,
+            ),
+          ),
           const SizedBox(height: 14),
           child,
         ],
@@ -1643,6 +1644,7 @@ class _DashboardPageState extends State<DashboardPage>
         padding: const EdgeInsets.all(16),
         decoration: chrome.floatingPanelDecoration(radius: 10),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             // Text info
             Expanded(
@@ -1684,10 +1686,10 @@ class _DashboardPageState extends State<DashboardPage>
               width: 84,
               height: 84,
               decoration: BoxDecoration(
-                color: const Color(0xFFC10D00).withOpacity(0.15),
+                color: const Color(0xFFC10D00).withValues(alpha: 0.15),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: const Color(0xFFC10D00).withOpacity(0.3),
+                  color: const Color(0xFFC10D00).withValues(alpha: 0.30),
                   width: 1,
                 ),
               ),
@@ -1704,17 +1706,54 @@ class _DashboardPageState extends State<DashboardPage>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildWorkflowStep('1', 'Compose', context, chrome),
-        _buildWorkflowStep('2', 'Govern', context, chrome),
-        _buildWorkflowStep('3', 'AI Risk Gate', context, chrome),
-        _buildWorkflowStep('4', 'Preview', context, chrome),
-        _buildWorkflowStep('5', 'Internal Sign-off', context, chrome),
+        _buildWorkflowStep(
+          'assets/images/icon1.png',
+          'Compose',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+        ),
+        _buildWorkflowStep(
+          'assets/images/icon2.png',
+          'Govern',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+        ),
+        _buildWorkflowStep(
+          'assets/images/icon3.png',
+          'AI Risk Gate',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+        ),
+        _buildWorkflowStep(
+          'assets/images/icon4.png',
+          'Preview',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+        ),
+        _buildWorkflowStep(
+          'assets/images/icon5.png',
+          'Internal Sign-off',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+          figmaLabelWidth: 102.03,
+        ),
       ],
     );
   }
 
-  Widget _buildWorkflowStep(String number, String label, BuildContext context,
-      ManagerChromeTheme chrome) {
+  Widget _buildWorkflowStep(
+    String iconAssetPath,
+    String label,
+    BuildContext context,
+    ManagerChromeTheme chrome, {
+    bool applyFigmaLabelSpecs = false,
+    double figmaLabelWidth = 79.29,
+  }) {
     return Expanded(
       child: InkWell(
         onTap: () {
@@ -1725,34 +1764,53 @@ class _DashboardPageState extends State<DashboardPage>
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(
             children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFC10D00),
-                  shape: BoxShape.circle,
-                ),
+              SizedBox(
+                width: 51.92,
+                height: 51.92,
                 child: Center(
-                  child: Text(
-                    number,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 28,
+                  child: Image.asset(
+                    iconAssetPath,
+                    width: 51.92,
+                    height: 51.92,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.broken_image,
+                      color: Colors.white70,
+                      size: 28,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: chrome.textPrimary,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              const SizedBox(height: 8),
+              applyFigmaLabelSpecs
+                  ? SizedBox(
+                      width: figmaLabelWidth,
+                      height: 18.44,
+                      child: Center(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9.22,
+                            height: 9.38 / 9.22,
+                            letterSpacing: 0.0922,
+                            color: chrome.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  : Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: chrome.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
             ],
           ),
         ),
@@ -1946,14 +2004,18 @@ class _DashboardPageState extends State<DashboardPage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 112,
-                height: 112,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFC10D00),
-                  shape: BoxShape.circle,
+              SizedBox(
+                width: 60,
+                height: 61,
+                child: Image.asset(
+                  'assets/images/Group tick.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.check_circle,
+                    color: Colors.white,
+                    size: 56,
+                  ),
                 ),
-                child: const Icon(Icons.check, color: Colors.white, size: 56),
               ),
               const SizedBox(height: 14),
               Text(
@@ -2211,7 +2273,7 @@ class _DashboardPageState extends State<DashboardPage>
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         // Filtered Proposals List
         if (filteredProposals.isEmpty)
@@ -2311,12 +2373,6 @@ class _DashboardPageState extends State<DashboardPage>
       );
     }
 
-    final checkboxIdleBorder = selected
-        ? const Color(0xFFC10D00)
-        : (chrome.isDark
-            ? Colors.white.withOpacity(0.35)
-            : ManagerChromeTheme.textDark.withOpacity(0.35));
-
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -2336,20 +2392,27 @@ class _DashboardPageState extends State<DashboardPage>
               });
             },
             child: Container(
-              width: 22,
-              height: 22,
-              margin: const EdgeInsets.only(right: 14),
+              width: 34,
+              height: 34,
+              margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: checkboxIdleBorder,
-                  width: 2,
-                ),
-                color: selected ? const Color(0xFFC10D00) : Colors.transparent,
+                border: selected
+                    ? Border.all(
+                        color: const Color(0xFF2D9CFF),
+                        width: 1.8,
+                      )
+                    : null,
               ),
-              child: selected
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : null,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.asset(
+                  'assets/images/group_187.png',
+                  width: 34,
+                  height: 34,
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
           ),
           Expanded(
@@ -2572,15 +2635,13 @@ class _DashboardPageState extends State<DashboardPage>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
+                SizedBox(
                   width: 80,
                   height: 80,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFC10D00).withOpacity(0.12),
-                    shape: BoxShape.circle,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Image.asset(iconAsset, fit: BoxFit.contain),
                   ),
-                  padding: const EdgeInsets.all(14),
-                  child: Image.asset(iconAsset, fit: BoxFit.contain),
                 ),
                 const SizedBox(height: 10),
                 Text(
