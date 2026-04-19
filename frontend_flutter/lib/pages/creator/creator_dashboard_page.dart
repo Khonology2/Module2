@@ -946,9 +946,9 @@ class _DashboardPageState extends State<DashboardPage>
           onTap: onTap,
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            width: 80,
-            height: 80,
-            padding: const EdgeInsets.all(14),
+            width: 64,
+            height: 64,
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: chrome.floatingFill,
               shape: BoxShape.circle,
@@ -958,8 +958,8 @@ class _DashboardPageState extends State<DashboardPage>
         ),
         if (badge != null && badge > 0)
           Positioned(
-            right: 4,
-            top: 4,
+            right: 2,
+            top: 2,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: const BoxDecoration(
@@ -1680,10 +1680,9 @@ class _DashboardPageState extends State<DashboardPage>
               ),
             ),
             const SizedBox(width: 8),
-            // Icon (~2× for visual prominence)
             Container(
-              width: 104,
-              height: 104,
+              width: 84,
+              height: 84,
               decoration: BoxDecoration(
                 color: const Color(0xFFC10D00).withOpacity(0.15),
                 shape: BoxShape.circle,
@@ -1692,7 +1691,7 @@ class _DashboardPageState extends State<DashboardPage>
                   width: 1,
                 ),
               ),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               child: Image.asset(iconAsset, fit: BoxFit.contain),
             ),
           ],
@@ -1723,12 +1722,12 @@ class _DashboardPageState extends State<DashboardPage>
         },
         borderRadius: BorderRadius.circular(10),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(
             children: [
               Container(
-                width: 96,
-                height: 96,
+                width: 72,
+                height: 72,
                 decoration: const BoxDecoration(
                   color: Color(0xFFC10D00),
                   shape: BoxShape.circle,
@@ -1739,16 +1738,16 @@ class _DashboardPageState extends State<DashboardPage>
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
-                      fontSize: 34,
+                      fontSize: 28,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12,
                   color: chrome.textPrimary,
                   fontWeight: FontWeight.w500,
                 ),
@@ -2236,7 +2235,8 @@ class _DashboardPageState extends State<DashboardPage>
             height: listMaxHeight,
             child: ListView.builder(
               padding: EdgeInsets.zero,
-              itemCount: filteredProposals.length > 5 ? 5 : filteredProposals.length,
+              itemCount:
+                  filteredProposals.length > 5 ? 5 : filteredProposals.length,
               itemBuilder: (context, index) {
                 final proposal = filteredProposals[index];
                 String status = proposal['status'] ?? 'Draft';

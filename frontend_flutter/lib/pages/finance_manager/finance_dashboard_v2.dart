@@ -106,8 +106,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       '$_financeIconDir/Top clients by rev_intab.png';
   static const String _recentSignedInTabIcon =
       '$_financeIconDir/Recent_signed_deals_intab.png';
-  static const double _adminLikeIconDiameter = 80.0;
-  static const double _adminLikeIconPadding = 14.0;
+  static const double _adminLikeIconDiameter = 72.0;
+  static const double _adminLikeIconPadding = 12.0;
 
   BoxDecoration _panelDecoration() => BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -2244,8 +2244,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       clipBehavior: Clip.none,
       children: [
         SizedBox(
-          width: 44,
-          height: 44,
+          width: 40,
+          height: 40,
           child: IconButton(
             tooltip: 'Notifications',
             icon: Icon(
@@ -2253,6 +2253,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   ? Icons.notifications_active
                   : Icons.notifications_none,
               color: Colors.white,
+              size: 20,
             ),
             onPressed: () async {
               await app.fetchNotifications();
@@ -2263,8 +2264,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
         ),
         if (unread > 0)
           Positioned(
-            right: 6,
-            top: 6,
+            right: 2,
+            top: 2,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: const BoxDecoration(

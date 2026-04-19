@@ -215,8 +215,8 @@ class _FinanceSidebarNavItem extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
                       color: base.withValues(alpha: 0.25),
                       shape: BoxShape.circle,
@@ -231,7 +231,7 @@ class _FinanceSidebarNavItem extends StatelessWidget {
                     child: Icon(
                       icon,
                       color: isActive ? Colors.white : Colors.white70,
-                      size: 22,
+                      size: 20,
                     ),
                   ),
                   if (badge != null)
@@ -290,8 +290,8 @@ class _FinanceSidebarNavItem extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: base.withValues(alpha: 0.25),
                     shape: BoxShape.circle,
@@ -306,7 +306,7 @@ class _FinanceSidebarNavItem extends StatelessWidget {
                   child: Icon(
                     icon,
                     color: isActive ? Colors.white : const Color(0xFFECF0F1),
-                    size: 20,
+                    size: 19,
                   ),
                 ),
                 const SizedBox(width: 12),
