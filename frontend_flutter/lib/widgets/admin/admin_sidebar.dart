@@ -12,6 +12,7 @@ class AdminSidebar extends StatelessWidget {
     required this.onToggle,
     required this.onSelect,
     this.bottomLabel = 'Logout',
+
     /// When set (e.g. admin dashboard + manager theme), sidebar and nav
     /// chrome follow light/dark manager spec instead of legacy fixed dark UI.
     this.managerChrome,
@@ -52,12 +53,12 @@ class AdminSidebar extends StatelessWidget {
     _AdminNavItem(
       pageLabel: 'Content Library',
       displayLabel: 'Content History',
-      assetPath: 'assets/images/admin_side bar/Admin_sidebar_content_library.png',
+      assetPath:
+          'assets/images/admin_side bar/Admin_sidebar_content_library.png',
     ),
   ];
 
-  Color _sidebarBg(ManagerChromeTheme? c) =>
-      c?.sidebarBackground ?? _adminBase;
+  Color _sidebarBg(ManagerChromeTheme? c) => c?.sidebarBackground ?? _adminBase;
 
   Color _sidebarBorder(ManagerChromeTheme? c) =>
       c?.sidebarRightBorder ?? const Color(0x24FFFFFF);
@@ -426,8 +427,9 @@ class _AdminSidebarNavItem extends StatelessWidget {
         child: Icon(
           iconData,
           size: 20,
-          color:
-              active ? Colors.white : (managerChrome?.textPrimary ?? Colors.white),
+          color: active
+              ? Colors.white
+              : (managerChrome?.textPrimary ?? Colors.white),
         ),
       ),
     );

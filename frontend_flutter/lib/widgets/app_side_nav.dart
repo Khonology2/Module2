@@ -327,7 +327,8 @@ class _AppSideNavState extends State<AppSideNav> {
       onExit: (_) => setState(() => _hoveringItem = null),
       child: Padding(
         padding: isCollapsed
-            ? EdgeInsets.symmetric(vertical: veryCompact ? 2 : (compact ? 3 : 5))
+            ? EdgeInsets.symmetric(
+                vertical: veryCompact ? 2 : (compact ? 3 : 5))
             : EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: veryCompact ? 1 : (compact ? 2 : 4),
@@ -394,7 +395,8 @@ class _AppSideNavState extends State<AppSideNav> {
               shape: BoxShape.circle,
             ),
             padding: EdgeInsets.all(veryCompact ? 7 : (compact ? 8 : 9)),
-            child: AssetService.buildImageWidget(assetPath, fit: BoxFit.contain),
+            child:
+                AssetService.buildImageWidget(assetPath, fit: BoxFit.contain),
           ),
           SizedBox(width: veryCompact ? 10 : (compact ? 12 : 14)),
           Expanded(

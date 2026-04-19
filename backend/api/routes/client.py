@@ -498,7 +498,7 @@ def _lookup_invitation_by_token(cursor, token: str):
         sql.SQL(
             """
             SELECT proposal_id, {email_col} as invited_email, {expires_col} as expires_at
-            FROM collaboration_invitations
+            FROM public.collaboration_invitations
             WHERE {token_col} = %s
             """
         ).format(
@@ -743,13 +743,6 @@ def start_client_device_session():
             _ensure_client_device_session_schema(cursor)
 
             invitation_token = _resolve_invitation_token(cursor, token)
-            try:
-                tok_preview = invitation_token or ''
-                if len(tok_preview) > 12:
-                    tok_preview = tok_preview[:12] + '...'
-                print(f"[CLIENT_PORTAL] resolved_invitation_token={tok_preview or '∅'}")
-            except Exception:
-                pass
             invitation, err, code = _lookup_invitation_by_token(cursor, invitation_token)
             if err:
                 return err, code
@@ -1406,7 +1399,7 @@ def get_client_proposals():
                 sql.SQL(
                     """
                     SELECT proposal_id, {email_col} as invited_email, {expires_col} as expires_at
-                    FROM collaboration_invitations
+                    FROM public.collaboration_invitations
                     WHERE {token_col} = %s
                     """
                 ).format(
@@ -1689,7 +1682,7 @@ def add_client_comment(proposal_id):
             cursor.execute(
                 """
                 SELECT invited_email, expires_at
-                FROM collaboration_invitations
+                FROM public.collaboration_invitations
                 WHERE access_token = %s
                 """,
                 (invitation_token,),
@@ -1779,7 +1772,7 @@ def client_approve_proposal(proposal_id):
             # Verify token
             cursor.execute("""
                 SELECT invited_email, expires_at
-                FROM collaboration_invitations
+                FROM public.collaboration_invitations
                 WHERE access_token = %s
             """, (invitation_token,))
             
@@ -1818,7 +1811,7 @@ def client_approve_proposal(proposal_id):
                        {client_name_expr} AS client_name,
                        {client_email_expr} AS client_email
                 FROM proposals p
-                LEFT JOIN collaboration_invitations ci ON ci.proposal_id = p.id AND ci.access_token = %s
+                LEFT JOIN public.collaboration_invitations ci ON ci.proposal_id = p.id AND ci.access_token = %s
                 WHERE p.id = %s AND (ci.invited_email = %s OR ci.access_token = %s)
             """
 
@@ -2006,7 +1999,7 @@ def client_reject_proposal(proposal_id):
             # Verify token
             cursor.execute("""
                 SELECT invited_email, expires_at
-                FROM collaboration_invitations
+                FROM public.collaboration_invitations
                 WHERE access_token = %s
             """, (invitation_token,))
             
@@ -2044,7 +2037,7 @@ def client_reject_proposal(proposal_id):
                 UPDATE proposals 
                 SET status = 'Client Declined', updated_at = NOW()
                 WHERE id = %s AND id IN (
-                    SELECT proposal_id FROM collaboration_invitations 
+                    SELECT proposal_id FROM public.collaboration_invitations 
                     WHERE access_token = %s AND proposal_id = %s
                 )
                 RETURNING id, title
@@ -2114,7 +2107,7 @@ def get_client_signing_url(proposal_id):
             # Verify token and get client email
             cursor.execute("""
                 SELECT invited_email, expires_at
-                FROM collaboration_invitations
+                FROM public.collaboration_invitations
                 WHERE access_token = %s
             """, (invitation_token,))
             
@@ -2153,7 +2146,7 @@ def get_client_signing_url(proposal_id):
                        {client_name_expr} AS client_name,
                        {client_email_expr} AS client_email
                 FROM proposals p
-                LEFT JOIN collaboration_invitations ci ON ci.proposal_id = p.id AND ci.access_token = %s
+                LEFT JOIN public.collaboration_invitations ci ON ci.proposal_id = p.id AND ci.access_token = %s
                 WHERE p.id = %s AND (ci.invited_email = %s OR ci.access_token = %s)
             """
 
@@ -2351,7 +2344,7 @@ def client_sign_proposal_token(proposal_id=None):
                 sql.SQL(
                     """
                     SELECT proposal_id, {email_col} as invited_email, {expires_col} as expires_at
-                    FROM collaboration_invitations
+                    FROM public.collaboration_invitations
                     WHERE {token_col} = %s
                     """
                 ).format(
@@ -2522,7 +2515,7 @@ def client_docusign_signing_url_api(proposal_id):
                 sql.SQL(
                     """
                     SELECT proposal_id, {email_col} as invited_email, {expires_col} as expires_at
-                    FROM collaboration_invitations
+                    FROM public.collaboration_invitations
                     WHERE {token_col} = %s
                     """
                 ).format(
@@ -2788,7 +2781,8 @@ def client_docusign_signed_pdf_api(proposal_id):
     Access is authorized via the client portal invitation token.
     """
     try:
-        token = unquote(str(request.args.get('token') or '')).strip().strip('"').strip("'")
+        token = request.args.get('token')
+        token = _normalize_access_token(token)
         if not token:
             return {'detail': 'Token is required'}, 400
 
@@ -2820,7 +2814,7 @@ def client_docusign_signed_pdf_api(proposal_id):
                 sql.SQL(
                     """
                     SELECT proposal_id, {email_col} as invited_email, {expires_col} as expires_at
-                    FROM collaboration_invitations
+                    FROM public.collaboration_invitations
                     WHERE {token_col} = %s
                     """
                 ).format(
@@ -3119,6 +3113,7 @@ def client_sign_proposal(username=None, proposal_id=None):
     except Exception as e:
         return {'detail': str(e)}, 500
 
+
 @bp.get("/client/dashboard_stats")
 @token_required
 def get_client_dashboard_stats(username=None):
@@ -3181,7 +3176,7 @@ def log_client_activity():
             # Get client info from token
             cursor.execute("""
                 SELECT ci.invited_email, ci.proposal_id, c.id as client_id
-                FROM collaboration_invitations ci
+                FROM public.collaboration_invitations ci
                 LEFT JOIN clients c ON c.email = ci.invited_email
                 WHERE ci.""" + token_col + """ = %s
             """, (invitation_token,))
@@ -3280,10 +3275,11 @@ def start_client_session():
             # Get client info from token
             cursor.execute("""
                 SELECT ci.invited_email, c.id as client_id
-                FROM collaboration_invitations ci
+                FROM public.collaboration_invitations ci
                 LEFT JOIN clients c ON c.email = ci.invited_email
                 WHERE ci.""" + token_col + """ = %s
-            """, (token,))
+            """,
+                (token,))
             
             result = cursor.fetchone()
             if not result:
