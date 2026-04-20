@@ -463,7 +463,7 @@ class _AnimatedLandingPageState extends State<AnimatedLandingPage>
                 opacity: _buttonOpacity.value,
                 child: TextButton(
                   onPressed: () {
-                    // Scroll to features or show modal
+                    Navigator.pushNamed(context, '/learn-more');
                   },
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.white,

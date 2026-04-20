@@ -5,7 +5,10 @@ Verifies Firebase ID tokens from the frontend
 import base64
 import json
 import os
+from pathlib import Path
+
 import firebase_admin
+from dotenv import load_dotenv
 from firebase_admin import credentials, auth
 from functools import wraps
 from flask import request, jsonify
@@ -13,14 +16,75 @@ from flask import request, jsonify
 # Initialize Firebase Admin SDK
 _firebase_app = None
 
+
+def _extract_unverified_payload(id_token):
+    """
+    Decode JWT payload without signature verification.
+    Used only to discover metadata such as project/audience for setup.
+    """
+    if not id_token or len(id_token.split(".")) < 2:
+        return {}
+    try:
+        payload_b64 = id_token.split(".")[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        payload_json = base64.urlsafe_b64decode(payload_b64)
+        payload = json.loads(payload_json)
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
+
+
+def _resolve_firebase_project_id():
+    """Resolve Firebase project id from environment variables."""
+    return (
+        os.getenv("FIREBASE_PROJECT_ID")
+        or os.getenv("GOOGLE_CLOUD_PROJECT")
+        or os.getenv("GCLOUD_PROJECT")
+    )
+
+
+def _decode_unverified_token_for_local_dev(id_token):
+    """Local-only fallback: decode JWT payload without signature verification."""
+    try:
+        parts = (id_token or "").split(".")
+        if len(parts) < 2:
+            return None
+        payload_b64 = parts[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        payload_json = base64.urlsafe_b64decode(payload_b64)
+        payload = json.loads(payload_json)
+        uid = payload.get("user_id") or payload.get("sub")
+        email = payload.get("email")
+        if uid or email:
+            print("[FIREBASE] [DEV] Accepting token (LOCAL_ACCEPT_FRONTEND_FIREBASE_TOKEN); no signature verification.")
+            return {
+                "uid": uid or (email and email.replace("@", "_at_")),
+                "email": email or "",
+                "name": payload.get("name"),
+                "email_verified": payload.get("email_verified", False),
+                "firebase_claims": payload,
+            }
+    except Exception as local_err:
+        print(f"[FIREBASE] [DEV] Local accept decode failed: {local_err}")
+    return None
+
 def initialize_firebase():
     """Initialize Firebase Admin SDK"""
     global _firebase_app
     
     if _firebase_app is not None:
         return _firebase_app
+
+    # Ensure backend/.env is loaded even if this module was imported before app.py's load_dotenv.
+    _env = Path(__file__).resolve().parent.parent.parent / ".env"
+    if _env.is_file():
+        load_dotenv(dotenv_path=_env, override=False)
     
     try:
+        # Resolve project id up front (needed when running without service-account file).
+        project_id = _resolve_firebase_project_id()
+        app_options = {'projectId': project_id} if project_id else None
+
         # Try to get credentials from environment variable (service account JSON)
         cred_path = os.getenv('FIREBASE_CREDENTIALS_PATH')
         
@@ -41,22 +105,24 @@ def initialize_firebase():
         if cred_path and os.path.exists(cred_path):
             print(f"[FIREBASE] Loading credentials from: {cred_path}")
             cred = credentials.Certificate(cred_path)
-            _firebase_app = firebase_admin.initialize_app(cred)
+            _firebase_app = firebase_admin.initialize_app(cred, app_options)
             print(f"[OK] [FIREBASE] Firebase Admin SDK initialized from: {cred_path}")
         else:
             # Try to use default credentials (for Google Cloud environments)
             # Or use service account JSON from environment variable
             service_account_json = os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')
             if service_account_json:
-                import json
                 cred_info = json.loads(service_account_json)
                 cred = credentials.Certificate(cred_info)
-                _firebase_app = firebase_admin.initialize_app(cred)
+                if not project_id:
+                    project_id = cred_info.get("project_id")
+                    app_options = {'projectId': project_id} if project_id else None
+                _firebase_app = firebase_admin.initialize_app(cred, app_options)
                 print("[FIREBASE] [OK] Firebase Admin SDK initialized from environment variable")
             else:
                 # Try default credentials (for local development with gcloud auth)
                 try:
-                    _firebase_app = firebase_admin.initialize_app()
+                    _firebase_app = firebase_admin.initialize_app(options=app_options)
                     print("[FIREBASE] [OK] Firebase Admin SDK initialized with default credentials")
                 except Exception as e:
                     print(f"[FIREBASE] [ERROR] WARNING: Firebase Admin SDK not initialized: {e}")
@@ -81,11 +147,16 @@ def verify_firebase_token(id_token):
     Returns:
         dict: Decoded token with user info (uid, email, etc.) or None if invalid
     """
+    global _firebase_app
     try:
+        local_accept = os.getenv('LOCAL_ACCEPT_FRONTEND_FIREBASE_TOKEN', '').strip().lower() in ('1', 'true', 'yes')
+
         if _firebase_app is None:
             initialize_firebase()
-        
+
         if _firebase_app is None:
+            if local_accept:
+                return _decode_unverified_token_for_local_dev(id_token)
             print("[FIREBASE] WARNING: Firebase not initialized, cannot verify token")
             return None
         
@@ -98,40 +169,49 @@ def verify_firebase_token(id_token):
         decoded_token = auth.verify_id_token(id_token)
         print(f"✅ Firebase ID token verified successfully")
         return decoded_token
+    except auth.CertificateFetchError as e:
+        print(
+            f"[FIREBASE] ERROR: Could not fetch Google certs to verify token (network/firewall?): {e}"
+        )
+        return None
+    except auth.RevokedIdTokenError as e:
+        print(f"[FIREBASE] ERROR: Revoked Firebase ID token: {e}")
+        return None
     except auth.InvalidIdTokenError as e:
         print(f"[FIREBASE] ERROR: Invalid Firebase ID token: {str(e)}")
         # Local dev: accept token when aud mismatch (e.g. frontend project vs backend project)
         if os.getenv('LOCAL_ACCEPT_FRONTEND_FIREBASE_TOKEN', '').strip().lower() in ('1', 'true', 'yes'):
-            try:
-                parts = id_token.split('.')
-                if len(parts) >= 2:
-                    payload_b64 = parts[1]
-                    payload_b64 += '=' * (4 - len(payload_b64) % 4)
-                    payload_json = base64.urlsafe_b64decode(payload_b64)
-                    payload = json.loads(payload_json)
-                    uid = payload.get('user_id') or payload.get('sub')
-                    email = payload.get('email')
-                    if uid or email:
-                        print("[FIREBASE] [DEV] Accepting token (LOCAL_ACCEPT_FRONTEND_FIREBASE_TOKEN); no signature verification.")
-                        return {
-                            'uid': uid or (email and email.replace('@', '_at_')),
-                            'email': email or '',
-                            'name': payload.get('name'),
-                            'email_verified': payload.get('email_verified', False),
-                            'firebase_claims': payload,
-                        }
-            except Exception as local_err:
-                print(f"[FIREBASE] [DEV] Local accept decode failed: {local_err}")
+            return _decode_unverified_token_for_local_dev(id_token)
         return None
     except auth.ExpiredIdTokenError as e:
         print(f"[FIREBASE] ERROR: Expired Firebase ID token: {str(e)}")
         return None
     except ValueError as e:
         # Token format errors
+        # If Firebase app has no project configured, infer it from token aud and retry once.
+        if "project ID is required" in str(e):
+            inferred_project_id = _extract_unverified_payload(id_token).get("aud")
+            if inferred_project_id:
+                try:
+                    if _firebase_app is not None:
+                        firebase_admin.delete_app(_firebase_app)
+                    _firebase_app = firebase_admin.initialize_app(
+                        options={'projectId': inferred_project_id}
+                    )
+                    print(
+                        f"[FIREBASE] [OK] Inferred project ID from token aud: {inferred_project_id}. Retrying verification."
+                    )
+                    decoded_token = auth.verify_id_token(id_token)
+                    print("✅ Firebase ID token verified successfully")
+                    return decoded_token
+                except Exception as retry_error:
+                    print(f"[FIREBASE] ERROR: Retry after inferred project id failed: {retry_error}")
         print(f"[FIREBASE] WARNING: Token format error (likely not a Firebase token): {str(e)}")
         return None
     except Exception as e:
         print(f"[FIREBASE] ERROR: Error verifying Firebase token: {type(e).__name__}: {str(e)}")
+        if os.getenv('LOCAL_ACCEPT_FRONTEND_FIREBASE_TOKEN', '').strip().lower() in ('1', 'true', 'yes'):
+            return _decode_unverified_token_for_local_dev(id_token)
         return None
 
 
@@ -147,9 +227,15 @@ def get_user_from_token(decoded_token):
     """
     if not decoded_token:
         return None
+
+    uid = (
+        decoded_token.get('uid')
+        or decoded_token.get('user_id')
+        or decoded_token.get('sub')
+    )
     
     return {
-        'uid': decoded_token.get('uid'),
+        'uid': uid,
         'email': decoded_token.get('email'),
         'name': decoded_token.get('name'),
         'email_verified': decoded_token.get('email_verified', False),

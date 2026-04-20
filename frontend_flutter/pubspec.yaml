@@ -42,6 +42,18 @@ dependency_overrides:
 flutter:
   uses-material-design: true
   assets:
+    - assets/images/light_mode_bg.png
+    - assets/images/white_khono_loading.png
+    - assets/images/icon1.png
+    - assets/images/icon2.png
+    - assets/images/icon3.png
+    - assets/images/icon4.png
+    - assets/images/icon5.png
     - assets/images/
+    - assets/images/client_icons/
+    - assets/images/finance_manager_new_icons/
+    - assets/images/admin_side bar/
+    - assets/images/Admin_new_icons/
     - assets/images/new icons for manager/
+    - assets/images/Creator_Dashboard/
     - assets/

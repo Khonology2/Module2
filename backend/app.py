@@ -22,6 +22,14 @@ backend_dir = Path(__file__).resolve().parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
+# Load backend/.env FIRST so stale OS-level DATABASE_URL / DB_* never shadow the file.
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=Path(__file__).resolve().with_name(".env"), override=True)
+
+# Single Postgres pool + config resolution (see api/utils/database.py).
+from api.utils.database import get_db_connection, get_pg_pool, release_pg_conn, _pg_conn
+
 import psycopg2
 import psycopg2.extras
 import cloudinary
@@ -68,7 +76,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from asgiref.wsgi import WsgiToAsgi
 import openai
-from dotenv import load_dotenv
 from api.utils.ai_safety import AISafetyError
 from api.utils.decorators import token_required as firebase_token_required
 from api.utils.profile_avatar import (
@@ -79,9 +86,6 @@ try:
     from hf_ai_assistant_service import HFAIAssistantError
 except ImportError:
     HFAIAssistantError = type("HFAIAssistantError", (Exception,), {})  # no-op if module missing
-
-# Load environment variables
-load_dotenv(dotenv_path=Path(__file__).resolve().with_name('.env'), override=True)
 
 def _mask_env_secret(value: str) -> str:
     token = (value or "").strip()
@@ -107,6 +111,8 @@ app.secret_key = os.getenv('SECRET_KEY', os.getenv('FLASK_SECRET_KEY', 'dev-secr
 app.config.setdefault('SESSION_COOKIE_HTTPONLY', True)
 app.config.setdefault('SESSION_COOKIE_SAMESITE', 'Lax')
 app.config.setdefault('SESSION_COOKIE_SECURE', (os.getenv('SESSION_COOKIE_SECURE') or '').strip().lower() in ('1', 'true', 'yes'))
+# Set true only after init_pg_schema() succeeds; used by /api/firebase fallback.
+app.config.setdefault('PG_SCHEMA_AVAILABLE', False)
 
 _MOJO_API_KEY = (os.getenv('MOJO_API_KEY') or '').strip()
 _MOJO_BASE_URL = (os.getenv('MOJO_BASE_URL') or 'https://api.mojoauth.com').strip().rstrip('/')
@@ -422,6 +428,8 @@ asgi_app = WsgiToAsgi(app)
 
 # Mark if database has been initialized
 _db_initialized = False
+# After first schema init attempt (success or failure); avoids hammering Postgres.
+_pg_schema_init_attempted = False
 
 limiter = Limiter(
     **(
@@ -473,176 +481,6 @@ openai.api_key = os.getenv('OPENAI_API_KEY')
 
 # Database initialization - PostgreSQL only
 BACKEND_TYPE = 'postgresql'
-
-# PostgreSQL connection pool
-_pg_pool = None
-
-
-def _build_db_config_from_env():
-    prefer_local = os.getenv('DB_PREFER_LOCAL', 'false').lower() == 'true'
-    if prefer_local:
-        local_config = {
-            'host': os.getenv('LOCAL_DB_HOST', 'localhost'),
-            'database': os.getenv('LOCAL_DB_NAME', os.getenv('DB_NAME', 'proposal_db')),
-            'user': os.getenv('LOCAL_DB_USER', os.getenv('DB_USER', 'postgres')),
-            'password': os.getenv('LOCAL_DB_PASSWORD', os.getenv('DB_PASSWORD', '')),
-            'port': int(os.getenv('LOCAL_DB_PORT', os.getenv('DB_PORT', '5432'))),
-        }
-        local_sslmode = os.getenv('LOCAL_DB_SSLMODE')
-        if local_sslmode:
-            local_config['sslmode'] = local_sslmode
-        return local_config
-
-    database_url = os.getenv('DATABASE_URL')
-    if database_url:
-        from urllib.parse import urlparse, parse_qs
-
-        parsed = urlparse(database_url)
-        host = (parsed.hostname or '').strip()
-        # Render "Internal" URL host looks like dpg-xxx-a (no domain). It only works on Render.
-        # From your PC we must use the External URL. Prefer DATABASE_URL_EXTERNAL, else DB_HOST if it has a domain.
-        if host.startswith('dpg-') and '.' not in host:
-            external_url = os.getenv('DATABASE_URL_EXTERNAL')
-            if external_url:
-                database_url = external_url
-                parsed = urlparse(database_url)
-                host = (parsed.hostname or '').strip()
-            elif os.getenv('DB_HOST') and '.' in (os.getenv('DB_HOST') or ''):
-                return {
-                    'host': os.getenv('DB_HOST').strip(),
-                    'database': os.getenv('DB_NAME') or (parsed.path or '').lstrip('/') or 'proposal_db',
-                    'user': os.getenv('DB_USER') or parsed.username,
-                    'password': os.getenv('DB_PASSWORD') or parsed.password,
-                    'port': int(os.getenv('DB_PORT') or str(parsed.port or 5432)),
-                    'sslmode': os.getenv('DB_SSLMODE') or 'require',
-                }
-        # Accept common Postgres URL scheme variants.
-        scheme = (parsed.scheme or '').lower()
-        if scheme.startswith('postgresql+'):
-            scheme = 'postgresql'
-        if scheme not in ('postgres', 'postgresql'):
-            raise ValueError(
-                'DATABASE_URL must start with postgres:// or postgresql:// '
-                '(optionally with a driver like postgresql+psycopg2://)'
-            )
-
-        db_config = {
-            'host': parsed.hostname,
-            'database': (parsed.path or '').lstrip('/'),
-            'user': parsed.username,
-            'password': parsed.password,
-            'port': parsed.port or 5432,
-        }
-
-        query = parse_qs(parsed.query or '')
-        sslmode_from_url = (query.get('sslmode') or [None])[0]
-
-        ssl_mode = sslmode_from_url or os.getenv('DB_SSLMODE')
-        if not ssl_mode:
-            if os.getenv('DB_REQUIRE_SSL', 'false').lower() == 'true':
-                ssl_mode = 'require'
-            elif db_config.get('host') and 'render.com' in db_config['host'].lower():
-                ssl_mode = 'require'
-            else:
-                ssl_mode = 'prefer'
-
-        if ssl_mode:
-            db_config['sslmode'] = ssl_mode
-
-        missing = [k for k in ('host', 'database', 'user') if not db_config.get(k)]
-        if missing:
-            raise ValueError(f"DATABASE_URL missing required parts: {', '.join(missing)}")
-
-        return db_config
-
-    return {
-        'host': os.getenv('DB_HOST', 'localhost'),
-        'database': os.getenv('DB_NAME', 'proposal_db'),
-        'user': os.getenv('DB_USER', 'postgres'),
-        'password': os.getenv('DB_PASSWORD', ''),
-        'port': int(os.getenv('DB_PORT', '5432')),
-    }
-
-def get_pg_pool():
-    global _pg_pool
-    if _pg_pool is None:
-        import psycopg2.pool
-        try:
-            db_config = _build_db_config_from_env()
-            # Helpful hint for a common Render misconfiguration:
-            # Render "Internal Database URL" hosts often look like "dpg-xxxx-a" (no dots).
-            # That value won't resolve outside Render's internal network; in that case you
-            # must use the External Database URL / full host like "dpg-xxxx-a.<region>-postgres.render.com".
-            host = (db_config.get('host') or '').strip()
-            if host.startswith('dpg-') and '.' not in host:
-                print(
-                    "[WARN] DB host looks like a Render internal hostname without a domain "
-                    f"({host!r}). If this service is not on Render's private network, "
-                    "set DATABASE_URL to the External Database URL (with a full *.render.com hostname) "
-                    "or set DB_HOST to the full hostname."
-                )
-            if 'sslmode' in db_config:
-                print(f"[*] Using SSL mode: {db_config['sslmode']} for external connection")
-            print(f"[*] Connecting to PostgreSQL: {db_config['host']}:{db_config['port']}/{db_config['database']}")
-            _pg_pool = psycopg2.pool.SimpleConnectionPool(
-                minconn=1,
-                maxconn=20,  # Increased max connections
-                **db_config
-            )
-            print("[OK] PostgreSQL connection pool created successfully")
-        except Exception as e:
-            print(f"[ERROR] Error creating PostgreSQL connection pool: {e}")
-            raise
-    return _pg_pool
-
-def _pg_conn():
-    try:
-        return get_pg_pool().getconn()
-    except Exception as e:
-        print(f"[ERROR] Error getting PostgreSQL connection: {e}")
-        raise
-
-def release_pg_conn(conn):
-    try:
-        if conn:
-            try:
-                import psycopg2.extensions as ext
-                tx_status = conn.get_transaction_status()
-                if tx_status in (
-                    ext.TRANSACTION_STATUS_INTRANS,
-                    ext.TRANSACTION_STATUS_INERROR,
-                ):
-                    conn.rollback()
-            except Exception:
-                pass
-            try:
-                conn.autocommit = False
-            except Exception:
-                pass
-            try:
-                get_pg_pool().putconn(conn)
-            except psycopg2.pool.PoolError:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-                return
-    except Exception as e:
-        print(f"[WARN] Error releasing PostgreSQL connection: {e}")
-
-# Context manager for automatic connection cleanup
-from contextlib import contextmanager
-
-@contextmanager
-def get_db_connection():
-    """Context manager that ensures connections are always returned to pool"""
-    conn = None
-    try:
-        conn = _pg_conn()
-        yield conn
-    finally:
-        if conn:
-            release_pg_conn(conn)
 
 # Token for encryption
 ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', 'dev-key-change-in-production')
@@ -1113,16 +951,24 @@ def init_pg_schema():
 @app.before_request
 def init_db():
     """Initialize PostgreSQL schema on first request"""
-    global _db_initialized
+    global _db_initialized, _pg_schema_init_attempted
     # If someone calls init_db() manually (e.g., from __main__ or a script),
     # Flask's request proxy won't be available. Handle that gracefully.
     if not has_request_context():
         if _db_initialized:
             return
         print("[*] Initializing PostgreSQL schema (no request context)...")
-        init_pg_schema()
-        _db_initialized = True
-        print("[OK] Database schema initialized successfully")
+        try:
+            init_pg_schema()
+            _db_initialized = True
+            _pg_schema_init_attempted = True
+            app.config['PG_SCHEMA_AVAILABLE'] = True
+            print("[OK] Database schema initialized successfully")
+        except Exception as e:
+            _pg_schema_init_attempted = True
+            app.config['PG_SCHEMA_AVAILABLE'] = False
+            print(f"[ERROR] Database initialization error: {e}")
+            raise
         return
     # Skip initialization for CORS preflight requests to avoid non-2xx responses
     # which will cause browsers to block the request due to failed preflight.
@@ -1140,14 +986,28 @@ def init_db():
         return
     if _db_initialized:
         return
-    
+    if _pg_schema_init_attempted:
+        # Schema init already failed; do not retry every request.
+        if request.path == "/api/firebase":
+            return
+        raise RuntimeError(
+            "PostgreSQL schema is not available. "
+            "Fix DATABASE_URL / DB_* or set ALLOW_FIREBASE_WITHOUT_DB=true for local-only login."
+        )
+
+    _pg_schema_init_attempted = True
     try:
         print("[*] Initializing PostgreSQL schema...")
         init_pg_schema()
         _db_initialized = True
+        app.config['PG_SCHEMA_AVAILABLE'] = True
         print("[OK] Database schema initialized successfully")
     except Exception as e:
+        app.config['PG_SCHEMA_AVAILABLE'] = False
         print(f"[ERROR] Database initialization error: {e}")
+        # Let Firebase login attempt a no-DB fallback (see api/routes/auth.py).
+        if request.path == "/api/firebase":
+            return
         raise
 
 # Auth token storage (in production, use Redis or session manager)
@@ -7411,18 +7271,17 @@ def health_check():
     """Health check endpoint with connection pool info"""
     pool_info = {
         "status": "ok",
-        "db_initialized": _db_initialized
+        "db_initialized": _db_initialized,
+        "pg_schema_available": app.config.get("PG_SCHEMA_AVAILABLE", False),
     }
     
-    # Add connection pool status if available
+    # Add connection pool status if available (shared pool from api.utils.database)
     try:
-        if _pg_pool:
-            # Try to get pool stats (note: SimpleConnectionPool doesn't expose all stats)
+        pool = get_pg_pool()
+        if pool is not None:
             pool_info["database"] = "postgresql"
             pool_info["pool_type"] = "SimpleConnectionPool"
             pool_info["pool_configured"] = True
-            
-            # Test connection
             try:
                 with get_db_connection() as conn:
                     cursor = conn.cursor()
@@ -7434,6 +7293,7 @@ def health_check():
         else:
             pool_info["pool_configured"] = False
     except Exception as e:
+        pool_info["pool_configured"] = False
         pool_info["pool_error"] = str(e)
     
     return pool_info, 200
@@ -7456,8 +7316,12 @@ if __name__ == '__main__':
         print("[*] Initializing PostgreSQL schema (startup)...")
         init_pg_schema()
         _db_initialized = True
+        app.config['PG_SCHEMA_AVAILABLE'] = True
+        _pg_schema_init_attempted = True
         print("[OK] Database schema initialized successfully")
     except Exception as e:
+        _pg_schema_init_attempted = True
+        app.config['PG_SCHEMA_AVAILABLE'] = False
         print(f"Warning: Database initialization failed: {e}")
     import os
     # Local dev expects 5000 (frontend is hardcoded to 127.0.0.1:5000).
