@@ -34,7 +34,7 @@ class AppSideNav extends StatefulWidget {
     },
     {
       'label': 'Proposals',
-      'icon': 'assets/images/new icons for manager/proposals.png',
+      'icon': 'assets/images/Networking_Collaboration_White Badge__Blue.png',
     },
     {
       'label': 'Templates',
@@ -272,16 +272,9 @@ class _AppSideNavState extends State<AppSideNav> {
       ),
       child: Row(
         children: [
-          Container(
+          SizedBox(
             width: 50,
             height: 50,
-            decoration: BoxDecoration(
-              color: isActive
-                  ? Colors.white.withOpacity(0.22)
-                  : chrome.sidebarIconCircleFill,
-              shape: BoxShape.circle,
-            ),
-            padding: const EdgeInsets.all(9),
             child: AssetService.buildImageWidget(assetPath, fit: BoxFit.contain),
           ),
           const SizedBox(width: 14),
