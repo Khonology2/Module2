@@ -1583,7 +1583,8 @@ class _DashboardPageState extends State<DashboardPage>
         'title': 'Draft Proposals',
         'subtitle': 'Proposals in progress\nand not yet submitted.',
         'value': counts['Draft']?.toString() ?? '0',
-        'icon': 'assets/images/new icons for manager/Draft proposal.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Red.png',
       },
       {
         'title': 'Pending CEO Approval',
@@ -1591,19 +1592,21 @@ class _DashboardPageState extends State<DashboardPage>
         'value':
             (counts['Pending CEO Approval'] ?? counts['Pending Approval'] ?? 0)
                 .toString(),
-        'icon': 'assets/images/new icons for manager/Pending Ceo approval.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Concentration_Key Focus_White Badge_Red.png',
       },
       {
         'title': 'Sent to Client',
         'subtitle': 'Delivered to clients\nand awaiting their response.',
         'value': counts['Sent to Client']?.toString() ?? '0',
-        'icon': 'assets/images/new icons for manager/sent to client.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Send_Paper Plane_White Badge_Red.png',
       },
       {
         'title': 'Signed',
         'subtitle': 'Finalized and\napproved by clients.',
         'value': counts['Signed']?.toString() ?? '0',
-        'icon': 'assets/images/new icons for manager/signed.png',
+        'icon': 'assets/images/Creator_Dashboard/Approved_White Badge_Red.png',
       },
     ];
 
