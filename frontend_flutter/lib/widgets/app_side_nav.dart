@@ -30,31 +30,37 @@ class AppSideNav extends StatefulWidget {
   static const List<Map<String, String>> _items = [
     {
       'label': 'Dashboard',
-      'icon': 'assets/images/new icons for manager/Dashboard.png',
+      'icon':
+          'assets/images/Creator_Dashboard/Project Launch_Start_White Badge_Blue.png',
     },
     {
       'label': 'Proposals',
-      'icon': 'assets/images/Networking_Collaboration_White Badge__Blue.png',
+      'icon':
+          'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Blue.png',
     },
     {
       'label': 'Templates',
-      'icon': 'assets/images/new icons for manager/Templates.png',
+      'icon':
+          'assets/images/Creator_Dashboard/Task Management_White Badge_Blue.png',
     },
     {
       'label': 'Content Library',
-      'icon': 'assets/images/new icons for manager/content library.png',
+      'icon':
+          'assets/images/Creator_Dashboard/Process Flows_Automation_White Badge_Blue.png',
     },
     {
       'label': 'Client Management',
-      'icon': 'assets/images/new icons for manager/client_management.png',
+      'icon':
+          'assets/images/Creator_Dashboard/HR_Team Management_White Badge_Blue.png',
     },
     {
       'label': 'Approved Proposals',
-      'icon': 'assets/images/new icons for manager/Approved proposals.png',
+      'icon': 'assets/images/Creator_Dashboard/Approved_White Badge_Blue.png',
     },
     {
       'label': 'Analytics (My Pipeline)',
-      'icon': 'assets/images/analytics.png',
+      'icon':
+          'assets/images/Creator_Dashboard/Business Growth_Development_White Badge_Blue.png',
     },
   ];
 
