@@ -65,10 +65,21 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   final ScrollController _proposalsScrollController = ScrollController();
 
   static const List<Map<String, dynamic>> _clientNavItems = [
-    {'index': 0, 'label': 'Dashboard', 'icon': Icons.dashboard_outlined},
-    {'index': 1, 'label': 'Proposals', 'icon': Icons.description_outlined},
-    {'index': 2, 'label': 'Documents', 'icon': Icons.folder_outlined},
-    {'index': 3, 'label': 'Profile', 'icon': Icons.person_outline},
+    {
+      'index': 0,
+      'label': 'Dashboard',
+      'asset': 'assets/images/new icons for manager/Dashboard.png'
+    },
+    {
+      'index': 1,
+      'label': 'Proposals',
+      'asset': 'assets/images/new icons for manager/proposals.png'
+    },
+    {
+      'index': 2,
+      'label': 'Documents',
+      'asset': 'assets/images/client_icons/Data Approval_White Badge_Blue.png'
+    },
   ];
 
   bool _isSow(Map<String, dynamic> p) {
@@ -92,9 +103,9 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
   Widget _filterChip(String label, String value) {
     final selected = _dashboardDocFilter == value;
-    const chipHeight = 18.06;
+    const chipHeight = 26.0;
     const chipRadius = 20.14;
-    const chipBorderWidth = 1.23;
+    const chipBorderWidth = 1.4;
     const chipBorderColor = Color(0xFF6A6A6A);
 
     return InkWell(
@@ -107,7 +118,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       child: SizedBox(
         height: chipHeight,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: selected
                 ? const Color(0xFFC10D00)
@@ -120,15 +131,116 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           child: Center(
             child: Text(
               label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1,
+                color: selected
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.75),
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 7.5,
-                fontWeight: FontWeight.w700,
-                height: 1.0,
-              ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSidebarActionItem({
+    required String label,
+    required String assetPath,
+    required bool isCollapsed,
+    required VoidCallback onTap,
+    required Color activeColor,
+    required Color hoverFill,
+    required Color iconCircleIdle,
+  }) {
+    final bool isHovering = _hoverSidebarIndex == -1;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hoverSidebarIndex = -1),
+      onExit: (_) => setState(() => _hoverSidebarIndex = null),
+      child: Padding(
+        padding: isCollapsed
+            ? const EdgeInsets.symmetric(vertical: 5)
+            : const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        child: Tooltip(
+          message: isCollapsed ? label : '',
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(10),
+            child: isCollapsed
+                ? Center(
+                    child: Container(
+                      width: 62,
+                      height: 62,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Image.asset(
+                          assetPath,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isHovering ? hoverFill : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: Colors.transparent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: Image.asset(
+                              assetPath,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.image_not_supported_outlined,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              height: 1.2,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
           ),
         ),
       ),
@@ -219,6 +331,20 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         ? '?token=${Uri.encodeComponent(token)}'
         : '';
     Navigator.pushReplacementNamed(context, '$route$suffix');
+  }
+
+  void _logoutClient() {
+    setState(() {
+      _accessToken = null;
+      _clientSessionToken = null;
+      _selectedNavIndex = 0;
+    });
+    if (kIsWeb) {
+      try {
+        web.window.localStorage.removeItem('lukens_client_session_token');
+      } catch (_) {}
+    }
+    Navigator.pushReplacementNamed(context, '/login');
   }
 
   String _sanitizeToken(String token) {
@@ -731,7 +857,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                     ),
                                   ),
                                   child: const Text(
-                                    'Ver 2025.03.AA1_SIT',
+                                    'ver 2026.04.BE7_SIT',
                                     style: TextStyle(
                                       fontSize: 9,
                                       color: Colors.white70,
@@ -1160,7 +1286,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: _isSidebarCollapsed ? 80 : 300,
+      width: _isSidebarCollapsed ? 80 : 270,
       decoration: BoxDecoration(
         color: sidebarBg,
         border: Border(
@@ -1182,15 +1308,11 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   child: Container(
                     height: 44,
                     decoration: BoxDecoration(
-                      color: hoverFill,
+                      color: Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.keyboard_arrow_right,
-                      color: Colors.white,
-                      size: 24,
-                    ),
+                    child: Container(),
                   ),
                 ),
               )
@@ -1209,13 +1331,13 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                           width: 30,
                           height: 30,
                           decoration: BoxDecoration(
-                            color: hoverFill,
+                            color: Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           alignment: Alignment.center,
                           child: const Icon(
                             Icons.keyboard_arrow_left,
-                            color: Colors.white,
+                            color: Colors.transparent,
                             size: 20,
                           ),
                         ),
@@ -1266,7 +1388,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       _buildSidebarNavItem(
                         index: item['index'] as int,
                         label: item['label'] as String,
-                        icon: item['icon'] as IconData,
+                        assetPath: item['asset'] as String,
                         isCollapsed: _isSidebarCollapsed,
                         activeColor: activeColor,
                         hoverFill: hoverFill,
@@ -1283,30 +1405,23 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                 height: 1,
                 color: Colors.white.withValues(alpha: 0.14),
               ),
-            Padding(
-              padding: EdgeInsets.only(
-                left: _isSidebarCollapsed ? 6 : 16,
-                right: _isSidebarCollapsed ? 6 : 16,
-                bottom: 18,
-              ),
-              child: _isSidebarCollapsed
-                  ? Tooltip(
-                      message: _clientEmail ?? '',
-                      child: const Icon(
-                        Icons.alternate_email_rounded,
-                        color: Colors.white70,
-                        size: 18,
-                      ),
-                    )
-                  : Text(
-                      _clientEmail ?? '',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontSize: 12,
-                      ),
-                    ),
+            _buildSidebarNavItem(
+              index: 3,
+              label: 'Account Profile',
+              assetPath: 'assets/images/User_Profile.png',
+              isCollapsed: _isSidebarCollapsed,
+              activeColor: activeColor,
+              hoverFill: hoverFill,
+              iconCircleIdle: iconCircleIdle,
+            ),
+            _buildSidebarActionItem(
+              label: 'Logout',
+              assetPath: 'assets/images/Logout_KhonoBuzz.png',
+              isCollapsed: _isSidebarCollapsed,
+              onTap: _logoutClient,
+              activeColor: activeColor,
+              hoverFill: hoverFill,
+              iconCircleIdle: iconCircleIdle,
             ),
           ],
         ),
@@ -1317,7 +1432,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   Widget _buildSidebarNavItem({
     required int index,
     required String label,
-    required IconData icon,
+    required String assetPath,
     required bool isCollapsed,
     required Color activeColor,
     required Color hoverFill,
@@ -1343,17 +1458,24 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
             child: isCollapsed
                 ? Center(
                     child: Container(
-                      width: 56,
-                      height: 56,
+                      width: 62,
+                      height: 62,
                       decoration: BoxDecoration(
-                        color: selected
-                            ? activeColor
-                            : isHovering
-                                ? hoverFill
-                                : iconCircleIdle,
+                        color: selected ? activeColor : Colors.transparent,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(icon, color: Colors.white, size: 24),
+                      child: Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Image.asset(
+                          assetPath,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                      ),
                     ),
                   )
                 : Container(
@@ -1370,15 +1492,24 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                     child: Row(
                       children: [
                         Container(
-                          width: 50,
-                          height: 50,
+                          width: 56,
+                          height: 56,
                           decoration: BoxDecoration(
-                            color: selected
-                                ? Colors.white.withValues(alpha: 0.22)
-                                : iconCircleIdle,
+                            color: Colors.transparent,
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(icon, color: Colors.white, size: 24),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Image.asset(
+                              assetPath,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.image_not_supported_outlined,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -1457,25 +1588,23 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   ),
                   const SizedBox(height: 8),
                   _buildDrawerNavItem(
-                      context, 0, Icons.dashboard_outlined, 'Dashboard'),
+                      context,
+                      0,
+                      'assets/images/new icons for manager/Dashboard.png',
+                      'Dashboard'),
                   _buildDrawerNavItem(
-                      context, 1, Icons.description_outlined, 'Proposals'),
+                      context,
+                      1,
+                      'assets/images/new icons for manager/proposals.png',
+                      'Proposals'),
                   _buildDrawerNavItem(
-                      context, 2, Icons.folder_outlined, 'Documents'),
-                  _buildDrawerNavItem(
-                      context, 3, Icons.person_outline, 'Profile'),
+                      context,
+                      2,
+                      'assets/images/client_icons/Data Approval_White Badge_Blue.png',
+                      'Documents'),
+                  _buildDrawerNavItem(context, 3,
+                      'assets/images/User_Profile.png', 'Account Profile'),
                   const Spacer(),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-                    child: Text(
-                      _clientEmail ?? '',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 12),
-                    ),
-                  ),
                 ],
               )),
             );
@@ -1486,7 +1615,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildDrawerNavItem(
-      BuildContext context, int index, IconData icon, String label,
+      BuildContext context, int index, String assetPath, String label,
       {VoidCallback? onTap, double itemHeight = 37.77, double? itemWidth}) {
     final selected = _selectedNavIndex == index;
     final badgeCount =
@@ -1520,7 +1649,18 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                 color: Color(0xFFE5E7EB),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: const Color(0xFF1F2937), size: 14),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Image.asset(
+                  assetPath,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.image_not_supported_outlined,
+                    color: Color(0xFF1F2937),
+                    size: 14,
+                  ),
+                ),
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -1556,6 +1696,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildTopHeader({required bool useDrawer}) {
+    final isDocumentsTab = _selectedNavIndex == 2;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       child: Row(
@@ -1573,23 +1714,27 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           Expanded(
             child: Row(
               children: [
-                const Text(
-                  'Client Portal',
-                  style: TextStyle(
+                Text(
+                  isDocumentsTab
+                      ? 'Client Portal Signed Documents'
+                      : 'Client Portal',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'Hello, ${_getClientDisplayName()}',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.75),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                if (!isDocumentsTab) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    'Hello, ${_getClientDisplayName()}',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.75),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -1616,33 +1761,31 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
   Widget _buildSummaryTiles() {
     final allDocs = List<Map<String, dynamic>>.from(_proposals);
-    final activeCount = allDocs.where((d) {
+    final activeCount = allDocs.length;
+    final pendingSignatureCount = allDocs.where((d) {
       final s = (d['status'] ?? '').toString().toLowerCase();
       if (s.contains('signed')) return false;
       return s.contains('sent') ||
           s.contains('released') ||
-          s.contains('review');
+          s.contains('review') ||
+          s.contains('signature');
     }).length;
     final signedSowCount = allDocs.where((d) {
       if (!_isSow(d)) return false;
       final s = (d['status'] ?? '').toString().toLowerCase();
       return s.contains('signed');
     }).length;
-    final pendingApprovalsCount = _statusCounts['pending'] ?? 0;
+    final pendingApprovalsCount = pendingSignatureCount;
 
-    const tileDescription =
-        'Additional description information can be included if required.';
-
-    const tileWidth = 306.62;
     const tileHeight = 102.64;
 
     Widget tile({
       required String label,
       required String value,
-      required IconData icon,
+      required String subtitle,
+      required String iconAssetPath,
     }) {
       return Container(
-        width: tileWidth,
         height: tileHeight,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
@@ -1680,7 +1823,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        tileDescription,
+                        subtitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -1705,21 +1848,13 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               ),
             ),
             const SizedBox(width: 12),
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    offset: const Offset(0, 1),
-                    blurRadius: 2,
-                  ),
-                ],
+            SizedBox(
+              width: 68,
+              height: 68,
+              child: Image.asset(
+                iconAssetPath,
+                fit: BoxFit.contain,
               ),
-              child: Icon(icon, color: PremiumTheme.primaryRed, size: 22),
             ),
           ],
         ),
@@ -1730,33 +1865,54 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       tile(
         label: 'Active Proposals',
         value: activeCount.toString(),
-        icon: Icons.adjust,
+        subtitle: 'All proposals',
+        iconAssetPath:
+            'assets/images/client_icons/Goal_Target_White Badge_Red.png',
       ),
       tile(
-        label: "Signed SOW'S",
+        label: 'Signed',
         value: signedSowCount.toString(),
-        icon: Icons.check,
+        subtitle: 'Signature provided',
+        iconAssetPath: 'assets/images/Admin_new_icons/Client_Approved.png',
       ),
       tile(
         label: 'Pending Approvals',
         value: pendingApprovalsCount.toString(),
-        icon: Icons.remove_red_eye_outlined,
+        subtitle: 'Awaiting review',
+        iconAssetPath: 'assets/images/Admin_new_icons/Pending_CEO_Approval.png',
       ),
     ];
 
-    // Figma: three blocks side-by-side, 306.62 × 102.64 each; scroll horizontally if needed.
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          children[0],
-          const SizedBox(width: 12),
-          children[1],
-          const SizedBox(width: 12),
-          children[2],
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 920;
+        if (!wide) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 320, child: children[0]),
+                const SizedBox(width: 12),
+                SizedBox(width: 320, child: children[1]),
+                const SizedBox(width: 12),
+                SizedBox(width: 320, child: children[2]),
+              ],
+            ),
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: children[0]),
+            const SizedBox(width: 12),
+            Expanded(child: children[1]),
+            const SizedBox(width: 12),
+            Expanded(child: children[2]),
+          ],
+        );
+      },
     );
   }
 
@@ -1786,25 +1942,98 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     );
   }
 
-  Widget _buildRecentDocuments() {
+  Widget _buildRecentDocuments({double? width, double? height}) {
     final docs = _filteredDocuments();
     final isDocumentsTab = _selectedNavIndex == 2;
     final isProposalsTab = _selectedNavIndex == 1;
     const managerBadgeAsset =
         'assets/images/Project Management_Red Badge_White.png';
+    const recentDocumentsIconAsset =
+        'assets/images/Admin_new_icons/Recent_Proposals.png';
+    const notificationBellAsset =
+        'assets/images/new icons for manager/notifications.png';
     final listTitle = isDocumentsTab
-        ? 'Signed Documents'
+        ? 'Client Portal Signed Documents'
         : isProposalsTab
             ? 'Awaiting Signature'
             : 'Recent Documents';
-    const recentDocsWidth = 466.59;
-    const recentDocsHeight = 308.28;
+    const recentDocsWidth = 580.0;
+    const recentDocsHeight = 370.0;
+    final panelWidth = width ?? recentDocsWidth;
+    final panelHeight = height ?? recentDocsHeight;
+
+    Widget _buildBellCountBadge(int count) {
+      const size = 44.0;
+      const badgeBg = Color(0xFFC10D00);
+      return SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: ClipOval(
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: Image.asset(
+                    notificationBellAsset,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+            if (count > 0)
+              Positioned(
+                right: -4,
+                top: -4,
+                child: Container(
+                  constraints:
+                      const BoxConstraints(minWidth: 20, minHeight: 20),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: badgeBg,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    count > 99 ? '99+' : '$count',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
 
     return Align(
       alignment: Alignment.topLeft,
       child: SizedBox(
-        width: recentDocsWidth,
-        height: recentDocsHeight,
+        width: panelWidth,
+        height: panelHeight,
         child: Container(
           clipBehavior: Clip.antiAlias,
           padding: const EdgeInsets.all(16),
@@ -1825,6 +2054,15 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
             children: [
               Row(
                 children: [
+                  SizedBox(
+                    width: 62,
+                    height: 62,
+                    child: Image.asset(
+                      recentDocumentsIconAsset,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       listTitle,
@@ -1835,21 +2073,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       ),
                     ),
                   ),
-                  if (_selectedNavIndex == 0)
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _dashboardDocFilter = 'all';
-                        });
-                      },
-                      child: const Text('View All'),
-                    ),
-                  Text(
-                    '${docs.length}',
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.70),
-                        fontSize: 12),
-                  ),
+                  _buildBellCountBadge(docs.length),
                 ],
               ),
               const SizedBox(height: 12),
@@ -1858,8 +2082,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _filterChip('View All', 'all'),
-                      const SizedBox(width: 10),
                       _filterChip('Released', 'released'),
                       const SizedBox(width: 10),
                       _filterChip('Signed', 'signed'),
@@ -1879,210 +2101,224 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.70)),
                 )
               else
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: docs.length > 6 ? 6 : docs.length,
-                  separatorBuilder: (_, __) => Divider(
-                    height: 14,
-                    color: Colors.white.withValues(alpha: 0.08),
-                  ),
-                  itemBuilder: (context, index) {
-                    final doc = docs[index];
-                    final status = (doc['status'] ?? '').toString();
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: docs.length > 6 ? 6 : docs.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 14,
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                    itemBuilder: (context, index) {
+                      final doc = docs[index];
+                      final status = (doc['status'] ?? '').toString();
 
-                    Widget _statusChip(String rawStatus) {
-                      final normalizedLabel = _normalizeStatus(rawStatus);
-                      final lower = normalizedLabel.toLowerCase().trim();
-                      Color bg = Colors.white.withValues(alpha: 0.10);
-                      Color fg = Colors.white;
-                      String label = normalizedLabel.isEmpty
-                          ? (rawStatus.isEmpty ? 'Unknown' : rawStatus)
-                          : normalizedLabel;
-                      double chipWidth = 87.89;
+                      Widget _statusChip(String rawStatus) {
+                        final normalizedLabel = _normalizeStatus(rawStatus);
+                        final lower = normalizedLabel.toLowerCase().trim();
+                        Color bg = Colors.white.withValues(alpha: 0.10);
+                        Color fg = Colors.white;
+                        String label = normalizedLabel.isEmpty
+                            ? (rawStatus.isEmpty ? 'Unknown' : rawStatus)
+                            : normalizedLabel;
+                        double chipWidth = 87.89;
 
-                      if (lower.contains('signed')) {
-                        bg = const Color(0xFF6CA510);
-                        fg = Colors.white;
-                        chipWidth = 87.89;
-                      } else if (lower.contains('pending') ||
-                          lower.contains('released') ||
-                          lower.contains('sent for signature') ||
-                          lower.contains('in review')) {
-                        bg = const Color(0xFFEA990C);
-                        fg = Colors.white;
-                        chipWidth = 88.51;
-                        if (lower.contains('pending')) {
-                          label = 'Request Sent';
+                        if (lower.contains('signed')) {
+                          bg = const Color(0xFF6CA510);
+                          fg = Colors.white;
+                          chipWidth = 87.89;
+                        } else if (lower.contains('pending') ||
+                            lower.contains('released') ||
+                            lower.contains('sent for signature') ||
+                            lower.contains('in review')) {
+                          bg = const Color(0xFFEA990C);
+                          fg = Colors.white;
+                          chipWidth = 88.51;
+                          if (lower.contains('pending')) {
+                            label = 'Request Sent';
+                          }
+                        } else if (lower.contains('rejected') ||
+                            lower.contains('declined')) {
+                          bg = const Color(0xFFE74C3C);
+                          fg = Colors.white;
+                          chipWidth = 88.51;
                         }
-                      } else if (lower.contains('rejected') ||
-                          lower.contains('declined')) {
-                        bg = const Color(0xFFE74C3C);
-                        fg = Colors.white;
-                        chipWidth = 88.51;
+
+                        return SizedBox(
+                          width: chipWidth,
+                          height: 23.36,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: bg,
+                              borderRadius: BorderRadius.circular(26.06),
+                            ),
+                            child: Center(
+                              child: Text(
+                                label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: fg,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
                       }
 
-                      return SizedBox(
-                        width: chipWidth,
-                        height: 23.36,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                              color: bg,
-                              borderRadius: BorderRadius.circular(26.06)),
-                          child: Center(
-                            child: Text(
-                              label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                      final Widget _draftChip = _statusChip('Draft');
+
+                      Widget _viewChip(VoidCallback onPressed) {
+                        return SizedBox(
+                          width: 48.56,
+                          height: 23.36,
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                              backgroundColor: const Color(0xFF7F7F7F),
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(48.56, 23.36),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(26.06),
+                              ),
+                            ),
+                            onPressed: onPressed,
+                            child: const Text(
+                              'VIEW',
                               style: TextStyle(
-                                color: fg,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
                                 height: 1.0,
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }
+                        );
+                      }
 
-                    Widget _viewChip(VoidCallback onPressed) {
-                      return SizedBox(
-                        width: 48.56,
-                        height: 23.36,
-                        child: TextButton(
-                          style: TextButton.styleFrom(
-                            backgroundColor: const Color(0xFF7F7F7F),
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(48.56, 23.36),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(26.06),
-                            ),
-                          ),
-                          onPressed: onPressed,
-                          child: const Text(
-                            'VIEW',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              height: 1.0,
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-
-                    Widget _documentLeadingBadge() {
-                      return SizedBox(
-                        width: 33,
-                        height: 33,
-                        child: Image.asset(
-                          managerBadgeAsset,
+                      Widget _documentLeadingBadge() {
+                        return SizedBox(
                           width: 33,
                           height: 33,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Icon(
-                            Icons.check_box_outline_blank,
-                            color: Colors.white70,
-                            size: 18,
+                          child: Image.asset(
+                            isProposalsTab
+                                ? recentDocumentsIconAsset
+                                : managerBadgeAsset,
+                            width: 33,
+                            height: 33,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Icon(
+                              Icons.check_box_outline_blank,
+                              color: Colors.white70,
+                              size: 18,
+                            ),
                           ),
+                        );
+                      }
+
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedDocument = doc;
+                          });
+                        },
+                        child: Row(
+                          children: [
+                            _documentLeadingBadge(),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Builder(
+                                builder: (context) {
+                                  final lead =
+                                      '${_documentLabel(doc)} #${doc['id']}';
+                                  final rawTitle =
+                                      (doc['title'] ?? 'Untitled').toString();
+
+                                  // Figma text treatment: lead is bold small-caps, project part is italic.
+                                  return SizedBox(
+                                    height: 22,
+                                    child: RichText(
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      text: TextSpan(
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontFamily: 'Poppins',
+                                          fontSize: 11.5,
+                                          height: 1.05,
+                                          letterSpacing: 0.11,
+                                        ),
+                                        children: [
+                                          TextSpan(
+                                            text: '$lead ',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontFeatures: [
+                                                ui.FontFeature.enable('smcp')
+                                              ],
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text: '- $rawTitle',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                              fontStyle: FontStyle.italic,
+                                              fontFeatures: [
+                                                ui.FontFeature.enable('smcp')
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            if (isDocumentsTab)
+                              TextButton(
+                                onPressed: () => _downloadPdfForDocument(doc),
+                                style: TextButton.styleFrom(
+                                  backgroundColor: const Color(0xFFC10D00),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                                child: const Text('Download'),
+                              )
+                            else if (doc['status'] == 'Draft')
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _draftChip,
+                                  const SizedBox(width: 7.84),
+                                  _viewChip(() {
+                                    setState(() {
+                                      _selectedDocument = doc;
+                                    });
+                                    _openProposal(doc);
+                                  }),
+                                ],
+                              )
+                            else
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _statusChip(status),
+                                  const SizedBox(width: 7.84),
+                                  _viewChip(() => _openProposal(doc)),
+                                ],
+                              ),
+                          ],
                         ),
                       );
-                    }
-
-                    return InkWell(
-                      onTap: () {
-                        setState(() {
-                          _selectedDocument = doc;
-                        });
-                      },
-                      child: Row(
-                        children: [
-                          _documentLeadingBadge(),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Builder(
-                              builder: (context) {
-                                final lead =
-                                    '${_documentLabel(doc)} #${doc['id']}';
-                                final rawTitle =
-                                    (doc['title'] ?? 'Untitled').toString();
-
-                                // Figma text treatment: lead is bold small-caps, project part is italic.
-                                return SizedBox(
-                                  height: 18.44,
-                                  child: RichText(
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    text: TextSpan(
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontFamily: 'Poppins',
-                                        fontSize: 9.22,
-                                        height: 1.0174,
-                                        letterSpacing: 0.0922,
-                                      ),
-                                      children: [
-                                        TextSpan(
-                                          text: '$lead ',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontFeatures: [
-                                              ui.FontFeature.enable('smcp')
-                                            ],
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: '- $rawTitle',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            fontStyle: FontStyle.italic,
-                                            fontFeatures: [
-                                              ui.FontFeature.enable('smcp')
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          if (isDocumentsTab)
-                            TextButton(
-                              onPressed: () => _downloadPdfForDocument(doc),
-                              child: const Text('Download'),
-                            )
-                          else if (isProposalsTab)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _statusChip(status),
-                                const SizedBox(width: 7.84),
-                                _viewChip(() {
-                                  setState(() {
-                                    _selectedDocument = doc;
-                                  });
-                                  _openSigningUrl(doc);
-                                }),
-                              ],
-                            )
-                          else
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _statusChip(status),
-                                const SizedBox(width: 7.84),
-                                _viewChip(() => _openProposal(doc)),
-                              ],
-                            ),
-                        ],
-                      ),
-                    );
-                  },
+                    },
+                  ),
                 ),
             ],
           ),
@@ -2093,13 +2329,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
   Widget _buildRightPanel() {
     final doc = _selectedDocument;
-    final title = doc?['title']?.toString() ?? 'Select a document';
-    final status = doc?['status']?.toString() ?? '';
-    final hasSigning =
-        (doc?['signing_url']?.toString() ?? '').trim().isNotEmpty;
-    final statusLower = status.toLowerCase().trim();
-    final isSignedStatus =
-        statusLower.contains('client signed') || statusLower.contains('signed');
 
     Widget panelCard({
       required String title,
@@ -2108,6 +2337,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     }) {
       final showTitle = title.trim().isNotEmpty;
       final card = Container(
+        width: double.infinity,
         clipBehavior: Clip.antiAlias,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -2142,101 +2372,26 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       );
 
       if (fixedHeight != null) {
-        return SizedBox(height: fixedHeight, child: card);
+        return SizedBox(
+            height: fixedHeight, width: double.infinity, child: card);
       }
       return card;
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (doc != null) ...[
-          panelCard(
-            title: 'View Document',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  status.isEmpty ? '' : status,
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.70),
-                      fontSize: 12),
-                ),
-                if (isSignedStatus) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.check_circle,
-                          size: 16, color: Color(0xFF2ECC71)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'This document has been signed. No further action is required.',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.75),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: isSignedStatus
-                            ? null
-                            : () {
-                                if (hasSigning) {
-                                  _openSigningUrl(doc);
-                                } else {
-                                  _showFallbackSignModal(doc);
-                                }
-                              },
-                        child: const Text('View'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: isSignedStatus
-                            ? null
-                            : () => _openProposalComments(doc),
-                        child: const Text('Request Changes'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
         panelCard(
           title: '',
-          fixedHeight: 120,
+          fixedHeight: 184,
           child: Row(
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: Icon(
-                  Icons.forum_outlined,
-                  color: Colors.white.withValues(alpha: 0.8),
-                  size: 28,
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: Image.asset(
+                  'assets/images/client_icons/HR_Team Management_White Badge_Red.png',
+                  fit: BoxFit.contain,
                 ),
               ),
               const SizedBox(width: 16),
@@ -2249,16 +2404,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       'Project Chat',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Open a document to view and post comments as required.',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.70),
-                        fontSize: 12,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -2269,14 +2416,20 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                     doc == null ? null : () => _openProposalComments(doc),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFC10D00),
+                  disabledBackgroundColor: const Color(0xFFC10D00),
                   foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
-                child: const Text('OPEN COMMENTS'),
+                child: const Text(
+                  'OPEN COMMENTS',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -2284,20 +2437,15 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         const SizedBox(height: 12),
         panelCard(
           title: '',
-          fixedHeight: 120,
+          fixedHeight: 184,
           child: Row(
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(28),
-                ),
-                child: Icon(
-                  Icons.download_outlined,
-                  color: Colors.white.withValues(alpha: 0.8),
-                  size: 28,
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: Image.asset(
+                  'assets/images/client_icons/Download_Arrow_White Badge_Red.png',
+                  fit: BoxFit.contain,
                 ),
               ),
               const SizedBox(width: 16),
@@ -2308,18 +2456,12 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   children: [
                     const Text(
                       'Download Document',
+                      maxLines: 2,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Additional description information can be included if required and or as deemed necessary.',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.70),
-                        fontSize: 12,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        height: 1.15,
                       ),
                     ),
                   ],
@@ -2330,14 +2472,20 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                     doc == null ? null : () => _downloadPdfForDocument(doc),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFC10D00),
+                  disabledBackgroundColor: const Color(0xFFC10D00),
                   foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
-                child: const Text('DOWNLOAD PDF'),
+                child: const Text(
+                  'DOWNLOAD PDF',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -2596,7 +2744,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           ),
           alignment: Alignment.center,
           child: const Text(
-            'Ver 2025.03.AA1_SIT',
+            'ver 2026.04.BE7_SIT',
             style: TextStyle(
               fontSize: 9,
               color: Colors.white70,
@@ -2978,13 +3126,21 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           const SizedBox(height: 14),
           LayoutBuilder(
             builder: (context, constraints) {
-              const rightPanelWidth = 466.59;
+              const rightPanelWidth = 420.0;
+              final leftPanelWidth =
+                  (constraints.maxWidth - rightPanelWidth - 16).clamp(
+                520.0,
+                constraints.maxWidth,
+              );
               final stackLowerCards = constraints.maxWidth < 980;
               if (stackLowerCards) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildRecentDocuments(),
+                    _buildRecentDocuments(
+                      width: constraints.maxWidth,
+                      height: 380,
+                    ),
                     const SizedBox(height: 14),
                     SizedBox(width: rightPanelWidth, child: _buildRightPanel()),
                   ],
@@ -2993,7 +3149,10 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildRecentDocuments(),
+                  _buildRecentDocuments(
+                    width: leftPanelWidth,
+                    height: 380,
+                  ),
                   const SizedBox(width: 16),
                   SizedBox(width: rightPanelWidth, child: _buildRightPanel()),
                 ],
@@ -3011,6 +3170,23 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     if (_selectedNavIndex == 0 ||
         _selectedNavIndex == 1 ||
         _selectedNavIndex == 2) {
+      if (_selectedNavIndex == 2) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final maxWidth = constraints.maxWidth;
+            final targetWidth = (maxWidth).clamp(620.0, maxWidth);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildRecentDocuments(
+                  width: targetWidth,
+                  height: 420,
+                ),
+              ],
+            );
+          },
+        );
+      }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -4268,7 +4444,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                             ),
                           ),
                           child: const Text(
-                            'Ver 2025.03.AA1_SIT',
+                            'ver 2026.04.BE7_SIT',
                             style: TextStyle(
                               fontSize: 9,
                               color: Colors.white70,
@@ -4483,7 +4659,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                             ),
                           ),
                           child: const Text(
-                            'Ver 2025.03.AA1_SIT',
+                            'ver 2026.04.BE7_SIT',
                             style: TextStyle(
                               fontSize: 9,
                               color: Colors.white70,
@@ -4613,8 +4789,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                       children: [
                                         leftContent,
                                         const SizedBox(height: 16),
-                                        if ((_selectedNavIndex == 1 ||
-                                                _selectedNavIndex == 2) &&
+                                        if (_selectedNavIndex == 1 &&
                                             widget.showSummary)
                                           _buildRightPanel(),
                                       ],
@@ -4627,8 +4802,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                     children: [
                                       Expanded(child: leftContent),
                                       const SizedBox(width: 16),
-                                      if ((_selectedNavIndex == 1 ||
-                                              _selectedNavIndex == 2) &&
+                                      if (_selectedNavIndex == 1 &&
                                           widget.showSummary)
                                         SizedBox(
                                           width: 380,
