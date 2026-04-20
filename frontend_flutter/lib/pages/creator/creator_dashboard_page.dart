@@ -403,7 +403,7 @@ class _DashboardPageState extends State<DashboardPage>
     final unread = _unreadNotificationCount(app, messagesOnly: false);
     return _buildIconButton(
       chrome: chrome,
-      assetPath: 'assets/images/new icons for manager/notifications.png',
+      assetPath: 'assets/images/Creator_Dashboard/Notification_blue.png',
       badge: unread > 0 ? unread : null,
       onTap: () async {
         await app.fetchNotifications();
@@ -912,7 +912,7 @@ class _DashboardPageState extends State<DashboardPage>
           // Right: messages (comments & mentions), notifications (everything else), profile
           _buildIconButton(
             chrome: chrome,
-            assetPath: 'assets/images/new icons for manager/messages.png',
+            assetPath: 'assets/images/Creator_Dashboard/Email_blue.png',
             onTap: () async {
               await app.fetchNotifications();
               if (!mounted) return;
@@ -997,7 +997,7 @@ class _DashboardPageState extends State<DashboardPage>
               width: 44.87,
               height: 44.87,
               child: Image.asset(
-                'assets/images/group_398.png',
+                'assets/images/Creator_Dashboard/Notification_blue.png',
                 width: 44.87,
                 height: 44.87,
                 fit: BoxFit.contain,
@@ -1706,35 +1706,35 @@ class _DashboardPageState extends State<DashboardPage>
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _buildWorkflowStep(
-          'assets/images/icon1.png',
+          'assets/images/Creator_Dashboard/1.png',
           'Compose',
           context,
           chrome,
           applyFigmaLabelSpecs: true,
         ),
         _buildWorkflowStep(
-          'assets/images/icon2.png',
+          'assets/images/Creator_Dashboard/2.png',
           'Govern',
           context,
           chrome,
           applyFigmaLabelSpecs: true,
         ),
         _buildWorkflowStep(
-          'assets/images/icon3.png',
+          'assets/images/Creator_Dashboard/3.png',
           'AI Risk Gate',
           context,
           chrome,
           applyFigmaLabelSpecs: true,
         ),
         _buildWorkflowStep(
-          'assets/images/icon4.png',
+          'assets/images/Creator_Dashboard/4.png',
           'Preview',
           context,
           chrome,
           applyFigmaLabelSpecs: true,
         ),
         _buildWorkflowStep(
-          'assets/images/icon5.png',
+          'assets/images/Creator_Dashboard/5.png',
           'Internal Sign-off',
           context,
           chrome,
@@ -1987,7 +1987,8 @@ class _DashboardPageState extends State<DashboardPage>
     if (_riskItems.isEmpty) {
       return _buildDashboardSection(
         chrome: chrome,
-        iconAsset: 'assets/images/new icons for manager/risk_gate_tab.png',
+        iconAsset:
+            'assets/images/Creator_Dashboard/Innovation Brainstorm_White Badge_Red.png',
         title: 'AI-Powered Compound Risk Gate',
         subtitle:
             'AI analyses multiple small deviations and flags combined risks.',
@@ -2007,7 +2008,7 @@ class _DashboardPageState extends State<DashboardPage>
                 width: 60,
                 height: 61,
                 child: Image.asset(
-                  'assets/images/Group tick.png',
+                  'assets/images/Creator_Dashboard/Approved_White Badge_Red.png',
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) => const Icon(
                     Icons.check_circle,
@@ -2041,7 +2042,8 @@ class _DashboardPageState extends State<DashboardPage>
 
     return _buildDashboardSection(
       chrome: chrome,
-      iconAsset: 'assets/images/new icons for manager/risk_gate_tab.png',
+      iconAsset:
+          'assets/images/Creator_Dashboard/Innovation Brainstorm_White Badge_Red.png',
       title: 'AI-Powered Compound Risk Gate',
       subtitle:
           'AI analyses multiple small deviations and flags combined risks.',
@@ -2396,7 +2398,7 @@ class _DashboardPageState extends State<DashboardPage>
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: Image.asset(
-                  'assets/images/group_187.png',
+                  'assets/images/Creator_Dashboard/Networking_Collaboration_Red Badge__White.png',
                   width: 34,
                   height: 34,
                   fit: BoxFit.cover,
@@ -2570,27 +2572,32 @@ class _DashboardPageState extends State<DashboardPage>
   Widget _buildSystemComponents(ManagerChromeTheme chrome) {
     final components = [
       {
-        'icon': 'assets/images/new icons for manager/Template_li`brary_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Project Management_White Badge_Red.png',
         'label': 'Template Library',
       },
       {
-        'icon': 'assets/images/new icons for manager/content_block_tab.png',
+        'icon': 'assets/images/Creator_Dashboard/Content_blocks_white_red.png',
         'label': 'Content Blocks',
       },
       {
-        'icon': 'assets/images/new icons for manager/client_management_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Team Meeting_White Badge_Red.png',
         'label': 'Client Management',
       },
       {
-        'icon': 'assets/images/new icons for manager/E-signature_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Tag_Channel Name_White Badge_Red.png',
         'label': 'E-Signature',
       },
       {
-        'icon': 'assets/images/new icons for manager/analytics_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Business Growth_Development_White Badge_Red.png',
         'label': 'Analytics',
       },
       {
-        'icon': 'assets/images/new icons for manager/user_management_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/HR_Team Management_White Badge_Red.png',
         'label': 'User Management',
       },
     ];
@@ -2889,7 +2896,7 @@ class _DashboardPageState extends State<DashboardPage>
                   _buildDashboardSection(
                     chrome: chrome,
                     iconAsset:
-                        'assets/images/new icons for manager/proposals.png',
+                        'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Blue.png',
                     iconOnWhiteCircle: true,
                     title: 'Recent Proposals',
                     subtitle: 'Latest proposals created or recently updated.',
@@ -2901,7 +2908,7 @@ class _DashboardPageState extends State<DashboardPage>
                   _buildDashboardSection(
                     chrome: chrome,
                     iconAsset:
-                        'assets/images/new icons for manager/available_tools.png',
+                        'assets/images/Creator_Dashboard/Group 418.png',
                     title: 'Available Tools',
                     subtitle:
                         'Additional description can be included if required.',
@@ -2919,7 +2926,7 @@ class _DashboardPageState extends State<DashboardPage>
                   _buildDashboardSection(
                     chrome: chrome,
                     iconAsset:
-                        'assets/images/new icons for manager/proposal_workflow.png',
+                        'assets/images/Creator_Dashboard/Task Management_White Badge_Red.png',
                     title: 'Proposal Workflow',
                     subtitle: 'Monitor proposal progress across all stages.',
                     child: _buildWorkflow(context, chrome),
