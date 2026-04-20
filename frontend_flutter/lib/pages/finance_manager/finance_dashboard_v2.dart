@@ -1053,55 +1053,63 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     VoidCallback? onAction,
     required Widget child,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _panelDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final hasHeight = constraints.hasBoundedHeight;
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: _panelDecoration(),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: PremiumTheme.titleMedium),
-                    const SizedBox(height: 6),
-                    Text(
-                      subtitle,
-                      style: PremiumTheme.bodyMedium
-                          .copyWith(color: Colors.white70),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: PremiumTheme.titleMedium),
+                        const SizedBox(height: 6),
+                        Text(
+                          subtitle,
+                          style: PremiumTheme.bodyMedium
+                              .copyWith(color: Colors.white70),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 10),
+                  _panelIcon(iconPath),
+                  if (actionLabel != null)
+                    TextButton(
+                      onPressed: onAction,
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFC10D00),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                      ),
+                      child: Text(
+                        actionLabel,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(width: 10),
-              _panelIcon(iconPath),
-              if (actionLabel != null)
-                TextButton(
-                  onPressed: onAction,
-                  style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFFC10D00),
-                    foregroundColor: Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  ),
-                  child: Text(
-                    actionLabel,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
+              const SizedBox(height: 12),
+              if (hasHeight)
+                Expanded(child: child)
+              else
+                child,
             ],
           ),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1564,57 +1572,85 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       future: future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return SizedBox(
-            height: 220,
-            child: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.white.withOpacity(0.7)),
-              ),
-            ),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final h = constraints.hasBoundedHeight
+                  ? constraints.maxHeight
+                  : 220.0;
+              return SizedBox(
+                height: h,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.white.withOpacity(0.7)),
+                  ),
+                ),
+              );
+            },
           );
         }
         final items = snapshot.data ?? [];
         if (items.isEmpty) {
-          return SizedBox(
-            height: 80,
-            child: Center(
-              child: Text('No stalled deals > 30 days',
-                  style:
-                      PremiumTheme.bodyMedium.copyWith(color: Colors.white60)),
-            ),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final h = constraints.hasBoundedHeight
+                  ? constraints.maxHeight
+                  : 80.0;
+              return SizedBox(
+                height: h,
+                child: Center(
+                  child: Text('No stalled deals > 30 days',
+                      style: PremiumTheme.bodyMedium
+                          .copyWith(color: Colors.white60)),
+                ),
+              );
+            },
           );
         }
 
-        final shown = items.take(8).toList();
-        return Column(
-          children: [
-            for (int i = 0; i < shown.length; i++) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      (shown[i]['proposal'] ?? '').toString(),
-                      style:
-                          PremiumTheme.bodyMedium.copyWith(color: Colors.white),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '${shown[i]['days_in_stage'] ?? ''}d',
-                    style: PremiumTheme.bodyMedium.copyWith(
-                      color: Colors.orange,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
+        final shown = items.take(20).toList();
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final available = constraints.hasBoundedHeight
+                ? constraints.maxHeight
+                : 220.0;
+            final h = available.clamp(0.0, 220.0);
+            return SizedBox(
+              height: h,
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                itemCount: shown.length,
+                separatorBuilder: (context, index) => Divider(
+                  color: Colors.white.withOpacity(0.06),
+                  height: 14,
+                ),
+                itemBuilder: (context, index) {
+                  final row = shown[index];
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          (row['proposal'] ?? '').toString(),
+                          style: PremiumTheme.bodyMedium
+                              .copyWith(color: Colors.white),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '${row['days_in_stage'] ?? ''}d',
+                        style: PremiumTheme.bodyMedium.copyWith(
+                          color: Colors.orange,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
-              if (i != shown.length - 1)
-                Divider(color: Colors.white.withOpacity(0.06), height: 14),
-            ],
-          ],
+            );
+          },
         );
       },
     );
@@ -2843,8 +2879,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
               },
             ),
             Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: Column(
                 children: [
                   _buildHeader(app, isMobile, chrome),
                   Expanded(
@@ -3908,122 +3943,133 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final headerWidth = constraints.hasBoundedWidth
+                ? constraints.maxWidth
+                : MediaQuery.sizeOf(context).width;
+
+            return SizedBox(
+              width: headerWidth,
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    _currentTab == 'proposals'
-                        ? 'Finance Proposal Management'
-                        : 'Finance Dashboard',
-                    style: TextStyle(
-                      color: chrome.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(width: 14),
-                  if (!isMobile)
-                    Flexible(
-                      child: Text(
-                        'Hello, ${userName.toString()}',
-                        style: TextStyle(
-                          color: chrome.textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: _adminLikeIconDiameter,
-                  height: _adminLikeIconDiameter,
-                  child: IconButton(
-                    tooltip: 'Messages',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    splashColor: Colors.transparent,
-                    highlightColor: Colors.transparent,
-                    hoverColor: Colors.transparent,
-                    onPressed: () async {
-                      await app.fetchNotifications();
-                      if (!mounted) return;
-                      _showNotificationsSheet(app);
-                    },
-                    icon: Image.asset(
-                      'assets/images/new icons for manager/messages.png',
-                      width: 52,
-                      height: 52,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 0),
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    SizedBox(
-                      width: _adminLikeIconDiameter,
-                      height: _adminLikeIconDiameter,
-                      child: IconButton(
-                        tooltip: 'Notifications',
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        splashColor: Colors.transparent,
-                        highlightColor: Colors.transparent,
-                        hoverColor: Colors.transparent,
-                        onPressed: () async {
-                          await app.fetchNotifications();
-                          if (!mounted) return;
-                          _showNotificationsSheet(app);
-                        },
-                        icon: Image.asset(
-                          'assets/images/new icons for manager/notifications.png',
-                          width: 52,
-                          height: 52,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                    if (unread > 0)
-                      Positioned(
-                        right: -2,
-                        top: -2,
-                        child: Container(
-                          width: 18,
-                          height: 18,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFC10D00),
-                            shape: BoxShape.circle,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Text(
+                          _currentTab == 'proposals'
+                              ? 'Finance Proposal Management'
+                              : 'Finance Dashboard',
+                          style: TextStyle(
+                            color: chrome.textPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
                           ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            unread > 9 ? '9+' : unread.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 14),
+                        if (!isMobile)
+                          Flexible(
+                            child: Text(
+                              'Hello, ${userName.toString()}',
+                              style: TextStyle(
+                                color: chrome.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: _adminLikeIconDiameter,
+                        height: _adminLikeIconDiameter,
+                        child: IconButton(
+                          tooltip: 'Messages',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          splashColor: Colors.transparent,
+                          highlightColor: Colors.transparent,
+                          hoverColor: Colors.transparent,
+                          onPressed: () async {
+                            await app.fetchNotifications();
+                            if (!mounted) return;
+                            _showNotificationsSheet(app);
+                          },
+                          icon: Image.asset(
+                            'assets/images/new icons for manager/messages.png',
+                            width: 52,
+                            height: 52,
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
-                  ],
-                ),
-              ],
-            ),
-          ],
+                      const SizedBox(width: 0),
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          SizedBox(
+                            width: _adminLikeIconDiameter,
+                            height: _adminLikeIconDiameter,
+                            child: IconButton(
+                              tooltip: 'Notifications',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              splashColor: Colors.transparent,
+                              highlightColor: Colors.transparent,
+                              hoverColor: Colors.transparent,
+                              onPressed: () async {
+                                await app.fetchNotifications();
+                                if (!mounted) return;
+                                _showNotificationsSheet(app);
+                              },
+                              icon: Image.asset(
+                                'assets/images/new icons for manager/notifications.png',
+                                width: 52,
+                                height: 52,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                          if (unread > 0)
+                            Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Container(
+                                width: 18,
+                                height: 18,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFC10D00),
+                                  shape: BoxShape.circle,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  unread > 9 ? '9+' : unread.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );

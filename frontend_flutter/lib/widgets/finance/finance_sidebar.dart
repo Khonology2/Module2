@@ -29,10 +29,15 @@ class FinanceSidebar extends StatelessWidget {
 
   static const Color _base = Color(0xFF252525);
   static const Color _accent = Color(0xFFC10D00);
+  static const double _collapsedWidth = 80.0;
+  static const double _expandedWidth = 250.0;
 
   @override
   Widget build(BuildContext context) {
     final c = managerChrome;
+    final height = MediaQuery.sizeOf(context).height;
+    final compact = height < 840;
+    final veryCompact = height < 720;
     final items = <_FinanceNavItem>[
       const _FinanceNavItem(
         label: 'Dashboard',
@@ -61,7 +66,7 @@ class FinanceSidebar extends StatelessWidget {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: isCollapsed ? 90.0 : 250.0,
+      width: isCollapsed ? _collapsedWidth : _expandedWidth,
       decoration: BoxDecoration(
         color: c?.sidebarBackground ?? _base,
         border: Border(
@@ -77,7 +82,7 @@ class FinanceSidebar extends StatelessWidget {
 
           return Column(
             children: [
-              _buildHeader(effectiveCollapsed, c),
+              _buildHeader(effectiveCollapsed, compact, c),
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
@@ -91,6 +96,8 @@ class FinanceSidebar extends StatelessWidget {
                           isCollapsed: effectiveCollapsed,
                           onTap: () => onSelect(item.label),
                           accent: _accent,
+                          compact: compact,
+                          veryCompact: veryCompact,
                           managerChrome: c,
                         ),
                       const SizedBox(height: 20),
@@ -113,6 +120,8 @@ class FinanceSidebar extends StatelessWidget {
                 isCollapsed: effectiveCollapsed,
                 onTap: () => onSelect('Account Profile'),
                 accent: _accent,
+                compact: compact,
+                veryCompact: veryCompact,
                 managerChrome: c,
               ),
               const SizedBox(height: 4),
@@ -124,6 +133,8 @@ class FinanceSidebar extends StatelessWidget {
                 isCollapsed: effectiveCollapsed,
                 onTap: () => onSelect(bottomLabel),
                 accent: _accent,
+                compact: compact,
+                veryCompact: veryCompact,
                 managerChrome: c,
               ),
               if (!effectiveCollapsed) ...[
@@ -166,10 +177,17 @@ class FinanceSidebar extends StatelessWidget {
 
   Color _iconFg(ManagerChromeTheme? c) => c == null ? Colors.white : c.textPrimary;
 
-  Widget _buildHeader(bool effectiveCollapsed, ManagerChromeTheme? c) {
+  Widget _buildHeader(
+    bool effectiveCollapsed,
+    bool compact,
+    ManagerChromeTheme? c,
+  ) {
     if (effectiveCollapsed) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+        padding: EdgeInsets.symmetric(
+          vertical: compact ? 16 : 20,
+          horizontal: 10,
+        ),
         child: InkWell(
           onTap: onToggle,
           borderRadius: BorderRadius.circular(10),
@@ -191,7 +209,8 @@ class FinanceSidebar extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 30, 16, 20),
+      padding:
+          EdgeInsets.fromLTRB(16, compact ? 18 : 30, 16, compact ? 12 : 20),
       child: Stack(
         children: [
           Positioned(
@@ -218,13 +237,13 @@ class FinanceSidebar extends StatelessWidget {
           ),
           Column(
             children: [
-              const SizedBox(height: 4),
+              SizedBox(height: compact ? 2 : 4),
               Image.asset(
                 'assets/images/new icons for manager/khonology_logo.png',
-                height: 36,
+                height: compact ? 30 : 36,
                 fit: BoxFit.contain,
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: compact ? 12 : 20),
               Text(
                 'Welcome to',
                 style: TextStyle(
@@ -234,18 +253,18 @@ class FinanceSidebar extends StatelessWidget {
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: compact ? 2 : 4),
               Text(
                 'Proposal & SOW Builder',
                 style: TextStyle(
                   color: _iconFg(c),
-                  fontSize: 18,
+                  fontSize: compact ? 16 : 18,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.3,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 22),
+              SizedBox(height: compact ? 14 : 22),
               Container(
                 height: 1,
                 color: c?.divider ?? Colors.white.withValues(alpha: 0.14),
@@ -279,6 +298,8 @@ class _FinanceSidebarNavItem extends StatelessWidget {
     required this.isCollapsed,
     required this.onTap,
     required this.accent,
+    required this.compact,
+    required this.veryCompact,
     this.managerChrome,
   });
 
@@ -289,6 +310,8 @@ class _FinanceSidebarNavItem extends StatelessWidget {
   final bool isCollapsed;
   final VoidCallback onTap;
   final Color accent;
+  final bool compact;
+  final bool veryCompact;
   final ManagerChromeTheme? managerChrome;
   static const double _iconWidth = 33.988162994384766;
   static const double _iconHeight = 33.998130798339844;
@@ -323,7 +346,9 @@ class _FinanceSidebarNavItem extends StatelessWidget {
 
     if (isCollapsed) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.symmetric(
+          vertical: veryCompact ? 2 : (compact ? 3 : 5),
+        ),
         child: Tooltip(
           message: label,
           child: Material(
@@ -335,13 +360,13 @@ class _FinanceSidebarNavItem extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: veryCompact ? 48 : (compact ? 52 : 56),
+                    height: veryCompact ? 48 : (compact ? 52 : 56),
                     decoration: BoxDecoration(
                       color: isActive ? accent : _idleRail(c),
                       shape: BoxShape.circle,
                     ),
-                    padding: const EdgeInsets.all(6),
+                    padding: EdgeInsets.all(veryCompact ? 6 : (compact ? 7 : 8)),
                     child: _buildNavIcon(),
                   ),
                   if (badge != null)
@@ -381,14 +406,20 @@ class _FinanceSidebarNavItem extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: veryCompact ? 1 : (compact ? 2 : 4),
+      ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: veryCompact ? 7 : (compact ? 9 : 12),
+            ),
             decoration: BoxDecoration(
               color: isActive ? accent : _idleRail(c),
               borderRadius: isActive ? BorderRadius.circular(10) : BorderRadius.zero,
@@ -396,22 +427,26 @@ class _FinanceSidebarNavItem extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: veryCompact ? 40 : (compact ? 44 : 50),
+                  height: veryCompact ? 40 : (compact ? 44 : 50),
                   decoration: BoxDecoration(
                     color: isActive ? Colors.white.withValues(alpha: 0.22) : _iconWell(c),
                     shape: BoxShape.circle,
                   ),
-                  padding: const EdgeInsets.all(6),
+                  padding: EdgeInsets.all(veryCompact ? 7 : (compact ? 8 : 9)),
                   child: _buildNavIcon(),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: veryCompact ? 10 : (compact ? 12 : 14)),
                 Expanded(
                   child: Text(
                     displayLabel,
                     style: TextStyle(
                       color: _labelColor(c, onAccent: isActive),
-                      fontSize: displayLabel == 'Client Management' ? 13 : 14,
+                      fontSize: veryCompact
+                          ? 13
+                          : (compact
+                              ? (displayLabel == 'Client Management' ? 13 : 14)
+                              : (displayLabel == 'Client Management' ? 14 : 15)),
                       fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                       letterSpacing:
                           displayLabel == 'Client Management' ? -0.2 : 0,
