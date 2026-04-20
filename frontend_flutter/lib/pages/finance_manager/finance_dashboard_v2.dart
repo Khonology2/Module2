@@ -17,6 +17,7 @@ import '../../theme/premium_theme.dart';
 import '../../widgets/custom_scrollbar.dart';
 import '../../widgets/finance/finance_sidebar.dart';
 import '../../widgets/footer.dart';
+import '../../widgets/glass_date_picker.dart';
 import '../../widgets/manager_page_background.dart';
 import '../creator/blank_document_editor_page.dart';
 import 'finance_client_management_page.dart';
@@ -2145,7 +2146,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   side: BorderSide(color: fieldBorder),
                 ),
                 onPressed: () async {
-                  final picked = await showDatePicker(
+                  final picked = await showGlassDatePicker(
                     context: context,
                     initialDate: _auditFrom ?? DateTime.now(),
                     firstDate: DateTime(2020),
@@ -2165,7 +2166,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   side: BorderSide(color: fieldBorder),
                 ),
                 onPressed: () async {
-                  final picked = await showDatePicker(
+                  final picked = await showGlassDatePicker(
                     context: context,
                     initialDate: _auditTo ?? DateTime.now(),
                     firstDate: DateTime(2020),
