@@ -11,6 +11,7 @@ import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../theme/premium_theme.dart';
 import '../../widgets/custom_scrollbar.dart';
+import '../../widgets/glass_date_picker.dart';
 import 'content_library_dialog.dart';
 import 'template_library_page.dart';
 
@@ -2982,7 +2983,7 @@ class _ProposalWizardPageState extends State<ProposalWizard>
                           } catch (_) {}
                         }
 
-                        final picked = await showDatePicker(
+                        final picked = await showGlassDatePicker(
                           context: context,
                           initialDate: initialDate,
                           firstDate: DateTime(now.year - 5),

@@ -25,6 +25,7 @@ import '../../widgets/admin/admin_sidebar.dart';
 import '../../widgets/manager_page_background.dart';
 import '../../utils/html_content_parser.dart';
 import '../../widgets/header.dart';
+import '../../widgets/glass_date_picker.dart';
 import 'governance_panel.dart';
 import '../../services/ai_analysis_service.dart';
 // Import models from document_editor
@@ -7504,7 +7505,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                 child: InkWell(
                   onTap: allowDateEdit
                       ? () async {
-                          final picked = await showDatePicker(
+                          final picked = await showGlassDatePicker(
                             context: context,
                             initialDate: _standardizedProposalDate,
                             firstDate: DateTime(2020),
