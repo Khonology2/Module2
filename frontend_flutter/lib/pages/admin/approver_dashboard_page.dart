@@ -3240,9 +3240,11 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
 
   String _extractRiskLevel(Map<String, dynamic> proposal) {
     final gate = _extractRiskGateObject(proposal);
-    return (proposal['risk_level'] ??
+    final level = (proposal['risk_level'] ??
             proposal['riskLevel'] ??
             proposal['riskLevelLabel'] ??
+            proposal['risk_status'] ??
+            proposal['riskStatus'] ??
             gate?['risk_level'] ??
             gate?['riskLevel'] ??
             gate?['level'] ??
@@ -3252,6 +3254,11 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
         .toString()
         .toLowerCase()
         .trim();
+
+    if (level == 'block') return 'critical';
+    if (level == 'review') return 'high';
+    if (level == 'pass') return 'low';
+    return level;
   }
 
   bool _isHighRisk({required double? riskScore, required String riskLevel}) {
@@ -3260,7 +3267,9 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     return riskLevel == 'high' ||
         riskLevel == 'critical' ||
         riskLevel.contains('high') ||
-        riskLevel.contains('critical');
+        riskLevel.contains('critical') ||
+        riskLevel.contains('block') ||
+        riskLevel.contains('review');
   }
 
   String _formatCurrency(double value) {

@@ -252,7 +252,7 @@ class AdminSidebar extends StatelessWidget {
     final veryCompact = height < 720;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: isCollapsed ? 90.0 : 250.0,
+      width: isCollapsed ? 80.0 : 250.0,
       decoration: BoxDecoration(
         color: _sidebarBg(c),
         border: Border(
@@ -449,13 +449,14 @@ class _AdminSidebarNavItem extends StatelessWidget {
               onTap: onTap,
               borderRadius: BorderRadius.circular(10),
               child: Container(
-                width: 50,
-                height: 50,
+                width: veryCompact ? 48 : (compact ? 52 : 56),
+                height: veryCompact ? 48 : (compact ? 52 : 56),
                 decoration: BoxDecoration(
                   color: isActive ? accent : _idleRail(c),
                   shape: BoxShape.circle,
                 ),
-                padding: const EdgeInsets.all(6),
+                padding:
+                    EdgeInsets.all(veryCompact ? 6 : (compact ? 7 : 8)),
                 child: _buildNavIcon(active: isActive),
               ),
             ),

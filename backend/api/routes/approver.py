@@ -231,18 +231,29 @@ def get_all_proposals_for_admin(username=None, user_id=None, email=None):
 
             query = f'''
                 SELECT
-                    id,
-                    title,
-                    content,
+                    p.id,
+                    p.title,
+                    p.content,
                     {client_expr} AS client,
                     {client_email_expr} AS client_email,
                     {owner_expr} AS user_id,
-                    status,
-                    created_at,
-                    updated_at,
-                    {budget_expr} AS budget
-                FROM proposals
-                ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+                    p.status,
+                    p.created_at,
+                    p.updated_at,
+                    {budget_expr} AS budget,
+                    rr.status AS risk_status,
+                    rr.risk_score AS risk_score,
+                    rr.overridden AS risk_overridden,
+                    rr.created_at AS risk_run_created_at
+                FROM proposals p
+                LEFT JOIN LATERAL (
+                    SELECT status, risk_score, overridden, created_at
+                    FROM risk_gate_runs
+                    WHERE proposal_id = p.id
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ) rr ON TRUE
+                ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC NULLS LAST
             '''
 
             cursor.execute(query)
@@ -260,6 +271,10 @@ def get_all_proposals_for_admin(username=None, user_id=None, email=None):
                     'user_id': row.get('user_id'),
                     'status': row.get('status'),
                     'budget': row.get('budget'),
+                    'risk_score': row.get('risk_score'),
+                    'risk_status': row.get('risk_status'),
+                    'risk_overridden': row.get('risk_overridden'),
+                    'risk_run_created_at': row.get('risk_run_created_at').isoformat() if row.get('risk_run_created_at') else None,
                     'created_at': row.get('created_at').isoformat() if row.get('created_at') else None,
                     'updated_at': row.get('updated_at').isoformat() if row.get('updated_at') else None,
                     'updatedAt': row.get('updated_at').isoformat() if row.get('updated_at') else None,
