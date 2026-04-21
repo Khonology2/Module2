@@ -3302,7 +3302,6 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
         'riskLevelLabel',
       },
     );
-
     final level = (proposal['risk_level'] ??
             proposal['riskLevel'] ??
             proposal['riskLevelLabel'] ??

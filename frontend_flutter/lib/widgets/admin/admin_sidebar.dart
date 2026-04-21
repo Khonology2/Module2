@@ -175,7 +175,11 @@ class AdminSidebar extends StatelessWidget {
     final effectiveCollapsed = showCollapseToggle ? isCollapsed : false;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
+<<<<<<< HEAD
       width: effectiveCollapsed ? collapsedWidth : expandedWidth,
+=======
+      width: isCollapsed ? 80.0 : 250.0,
+>>>>>>> 3eb5e93 (PSB-249 Fix Admin Dashboard High-Risk Items metric)
       decoration: BoxDecoration(
         color: _sidebarBg(c),
         border: Border(
