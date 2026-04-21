@@ -18,10 +18,83 @@ _db_initialized = False
 
 # Load .env from backend directory so DB_HOST / DATABASE_URL_EXTERNAL are always found
 _backend_dir = Path(__file__).resolve().parent.parent.parent
-load_dotenv(dotenv_path=_backend_dir / ".env")
+load_dotenv(dotenv_path=_backend_dir / ".env", override=True)
+
+
+def _config_from_database_url(database_url: str) -> dict:
+    """
+    Parse postgres:// or postgresql:// into psycopg2 kwargs.
+    Remaps Render *internal* hostnames (dpg-…-a with no domain) to DATABASE_URL_EXTERNAL
+    or DB_* when connecting from outside Render.
+    """
+    database_url = (database_url or "").strip()
+    if not database_url:
+        raise ValueError("database_url is empty")
+
+    parsed = urlparse(database_url)
+    host = (parsed.hostname or "").strip()
+    if host.startswith("dpg-") and "." not in host:
+        external_url = os.getenv("DATABASE_URL_EXTERNAL")
+        if external_url:
+            database_url = external_url.strip()
+            parsed = urlparse(database_url)
+            host = (parsed.hostname or "").strip()
+        elif os.getenv("DB_HOST") and "." in (os.getenv("DB_HOST") or ""):
+            return {
+                "host": os.getenv("DB_HOST").strip(),
+                "database": os.getenv("DB_NAME")
+                or (parsed.path or "").lstrip("/")
+                or "proposal_db",
+                "user": os.getenv("DB_USER") or parsed.username,
+                "password": os.getenv("DB_PASSWORD") or parsed.password,
+                "port": int(os.getenv("DB_PORT") or str(parsed.port or 5432)),
+                "sslmode": os.getenv("DB_SSLMODE") or "require",
+            }
+
+    scheme = (parsed.scheme or "").lower()
+    if scheme.startswith("postgresql+"):
+        scheme = "postgresql"
+    if scheme not in ("postgres", "postgresql"):
+        raise ValueError(
+            "DATABASE_URL must start with postgres:// or postgresql:// "
+            "(optionally with a driver like postgresql+psycopg2://)"
+        )
+
+    db_config = {
+        "host": parsed.hostname,
+        "database": (parsed.path or "").lstrip("/"),
+        "user": parsed.username,
+        "password": parsed.password,
+        "port": parsed.port or 5432,
+    }
+
+    query = parse_qs(parsed.query or "")
+    sslmode_from_url = (query.get("sslmode") or [None])[0]
+    ssl_mode = sslmode_from_url or os.getenv("DB_SSLMODE")
+    if not ssl_mode:
+        if os.getenv("DB_REQUIRE_SSL", "false").lower() == "true":
+            ssl_mode = "require"
+        elif db_config.get("host") and "render.com" in db_config["host"].lower():
+            ssl_mode = "require"
+        else:
+            ssl_mode = "prefer"
+    if ssl_mode:
+        db_config["sslmode"] = ssl_mode
+
+    missing = [k for k in ("host", "database", "user") if not db_config.get(k)]
+    if missing:
+        raise ValueError(f"DATABASE_URL missing required parts: {', '.join(missing)}")
+    return db_config
 
 
 def _build_db_config_from_env():
+    # Single explicit URL wins (avoids stale OS-level DB_* / DATABASE_URL when migrating).
+    for key in ("PRIMARY_DATABASE_URL", "ACTIVE_DATABASE_URL"):
+        raw = os.getenv(key)
+        if raw and raw.strip():
+            print(f"[*] Using database URL from {key} (highest priority)")
+            return _config_from_database_url(raw)
+
     prefer_local = os.getenv('DB_PREFER_LOCAL', 'false').lower() == 'true'
     if prefer_local:
         local_config = {
@@ -34,68 +107,44 @@ def _build_db_config_from_env():
         local_sslmode = os.getenv('LOCAL_DB_SSLMODE')
         if local_sslmode:
             local_config['sslmode'] = local_sslmode
+        print("[*] DB config: DB_PREFER_LOCAL=true (local Postgres)")
         return local_config
 
-    database_url = os.getenv('DATABASE_URL')
-    if database_url:
-        parsed = urlparse(database_url)
-        host = (parsed.hostname or '').strip()
-        # Render internal host (dpg-xxx-a) only works on Render. Use external URL or DB_HOST for local dev.
-        if host.startswith('dpg-') and '.' not in host:
-            external_url = os.getenv('DATABASE_URL_EXTERNAL')
-            if external_url:
-                database_url = external_url
-                parsed = urlparse(database_url)
-                host = (parsed.hostname or '').strip()
-            elif os.getenv('DB_HOST') and '.' in (os.getenv('DB_HOST') or ''):
-                return {
-                    'host': os.getenv('DB_HOST').strip(),
-                    'database': os.getenv('DB_NAME') or (parsed.path or '').lstrip('/') or 'proposal_db',
-                    'user': os.getenv('DB_USER') or parsed.username,
-                    'password': os.getenv('DB_PASSWORD') or parsed.password,
-                    'port': int(os.getenv('DB_PORT') or str(parsed.port or 5432)),
-                    'sslmode': os.getenv('DB_SSLMODE') or 'require',
-                }
-        # Accept common Postgres URL scheme variants.
-        scheme = (parsed.scheme or '').lower()
-        if scheme.startswith('postgresql+'):
-            scheme = 'postgresql'
+    # Prefer DATABASE_URL over split DB_* when both exist. Stale Windows USER
+    # environment variables often leave an old DB_HOST while .env is updated
+    # with a new DATABASE_URL only — using DB_* first connected to the wrong host.
+    database_url = (os.getenv('DATABASE_URL') or '').strip()
+    prefer_discrete = os.getenv('DB_CONFIG_PREFER_DISCRETE_KEYS', 'false').lower() in (
+        '1',
+        'true',
+        'yes',
+    )
+    if database_url and not prefer_discrete:
+        print("[*] DB config: using DATABASE_URL (set DB_CONFIG_PREFER_DISCRETE_KEYS=true to use DB_* instead)")
+        return _config_from_database_url(database_url)
 
-        if scheme not in ('postgres', 'postgresql'):
-            raise ValueError(
-                'DATABASE_URL must start with postgres:// or postgresql:// '
-                '(optionally with a driver like postgresql+psycopg2://)'
-            )
-
-        db_config = {
-            'host': parsed.hostname,
-            'database': (parsed.path or '').lstrip('/'),
-            'user': parsed.username,
-            'password': parsed.password,
-            'port': parsed.port or 5432,
+    explicit_host = os.getenv('DB_HOST')
+    explicit_name = os.getenv('DB_NAME')
+    explicit_user = os.getenv('DB_USER')
+    if explicit_host and explicit_name and explicit_user:
+        explicit_config = {
+            'host': explicit_host.strip(),
+            'database': explicit_name.strip(),
+            'user': explicit_user.strip(),
+            'password': os.getenv('DB_PASSWORD', os.getenv('DB_PASS', '')),
+            'port': int(os.getenv('DB_PORT', '5432')),
         }
+        explicit_sslmode = os.getenv('DB_SSLMODE')
+        if explicit_sslmode:
+            explicit_config['sslmode'] = explicit_sslmode
+        print("[*] DB config: using discrete DB_HOST / DB_NAME / DB_USER")
+        return explicit_config
 
-        query = parse_qs(parsed.query or '')
-        sslmode_from_url = (query.get('sslmode') or [None])[0]
+    if database_url:
+        print("[*] DB config: using DATABASE_URL (discrete keys skipped or incomplete)")
+        return _config_from_database_url(database_url)
 
-        ssl_mode = sslmode_from_url or os.getenv('DB_SSLMODE')
-        if not ssl_mode:
-            if os.getenv('DB_REQUIRE_SSL', 'false').lower() == 'true':
-                ssl_mode = 'require'
-            elif db_config.get('host') and 'render.com' in db_config['host'].lower():
-                ssl_mode = 'require'
-            else:
-                ssl_mode = 'prefer'
-
-        if ssl_mode:
-            db_config['sslmode'] = ssl_mode
-
-        missing = [k for k in ('host', 'database', 'user') if not db_config.get(k)]
-        if missing:
-            raise ValueError(f"DATABASE_URL missing required parts: {', '.join(missing)}")
-
-        return db_config
-
+    print("[*] DB config: fallback from individual DB_* / localhost defaults (no DATABASE_URL)")
     return {
         'host': os.getenv('DB_HOST', 'localhost'),
         'database': os.getenv('DB_NAME', 'proposal_db'),
@@ -112,7 +161,13 @@ def get_pg_pool():
     if _pg_pool is None:
         try:
             db_config = _build_db_config_from_env()
-            
+            host = (db_config.get("host") or "").strip()
+            if host.startswith("dpg-") and "." not in host:
+                print(
+                    "[WARN] DB host looks like a Render internal hostname without a domain "
+                    f"({host!r}). From your laptop use the External DB URL, PRIMARY_DATABASE_URL, "
+                    "or DB_HOST with a full *.render.com hostname."
+                )
             # Add SSL mode for external connections (like Render)
             # Check if host contains 'render.com' or SSL is explicitly required
             if 'sslmode' in db_config:
@@ -127,6 +182,10 @@ def get_pg_pool():
             print("[OK] PostgreSQL connection pool created successfully")
         except Exception as exc:
             print(f"[ERROR] Error creating PostgreSQL connection pool: {exc}")
+            if "SSL" in str(exc) or "ssl" in str(exc).lower():
+                print(
+                    "[HINT] Try DB_SSLMODE=prefer in backend/.env (some networks drop TLS on require)."
+                )
             raise
     return _pg_pool
 

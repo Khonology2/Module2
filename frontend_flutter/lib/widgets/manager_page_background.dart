@@ -15,14 +15,16 @@ class ManagerPageBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chrome = context.watch<ManagerThemeController>().chrome;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage(chrome.backgroundAsset),
-          fit: BoxFit.cover,
+    return SizedBox.expand(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(chrome.backgroundAsset),
+            fit: BoxFit.cover,
+          ),
         ),
+        child: child,
       ),
-      child: child,
     );
   }
 }

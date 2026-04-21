@@ -1,5 +1,4 @@
 // ignore_for_file: unused_field, unused_element, unused_local_variable, deprecated_member_use
-
 import 'dart:convert';
 import 'dart:ui';
 
@@ -403,7 +402,7 @@ class _DashboardPageState extends State<DashboardPage>
     final unread = _unreadNotificationCount(app, messagesOnly: false);
     return _buildIconButton(
       chrome: chrome,
-      assetPath: 'assets/images/new icons for manager/notifications.png',
+      assetPath: 'assets/images/Creator_Dashboard/Notification_blue.png',
       badge: unread > 0 ? unread : null,
       onTap: () async {
         await app.fetchNotifications();
@@ -788,64 +787,67 @@ class _DashboardPageState extends State<DashboardPage>
             )
           : null,
       body: ManagerPageBackground(
-        child: Row(
-          children: [
-            // Sidebar
-            Consumer<AppState>(
-              builder: (context, app, child) {
-                final role = (app.currentUser?['role'] ?? '')
-                    .toString()
-                    .toLowerCase()
-                    .trim();
-                final isAdmin =
-                    role == 'admin' || role == 'ceo' || role == 'approver';
-                return AppSideNav(
-                  isCollapsed: app.isSidebarCollapsed,
-                  currentLabel: app.currentNavLabel,
-                  isAdmin: isAdmin,
-                  onToggle: app.toggleSidebar,
-                  onSelect: (label) {
-                    app.setCurrentNavLabel(label);
-                    _navigateToPage(context, label);
-                  },
-                );
-              },
-            ),
+        child: SafeArea(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Sidebar
+              Consumer<AppState>(
+                builder: (context, app, child) {
+                  final role = (app.currentUser?['role'] ?? '')
+                      .toString()
+                      .toLowerCase()
+                      .trim();
+                  final isAdmin =
+                      role == 'admin' || role == 'ceo' || role == 'approver';
+                  return AppSideNav(
+                    isCollapsed: app.isSidebarCollapsed,
+                    currentLabel: app.currentNavLabel,
+                    isAdmin: isAdmin,
+                    onToggle: app.toggleSidebar,
+                    onSelect: (label) {
+                      app.setCurrentNavLabel(label);
+                      _navigateToPage(context, label);
+                    },
+                  );
+                },
+              ),
 
-            // Main Content Area
-            Expanded(
-              child: Column(
-                children: [
-                  // ── Header bar ────────────────────────────────────────────
-                  _buildHeaderBar(app, userRole, chrome),
+              // Main Content Area
+              Expanded(
+                child: Column(
+                  children: [
+                    // ── Header bar ────────────────────────────────────────────
+                    _buildHeaderBar(app, userRole, chrome),
 
-                  // ── Scrollable body ───────────────────────────────────────
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: CustomScrollbar(
-                        controller: _scrollController,
-                        child: RefreshIndicator(
-                          onRefresh: _refreshData,
-                          color: const Color(0xFFC10D00),
-                          child: SingleChildScrollView(
-                            controller: _scrollController,
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: _buildRoleSpecificContent(
-                                userRole, counts, app, chrome),
+                    // ── Scrollable body ───────────────────────────────────────
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                        child: CustomScrollbar(
+                          controller: _scrollController,
+                          child: RefreshIndicator(
+                            onRefresh: _refreshData,
+                            color: const Color(0xFFC10D00),
+                            child: SingleChildScrollView(
+                              controller: _scrollController,
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: _buildRoleSpecificContent(
+                                  userRole, counts, app, chrome),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
 
-                  // Footer
-                  const Footer(),
-                ],
+                    // Footer
+                    const Footer(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -912,7 +914,7 @@ class _DashboardPageState extends State<DashboardPage>
           // Right: messages (comments & mentions), notifications (everything else), profile
           _buildIconButton(
             chrome: chrome,
-            assetPath: 'assets/images/new icons for manager/messages.png',
+            assetPath: 'assets/images/Creator_Dashboard/Email_blue.png',
             onTap: () async {
               await app.fetchNotifications();
               if (!mounted) return;
@@ -925,50 +927,6 @@ class _DashboardPageState extends State<DashboardPage>
           const SizedBox(width: 8),
           // Notifications icon (preserves existing functionality)
           _buildNotificationButton(app, chrome),
-          const SizedBox(width: 12),
-          // Profile avatar
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFC10D00).withOpacity(0.5),
-                width: 2,
-              ),
-            ),
-            child: ClipOval(
-              child: Image.asset(
-                'assets/images/User_Profile.png',
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: chrome.textSecondary, size: 28),
-            onSelected: (value) {
-              if (value == 'logout') {
-                app.logout();
-                AuthService.logout();
-                Navigator.pushNamed(context, '/login');
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem<String>(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout),
-                    SizedBox(width: 8),
-                    Text('Logout'),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -987,9 +945,9 @@ class _DashboardPageState extends State<DashboardPage>
           onTap: onTap,
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            width: 80,
-            height: 80,
-            padding: const EdgeInsets.all(14),
+            width: 64,
+            height: 64,
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: chrome.floatingFill,
               shape: BoxShape.circle,
@@ -999,8 +957,8 @@ class _DashboardPageState extends State<DashboardPage>
         ),
         if (badge != null && badge > 0)
           Positioned(
-            right: 4,
-            top: 4,
+            right: 2,
+            top: 2,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: const BoxDecoration(
@@ -1037,20 +995,19 @@ class _DashboardPageState extends State<DashboardPage>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: chrome.isDark
-                    ? null
-                    : Border.all(color: chrome.divider, width: 1),
-              ),
+            SizedBox(
+              width: 44.87,
+              height: 44.87,
               child: Image.asset(
-                'assets/images/new icons for manager/messages.png',
+                'assets/images/Creator_Dashboard/Notification_blue.png',
+                width: 44.87,
+                height: 44.87,
                 fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.notifications_none,
+                  size: 24,
+                  color: Colors.black87,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -1537,20 +1494,13 @@ class _DashboardPageState extends State<DashboardPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (iconAsset != null) ...[
-                Container(
+                SizedBox(
                   width: 80,
                   height: 80,
-                  decoration: BoxDecoration(
-                    color: iconOnWhiteCircle
-                        ? Colors.white
-                        : const Color(0xFFC10D00).withOpacity(0.15),
-                    shape: BoxShape.circle,
-                    border: iconOnWhiteCircle && !chrome.isDark
-                        ? Border.all(color: chrome.divider, width: 1)
-                        : null,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Image.asset(iconAsset, fit: BoxFit.contain),
                   ),
-                  padding: const EdgeInsets.all(12),
-                  child: Image.asset(iconAsset, fit: BoxFit.contain),
                 ),
                 const SizedBox(width: 14),
               ],
@@ -1611,7 +1561,16 @@ class _DashboardPageState extends State<DashboardPage>
             ],
           ),
           const SizedBox(height: 16),
-          Container(height: 1, color: chrome.divider),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: double.infinity,
+              height: title == 'Recent Proposals' ? 0.61 : 1,
+              color: title == 'Recent Proposals'
+                  ? const Color(0xFFFFFFFF)
+                  : chrome.divider,
+            ),
+          ),
           const SizedBox(height: 14),
           child,
         ],
@@ -1626,7 +1585,8 @@ class _DashboardPageState extends State<DashboardPage>
         'title': 'Draft Proposals',
         'subtitle': 'Proposals in progress\nand not yet submitted.',
         'value': counts['Draft']?.toString() ?? '0',
-        'icon': 'assets/images/new icons for manager/Draft proposal.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Red.png',
       },
       {
         'title': 'Pending CEO Approval',
@@ -1634,19 +1594,21 @@ class _DashboardPageState extends State<DashboardPage>
         'value':
             (counts['Pending CEO Approval'] ?? counts['Pending Approval'] ?? 0)
                 .toString(),
-        'icon': 'assets/images/new icons for manager/Pending Ceo approval.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Concentration_Key Focus_White Badge_Red.png',
       },
       {
         'title': 'Sent to Client',
         'subtitle': 'Delivered to clients\nand awaiting their response.',
         'value': counts['Sent to Client']?.toString() ?? '0',
-        'icon': 'assets/images/new icons for manager/sent to client.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Send_Paper Plane_White Badge_Red.png',
       },
       {
         'title': 'Signed',
         'subtitle': 'Finalized and\napproved by clients.',
         'value': counts['Signed']?.toString() ?? '0',
-        'icon': 'assets/images/new icons for manager/signed.png',
+        'icon': 'assets/images/Creator_Dashboard/Approved_White Badge_Red.png',
       },
     ];
 
@@ -1684,6 +1646,7 @@ class _DashboardPageState extends State<DashboardPage>
         padding: const EdgeInsets.all(16),
         decoration: chrome.floatingPanelDecoration(radius: 10),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             // Text info
             Expanded(
@@ -1721,19 +1684,18 @@ class _DashboardPageState extends State<DashboardPage>
               ),
             ),
             const SizedBox(width: 8),
-            // Icon (~2× for visual prominence)
             Container(
-              width: 104,
-              height: 104,
+              width: 84,
+              height: 84,
               decoration: BoxDecoration(
-                color: const Color(0xFFC10D00).withOpacity(0.15),
+                color: const Color(0xFFC10D00).withValues(alpha: 0.15),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: const Color(0xFFC10D00).withOpacity(0.3),
+                  color: const Color(0xFFC10D00).withValues(alpha: 0.30),
                   width: 1,
                 ),
               ),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               child: Image.asset(iconAsset, fit: BoxFit.contain),
             ),
           ],
@@ -1746,17 +1708,54 @@ class _DashboardPageState extends State<DashboardPage>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildWorkflowStep('1', 'Compose', context, chrome),
-        _buildWorkflowStep('2', 'Govern', context, chrome),
-        _buildWorkflowStep('3', 'AI Risk Gate', context, chrome),
-        _buildWorkflowStep('4', 'Preview', context, chrome),
-        _buildWorkflowStep('5', 'Internal Sign-off', context, chrome),
+        _buildWorkflowStep(
+          'assets/images/Creator_Dashboard/1.png',
+          'Compose',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+        ),
+        _buildWorkflowStep(
+          'assets/images/Creator_Dashboard/2.png',
+          'Govern',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+        ),
+        _buildWorkflowStep(
+          'assets/images/Creator_Dashboard/3.png',
+          'AI Risk Gate',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+        ),
+        _buildWorkflowStep(
+          'assets/images/Creator_Dashboard/4.png',
+          'Preview',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+        ),
+        _buildWorkflowStep(
+          'assets/images/Creator_Dashboard/5.png',
+          'Internal Sign-off',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+          figmaLabelWidth: 102.03,
+        ),
       ],
     );
   }
 
-  Widget _buildWorkflowStep(String number, String label, BuildContext context,
-      ManagerChromeTheme chrome) {
+  Widget _buildWorkflowStep(
+    String iconAssetPath,
+    String label,
+    BuildContext context,
+    ManagerChromeTheme chrome, {
+    bool applyFigmaLabelSpecs = false,
+    double figmaLabelWidth = 79.29,
+  }) {
     return Expanded(
       child: InkWell(
         onTap: () {
@@ -1764,37 +1763,56 @@ class _DashboardPageState extends State<DashboardPage>
         },
         borderRadius: BorderRadius.circular(10),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(
             children: [
-              Container(
-                width: 96,
-                height: 96,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFC10D00),
-                  shape: BoxShape.circle,
-                ),
+              SizedBox(
+                width: 51.92,
+                height: 51.92,
                 child: Center(
-                  child: Text(
-                    number,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 34,
+                  child: Image.asset(
+                    iconAssetPath,
+                    width: 51.92,
+                    height: 51.92,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.broken_image,
+                      color: Colors.white70,
+                      size: 28,
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: chrome.textPrimary,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              applyFigmaLabelSpecs
+                  ? SizedBox(
+                      width: figmaLabelWidth,
+                      height: 18.44,
+                      child: Center(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9.22,
+                            height: 9.38 / 9.22,
+                            letterSpacing: 0.0922,
+                            color: chrome.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  : Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: chrome.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
             ],
           ),
         ),
@@ -1972,7 +1990,8 @@ class _DashboardPageState extends State<DashboardPage>
     if (_riskItems.isEmpty) {
       return _buildDashboardSection(
         chrome: chrome,
-        iconAsset: 'assets/images/new icons for manager/risk_gate_tab.png',
+        iconAsset:
+            'assets/images/Creator_Dashboard/Innovation Brainstorm_White Badge_Red.png',
         title: 'AI-Powered Compound Risk Gate',
         subtitle:
             'AI analyses multiple small deviations and flags combined risks.',
@@ -1988,14 +2007,18 @@ class _DashboardPageState extends State<DashboardPage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 112,
-                height: 112,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFC10D00),
-                  shape: BoxShape.circle,
+              SizedBox(
+                width: 60,
+                height: 61,
+                child: Image.asset(
+                  'assets/images/Creator_Dashboard/Approved_White Badge_Red.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.check_circle,
+                    color: Colors.white,
+                    size: 56,
+                  ),
                 ),
-                child: const Icon(Icons.check, color: Colors.white, size: 56),
               ),
               const SizedBox(height: 14),
               Text(
@@ -2022,7 +2045,8 @@ class _DashboardPageState extends State<DashboardPage>
 
     return _buildDashboardSection(
       chrome: chrome,
-      iconAsset: 'assets/images/new icons for manager/risk_gate_tab.png',
+      iconAsset:
+          'assets/images/Creator_Dashboard/Innovation Brainstorm_White Badge_Red.png',
       title: 'AI-Powered Compound Risk Gate',
       subtitle:
           'AI analyses multiple small deviations and flags combined risks.',
@@ -2145,6 +2169,8 @@ class _DashboardPageState extends State<DashboardPage>
   Widget _buildRecentProposals(
       List<dynamic> proposals, ManagerChromeTheme chrome) {
     final filteredProposals = _getFilteredProposals(proposals);
+    final size = MediaQuery.sizeOf(context);
+    final listMaxHeight = size.height < 800 ? 200.0 : 260.0;
 
     filteredProposals.sort((a, b) {
       DateTime? parseDate(dynamic value) {
@@ -2251,7 +2277,7 @@ class _DashboardPageState extends State<DashboardPage>
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         // Filtered Proposals List
         if (filteredProposals.isEmpty)
@@ -2271,19 +2297,27 @@ class _DashboardPageState extends State<DashboardPage>
             ),
           )
         else
-          ...filteredProposals.take(5).map((proposal) {
-            String status = proposal['status'] ?? 'Draft';
-            Color statusColor = _getStatusColor(status);
-            Color textColor = _getStatusTextColor(status);
-
-            return _buildProposalItem(
-              proposal,
-              status,
-              statusColor,
-              textColor,
-              chrome,
-            );
-          }).toList(),
+          SizedBox(
+            height: listMaxHeight,
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount:
+                  filteredProposals.length > 5 ? 5 : filteredProposals.length,
+              itemBuilder: (context, index) {
+                final proposal = filteredProposals[index];
+                String status = proposal['status'] ?? 'Draft';
+                Color statusColor = _getStatusColor(status);
+                Color textColor = _getStatusTextColor(status);
+                return _buildProposalItem(
+                  proposal,
+                  status,
+                  statusColor,
+                  textColor,
+                  chrome,
+                );
+              },
+            ),
+          ),
       ],
     );
   }
@@ -2343,12 +2377,6 @@ class _DashboardPageState extends State<DashboardPage>
       );
     }
 
-    final checkboxIdleBorder = selected
-        ? const Color(0xFFC10D00)
-        : (chrome.isDark
-            ? Colors.white.withOpacity(0.35)
-            : ManagerChromeTheme.textDark.withOpacity(0.35));
-
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -2368,20 +2396,27 @@ class _DashboardPageState extends State<DashboardPage>
               });
             },
             child: Container(
-              width: 22,
-              height: 22,
-              margin: const EdgeInsets.only(right: 14),
+              width: 34,
+              height: 34,
+              margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: checkboxIdleBorder,
-                  width: 2,
-                ),
-                color: selected ? const Color(0xFFC10D00) : Colors.transparent,
+                border: selected
+                    ? Border.all(
+                        color: const Color(0xFF2D9CFF),
+                        width: 1.8,
+                      )
+                    : null,
               ),
-              child: selected
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : null,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.asset(
+                  'assets/images/Creator_Dashboard/Networking_Collaboration_Red Badge__White.png',
+                  width: 34,
+                  height: 34,
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
           ),
           Expanded(
@@ -2550,27 +2585,32 @@ class _DashboardPageState extends State<DashboardPage>
   Widget _buildSystemComponents(ManagerChromeTheme chrome) {
     final components = [
       {
-        'icon': 'assets/images/new icons for manager/Template_li`brary_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Project Management_White Badge_Red.png',
         'label': 'Template Library',
       },
       {
-        'icon': 'assets/images/new icons for manager/content_block_tab.png',
+        'icon': 'assets/images/Creator_Dashboard/Content_blocks_white_red.png',
         'label': 'Content Blocks',
       },
       {
-        'icon': 'assets/images/new icons for manager/client_management_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Team Meeting_White Badge_Red.png',
         'label': 'Client Management',
       },
       {
-        'icon': 'assets/images/new icons for manager/E-signature_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Tag_Channel Name_White Badge_Red.png',
         'label': 'E-Signature',
       },
       {
-        'icon': 'assets/images/new icons for manager/analytics_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Business Growth_Development_White Badge_Red.png',
         'label': 'Analytics',
       },
       {
-        'icon': 'assets/images/new icons for manager/user_management_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/HR_Team Management_White Badge_Red.png',
         'label': 'User Management',
       },
     ];
@@ -2604,15 +2644,13 @@ class _DashboardPageState extends State<DashboardPage>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
+                SizedBox(
                   width: 80,
                   height: 80,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFC10D00).withOpacity(0.12),
-                    shape: BoxShape.circle,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Image.asset(iconAsset, fit: BoxFit.contain),
                   ),
-                  padding: const EdgeInsets.all(14),
-                  child: Image.asset(iconAsset, fit: BoxFit.contain),
                 ),
                 const SizedBox(height: 10),
                 Text(
@@ -2871,7 +2909,7 @@ class _DashboardPageState extends State<DashboardPage>
                   _buildDashboardSection(
                     chrome: chrome,
                     iconAsset:
-                        'assets/images/new icons for manager/proposals.png',
+                        'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Blue.png',
                     iconOnWhiteCircle: true,
                     title: 'Recent Proposals',
                     subtitle: 'Latest proposals created or recently updated.',
@@ -2883,7 +2921,7 @@ class _DashboardPageState extends State<DashboardPage>
                   _buildDashboardSection(
                     chrome: chrome,
                     iconAsset:
-                        'assets/images/new icons for manager/available_tools.png',
+                        'assets/images/Creator_Dashboard/Group 418.png',
                     title: 'Available Tools',
                     subtitle:
                         'Additional description can be included if required.',
@@ -2901,7 +2939,7 @@ class _DashboardPageState extends State<DashboardPage>
                   _buildDashboardSection(
                     chrome: chrome,
                     iconAsset:
-                        'assets/images/new icons for manager/proposal_workflow.png',
+                        'assets/images/Creator_Dashboard/Task Management_White Badge_Red.png',
                     title: 'Proposal Workflow',
                     subtitle: 'Monitor proposal progress across all stages.',
                     child: _buildWorkflow(context, chrome),

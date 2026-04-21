@@ -1640,6 +1640,7 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
                         child: AdminSidebar(
                           isCollapsed: app.isAdminSidebarCollapsed,
                           currentPage: app.adminNavLabel,
+                          managerChrome: chrome,
                           onToggle: app.toggleAdminSidebar,
                           onSelect: (label) {
                             app.setAdminNavLabel(label);

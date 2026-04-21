@@ -10,9 +10,11 @@ import 'package:provider/provider.dart';
 import '../../api.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../theme/manager_theme_controller.dart';
 import '../../theme/premium_theme.dart';
 import '../../widgets/custom_scrollbar.dart';
 import '../../widgets/admin/admin_sidebar.dart';
+import '../../widgets/manager_page_background.dart';
 
 enum AuditEventType {
   proposalCreated,
@@ -214,6 +216,7 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
 
     try {
       AuthService.restoreSessionFromStorage();
+      const requestTimeout = Duration(seconds: 25);
       var token = AuthService.token;
       if (token == null) {
         await Future.delayed(const Duration(milliseconds: 400));
@@ -223,27 +226,41 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
         throw Exception('Session expired');
       }
 
-      final response = await http.get(
-        Uri.parse('${ApiService.baseUrl}/api/proposals/all'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 12));
-
       final List<Map<String, dynamic>> proposals = [];
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        final raw = (decoded is Map ? decoded['proposals'] : null);
-        if (raw is List) {
-          for (final item in raw) {
+      try {
+        final response = await http.get(
+          Uri.parse('${ApiService.baseUrl}/api/proposals/all'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        ).timeout(requestTimeout);
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          final raw = (decoded is Map ? decoded['proposals'] : null);
+          if (raw is List) {
+            for (final item in raw) {
+              if (item is Map) {
+                proposals.add(Map<String, dynamic>.from(item));
+              }
+            }
+          }
+        }
+      } catch (_) {
+        // Fall back below.
+      }
+
+      if (proposals.isEmpty) {
+        try {
+          final fallback = await ApiService.getProposals(token).timeout(requestTimeout);
+          for (final item in fallback) {
             if (item is Map) {
               proposals.add(Map<String, dynamic>.from(item));
             }
           }
+        } catch (_) {
+          throw Exception('Unable to load history right now. Please retry.');
         }
-      } else {
-        throw Exception('Failed to load proposals (${response.statusCode})');
       }
 
       final events = _buildEvents(proposals);
@@ -986,6 +1003,9 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
       case 'Content Library':
         Navigator.pushReplacementNamed(context, '/content_library');
         break;
+      case 'Account Profile':
+        Navigator.pushReplacementNamed(context, '/manager_account_profile');
+        break;
       case 'Sign Out':
       case 'Logout':
         AuthService.logout();
@@ -998,6 +1018,7 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final chrome = context.watch<ManagerThemeController>().chrome;
 
     final events = _filteredEvents();
 
@@ -1071,52 +1092,32 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/Global BG.jpg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.black.withValues(alpha: 0.75),
-                  Colors.black.withValues(alpha: 0.35),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+      body: ManagerPageBackground(
+        child: SafeArea(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Material(
+                child: AdminSidebar(
+                  isCollapsed: app.isAdminSidebarCollapsed,
+                  currentPage: _currentPage,
+                  managerChrome: chrome,
+                  onToggle: app.toggleAdminSidebar,
+                  onSelect: (label) {
+                    setState(() => _currentPage = label);
+                    _navigateToPage(label);
+                  },
+                ),
               ),
-            ),
-          ),
-          SafeArea(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Material(
-                  child: AdminSidebar(
-                    isCollapsed: app.isAdminSidebarCollapsed,
-                    currentPage: _currentPage,
-                    onToggle: app.toggleAdminSidebar,
-                    onSelect: (label) {
-                      setState(() => _currentPage = label);
-                      _navigateToPage(label);
-                    },
-                  ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: main,
                 ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: main,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
