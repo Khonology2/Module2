@@ -60,8 +60,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     'rejected': 0,
     'viewed': 0,
   };
-  bool _isSidebarCollapsed = false;
-  int? _hoverSidebarIndex;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _proposalsScrollController = ScrollController();
 
@@ -69,12 +67,14 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     {
       'index': 0,
       'label': 'Dashboard',
-      'asset': 'assets/images/new icons for manager/Dashboard.png'
+      'asset':
+          'assets/images/Creator_Dashboard/Project Launch_Start_White Badge_Blue.png'
     },
     {
       'index': 1,
       'label': 'Proposals',
-      'asset': 'assets/images/new icons for manager/proposals.png'
+      'asset':
+          'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Blue.png'
     },
     {
       'index': 2,
@@ -152,105 +152,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSidebarActionItem({
-    required String label,
-    required String assetPath,
-    required bool isCollapsed,
-    required VoidCallback onTap,
-  }) {
-    final chrome = context.read<ManagerThemeController>().chrome;
-    final bool isHovering = _hoverSidebarIndex == -1;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hoverSidebarIndex = -1),
-      onExit: (_) => setState(() => _hoverSidebarIndex = null),
-      child: Padding(
-        padding: isCollapsed
-            ? const EdgeInsets.symmetric(vertical: 5)
-            : const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        child: Tooltip(
-          message: isCollapsed ? label : '',
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(10),
-            child: isCollapsed
-                ? Center(
-                    child: Container(
-                      width: 62,
-                      height: 62,
-                      decoration: BoxDecoration(
-                        color: Colors.transparent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Image.asset(
-                          assetPath,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Icon(
-                            Icons.image_not_supported_outlined,
-                            color: chrome.textPrimary,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                : Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isHovering
-                          ? chrome.sidebarHoverFill
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: Colors.transparent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(6),
-                            child: Image.asset(
-                              assetPath,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.image_not_supported_outlined,
-                                color: chrome.textPrimary,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            label,
-                            style: TextStyle(
-                              color: chrome.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                              height: 1.2,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
           ),
         ),
       ),
@@ -1323,13 +1224,124 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     });
   }
 
-  Widget _buildSidebar() {
+  Widget _buildSidebar({bool inDrawer = false}) {
     final chrome = context.watch<ManagerThemeController>().chrome;
+    final theme = Theme.of(context);
+    final isDark = chrome.isDark;
+    final unselectedColor = isDark
+        ? Colors.white
+        : theme.colorScheme.onSurface.withValues(alpha: 0.84);
+    final subItemUnselectedColor = isDark
+        ? Colors.white.withValues(alpha: 0.9)
+        : theme.colorScheme.onSurface.withValues(alpha: 0.78);
+    final welcomeTextColor = isDark
+        ? Colors.white
+        : theme.colorScheme.onSurface.withValues(alpha: 0.82);
     const Color leftAccent = Color(0xFF1565C0);
+    const Color activeColor = Color(0xFFC10D00);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: _isSidebarCollapsed ? 80 : 270,
+    Widget buildSidebarIcon({
+      required String assetPath,
+      required double chipSize,
+      required double iconSize,
+      required bool selected,
+    }) {
+      return SizedBox(
+        width: chipSize,
+        height: chipSize,
+        child: Image.asset(
+          assetPath,
+          width: iconSize,
+          height: iconSize,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => Icon(
+            Icons.image_not_supported_outlined,
+            size: iconSize,
+            color: chrome.textPrimary,
+          ),
+        ),
+      );
+    }
+
+    Widget buildNavRow({
+      required int index,
+      required String label,
+      required String assetPath,
+      required double chipSize,
+      required double iconSize,
+      required double navVerticalPadding,
+      required double navFontSize,
+      Color? labelColor,
+      VoidCallback? onTap,
+    }) {
+      final selected = _selectedNavIndex == index;
+      final badgeCount =
+          label == 'Proposals' ? _proposalsRequiringActionCount() : 0;
+
+      return Padding(
+        padding:
+            EdgeInsets.symmetric(horizontal: 14, vertical: navVerticalPadding),
+        child: InkWell(
+          onTap: onTap ?? () => _handleNavTap(index, closeDrawer: inDrawer),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected ? activeColor : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                buildSidebarIcon(
+                  assetPath: assetPath,
+                  chipSize: chipSize,
+                  iconSize: iconSize,
+                  selected: selected,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected
+                          ? Colors.white
+                          : (labelColor ?? unselectedColor),
+                      fontSize: navFontSize,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ),
+                if (!selected && badgeCount > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: chrome.isDark
+                          ? Colors.white.withValues(alpha: 0.18)
+                          : Colors.black.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      badgeCount > 99 ? '99+' : badgeCount.toString(),
+                      style: TextStyle(
+                        color: chrome.textPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: 285,
       decoration: BoxDecoration(
         color: chrome.sidebarBackground,
         border: Border(
@@ -1338,249 +1350,144 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         ),
       ),
       child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_isSidebarCollapsed)
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-                child: InkWell(
-                  onTap: () => setState(() => _isSidebarCollapsed = false),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Container(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxHeight < 760;
+            final isVeryCompact = constraints.maxHeight < 660;
+            final isUltraCompact = constraints.maxHeight < 580;
+
+            final double sidebarChipSize = isUltraCompact
+                ? 38
+                : (isVeryCompact ? 42 : (isCompact ? 44.87 : 46));
+            final double sidebarIconSize = isUltraCompact
+                ? 38
+                : (isVeryCompact ? 42 : (isCompact ? 44.87 : 46));
+            final double navVerticalPadding =
+                isUltraCompact ? 1.5 : (isVeryCompact ? 2 : 3);
+            final double navFontSize =
+                isUltraCompact ? 11.0 : (isVeryCompact ? 12.0 : 13.0);
+            final double sectionGap =
+                isUltraCompact ? 2 : (isVeryCompact ? 4 : 6);
+            final double bottomGap =
+                isUltraCompact ? 6 : (isVeryCompact ? 8 : 10);
+
+            return Column(
+              children: [
+                SizedBox(height: isUltraCompact ? 4 : 8),
+                Image.asset(
+                  'assets/icons/khono.png',
+                  width: isUltraCompact ? 150 : (isVeryCompact ? 190 : 228),
+                  height: isUltraCompact ? 28 : (isVeryCompact ? 35 : 44),
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/images/new icons for manager/khonology_logo.png',
+                    width: isUltraCompact ? 150 : (isVeryCompact ? 190 : 228),
+                    height: isUltraCompact ? 28 : (isVeryCompact ? 35 : 44),
+                    fit: BoxFit.contain,
                   ),
                 ),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 30, 16, 20),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: InkWell(
-                        onTap: () => setState(() => _isSidebarCollapsed = true),
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.keyboard_arrow_left,
-                            color: Colors.transparent,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Column(
+                SizedBox(height: isUltraCompact ? 4 : 6),
+                Text(
+                  'Welcome to',
+                  style: TextStyle(
+                    color: welcomeTextColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize:
+                        isUltraCompact ? 11.0 : (isVeryCompact ? 12.0 : 12.5),
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Proposal & SOW Builder',
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: welcomeTextColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize:
+                        isUltraCompact ? 11.0 : (isVeryCompact ? 12.0 : 12.5),
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                SizedBox(height: sectionGap),
+                Divider(color: chrome.divider, height: 1),
+                SizedBox(height: sectionGap),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
                       children: [
-                        const SizedBox(height: 4),
-                        Image.asset(
-                          'assets/images/new icons for manager/khonology_logo.png',
-                          height: 36,
-                          fit: BoxFit.contain,
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          'Welcome to',
-                          style: TextStyle(
-                            color: chrome.textSecondary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w400,
+                        for (final item in _clientNavItems)
+                          buildNavRow(
+                            index: item['index'] as int,
+                            label: item['label'] as String,
+                            assetPath: item['asset'] as String,
+                            chipSize: sidebarChipSize,
+                            iconSize: sidebarIconSize,
+                            navVerticalPadding: navVerticalPadding,
+                            navFontSize: navFontSize,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Proposal & SOW Builder',
-                          style: TextStyle(
-                            color: chrome.textPrimary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 22),
-                        Divider(color: chrome.divider, height: 1),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Column(
-                  children: [
-                    for (final item in _clientNavItems)
-                      _buildSidebarNavItem(
-                        index: item['index'] as int,
-                        label: item['label'] as String,
-                        assetPath: item['asset'] as String,
-                        isCollapsed: _isSidebarCollapsed,
-                      ),
-                  ],
+                SizedBox(height: bottomGap),
+                Divider(color: chrome.divider, height: 1),
+                buildNavRow(
+                  index: 3,
+                  label: 'Account Profile',
+                  assetPath: 'assets/images/User_Profile.png',
+                  chipSize: sidebarChipSize,
+                  iconSize: sidebarIconSize,
+                  navVerticalPadding: navVerticalPadding,
+                  navFontSize: navFontSize,
+                  labelColor: subItemUnselectedColor,
                 ),
-              ),
-            ),
-            if (!_isSidebarCollapsed)
-              Container(
-                margin:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                height: 1,
-                color: chrome.divider,
-              ),
-            _buildSidebarNavItem(
-              index: 3,
-              label: 'Account Profile',
-              assetPath: 'assets/images/User_Profile.png',
-              isCollapsed: _isSidebarCollapsed,
-            ),
-            _buildSidebarActionItem(
-              label: 'Logout',
-              assetPath: 'assets/images/Logout_KhonoBuzz.png',
-              isCollapsed: _isSidebarCollapsed,
-              onTap: _logoutClient,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSidebarNavItem({
-    required int index,
-    required String label,
-    required String assetPath,
-    required bool isCollapsed,
-  }) {
-    final chrome = context.read<ManagerThemeController>().chrome;
-    const Color activeColor = Color(0xFFC10D00);
-    final bool selected = _selectedNavIndex == index;
-    final bool isHovering = _hoverSidebarIndex == index;
-    final int badgeCount =
-        label == 'Proposals' ? _proposalsRequiringActionCount() : 0;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hoverSidebarIndex = index),
-      onExit: (_) => setState(() => _hoverSidebarIndex = null),
-      child: Padding(
-        padding: isCollapsed
-            ? const EdgeInsets.symmetric(vertical: 5)
-            : const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        child: Tooltip(
-          message: isCollapsed ? label : '',
-          child: InkWell(
-            onTap: () => _handleNavTap(index),
-            borderRadius: BorderRadius.circular(10),
-            child: isCollapsed
-                ? Center(
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 14, vertical: navVerticalPadding),
+                  child: InkWell(
+                    onTap: _logoutClient,
+                    borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      width: 62,
-                      height: 62,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 10),
                       decoration: BoxDecoration(
-                        color: selected ? activeColor : Colors.transparent,
-                        shape: BoxShape.circle,
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Image.asset(
-                          assetPath,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Icon(
-                            Icons.image_not_supported_outlined,
-                            color: chrome.textPrimary,
-                            size: 24,
+                      child: Row(
+                        children: [
+                          buildSidebarIcon(
+                            assetPath: 'assets/images/Logout_KhonoBuzz.png',
+                            chipSize: sidebarChipSize,
+                            iconSize: sidebarIconSize,
+                            selected: false,
                           ),
-                        ),
-                      ),
-                    ),
-                  )
-                : Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? activeColor
-                          : isHovering
-                              ? chrome.sidebarHoverFill
-                              : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: Colors.transparent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Image.asset(
-                              assetPath,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.image_not_supported_outlined,
-                                color: chrome.textPrimary,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            label,
-                            style: TextStyle(
-                              color: chrome.textPrimary,
-                              fontSize: 15,
-                              fontWeight:
-                                  selected ? FontWeight.w600 : FontWeight.w500,
-                              height: 1.2,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (badgeCount > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: chrome.isDark
-                                  ? Colors.white.withValues(alpha: 0.18)
-                                  : Colors.black.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
+                          const SizedBox(width: 12),
+                          Expanded(
                             child: Text(
-                              badgeCount > 99 ? '99+' : badgeCount.toString(),
+                              'Logout',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: chrome.textPrimary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
+                                color: subItemUnselectedColor,
+                                fontSize: navFontSize,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Poppins',
                               ),
                             ),
                           ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-          ),
+                ),
+                SizedBox(height: bottomGap),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1591,148 +1498,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     return Drawer(
       backgroundColor: chrome.sidebarBackground,
       child: SafeArea(
-        child: Builder(
-          builder: (context) {
-            return Container(
-              color: chrome.sidebarBackground,
-              child: SingleChildScrollView(
-                  child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 14),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 8, 10),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Client Portal',
-                            style: TextStyle(
-                              color: chrome.textPrimary,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: Icon(Icons.close, color: chrome.textSecondary),
-                          tooltip: 'Close',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildDrawerNavItem(
-                      context,
-                      0,
-                      'assets/images/new icons for manager/Dashboard.png',
-                      'Dashboard'),
-                  _buildDrawerNavItem(
-                      context,
-                      1,
-                      'assets/images/new icons for manager/proposals.png',
-                      'Proposals'),
-                  _buildDrawerNavItem(
-                      context,
-                      2,
-                      'assets/images/client_icons/Data Approval_White Badge_Blue.png',
-                      'Documents'),
-                  _buildDrawerNavItem(context, 3,
-                      'assets/images/User_Profile.png', 'Account Profile'),
-                  const Spacer(),
-                ],
-              )),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDrawerNavItem(
-      BuildContext context, int index, String assetPath, String label,
-      {VoidCallback? onTap, double itemHeight = 37.77, double? itemWidth}) {
-    final chrome = context.read<ManagerThemeController>().chrome;
-    final selected = _selectedNavIndex == index;
-    final badgeCount =
-        label == 'Proposals' ? _proposalsRequiringActionCount() : 0;
-    return InkWell(
-      onTap: () {
-        _handleNavTap(index, closeDrawer: true);
-        onTap?.call();
-      },
-      child: Container(
-        width: itemWidth,
-        height: itemHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: selected
-              ? (chrome.isDark
-                  ? Colors.white.withValues(alpha: 0.12)
-                  : Colors.black.withValues(alpha: 0.08))
-              : Colors.transparent,
-          border: selected
-              ? Border(
-                  left: BorderSide(color: PremiumTheme.primaryRed, width: 3),
-                )
-              : null,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                color: chrome.isDark
-                    ? const Color(0xFFE5E7EB)
-                    : const Color(0xFF3A3A3A),
-                shape: BoxShape.circle,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Image.asset(
-                  assetPath,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Icon(
-                    Icons.image_not_supported_outlined,
-                    color:
-                        chrome.isDark ? const Color(0xFF1F2937) : Colors.white,
-                    size: 14,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: selected ? chrome.textPrimary : chrome.textSecondary,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                ),
-              ),
-            ),
-            if (badgeCount > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: PremiumTheme.primaryRed,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  badgeCount > 99 ? '99+' : badgeCount.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-          ],
-        ),
+        child: _buildSidebar(inDrawer: true),
       ),
     );
   }
