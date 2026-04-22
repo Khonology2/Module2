@@ -3195,6 +3195,50 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     return null;
   }
 
+  String? _findNestedStringValue(dynamic node, Set<String> keys) {
+    if (node == null) return null;
+
+    if (node is Map) {
+      for (final entry in node.entries) {
+        final k = entry.key?.toString();
+        if (k != null && keys.contains(k)) {
+          final v = entry.value;
+          if (v is String && v.trim().isNotEmpty) return v;
+          if (v is num) return v.toString();
+          if (v is Map) {
+            final inner = v['value'] ??
+                v['label'] ??
+                v['status'] ??
+                v['level'] ??
+                v['decision'] ??
+                v['result'] ??
+                v['outcome'];
+            if (inner is String && inner.trim().isNotEmpty) return inner;
+            if (inner is num) return inner.toString();
+          }
+        }
+      }
+
+      for (final v in node.values) {
+        final found = _findNestedStringValue(v, keys);
+        if (found != null && found.trim().isNotEmpty) return found;
+      }
+      return null;
+    }
+
+    if (node is Iterable) {
+      for (final item in node) {
+        final found = _findNestedStringValue(item, keys);
+        if (found != null && found.trim().isNotEmpty) return found;
+      }
+      return null;
+    }
+
+    if (node is String) return node;
+    if (node is num) return node.toString();
+    return null;
+  }
+
   Map<String, dynamic>? _extractRiskGateObject(Map<String, dynamic> proposal) {
     final raw = proposal['risk_gate'] ??
         proposal['riskGate'] ??
@@ -3241,23 +3285,37 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
 
   String _extractRiskLevel(Map<String, dynamic> proposal) {
     final gate = _extractRiskGateObject(proposal);
+    final nested = _findNestedStringValue(
+      gate,
+      {
+        'risk_status',
+        'riskStatus',
+        'status',
+        'decision',
+        'outcome',
+        'result',
+        'risk_level',
+        'riskLevel',
+        'riskLevelLabel',
+        'level',
+        'risk_level_label',
+        'riskLevelLabel',
+      },
+    );
+
     final level = (proposal['risk_level'] ??
             proposal['riskLevel'] ??
             proposal['riskLevelLabel'] ??
             proposal['risk_status'] ??
             proposal['riskStatus'] ??
-            gate?['risk_level'] ??
-            gate?['riskLevel'] ??
-            gate?['level'] ??
-            gate?['risk_level_label'] ??
-            gate?['riskLevelLabel'] ??
+            nested ??
             '')
         .toString()
         .toLowerCase()
         .trim();
-    if (level == 'block') return 'critical';
-    if (level == 'review') return 'high';
-    if (level == 'pass') return 'low';
+    if (level.contains('block')) return 'critical';
+    if (level.contains('review')) return 'high';
+    if (level.contains('pass')) return 'low';
     return level;
   }
 
