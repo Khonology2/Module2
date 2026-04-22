@@ -25,6 +25,7 @@ import '../../widgets/admin/admin_sidebar.dart';
 import '../../widgets/manager_page_background.dart';
 import '../../utils/html_content_parser.dart';
 import '../../widgets/header.dart';
+import '../../widgets/glass_date_picker.dart';
 import 'governance_panel.dart';
 import '../../services/ai_analysis_service.dart';
 // Import models from document_editor
@@ -561,6 +562,15 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
   List<String> _uploadedImages = [];
   List<Map<String, dynamic>> _libraryImages = [];
   bool _isLoadingLibraryImages = false;
+  bool _useStandardizedProposalLayout = false;
+  DateTime _standardizedProposalDate = DateTime.now();
+  static const String _standardHeaderLogoAsset =
+      'assets/images/new icons for manager/khonology_logo.png';
+  static const String _standardHeaderBgAsset =
+      ManagerChromeTheme.darkBgAsset;
+  static const String _standardFooterAsset = 'assets/images/footer.png';
+  static const String _standardRiskGateAsset =
+      'assets/images/new icons for manager/risk_gate_tab.png';
   String? _headerLogoUrl;
   String? _footerLogoUrl;
   String _headerLogoPosition = 'left'; // 'left', 'center', 'right'
@@ -602,6 +612,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
   late TextEditingController _commentController;
   final FocusNode _commentFocusNode = FocusNode();
   final ScrollController _commentsScrollController = ScrollController();
+  final ScrollController _pageScrollController = ScrollController();
   OverlayEntry? _threadOverlay;
   int? _activeThreadRootId;
   late TextEditingController _threadReplyController;
@@ -1042,18 +1053,70 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
       });
     } else if (widget.proposalId == null) {
       // Only create initial section for new documents without AI content
-      final initialSection = DocumentSection(
-        title: widget.initialCoverImageUrl != null ? '' : 'Untitled Section',
-        content: '',
-        backgroundImageUrl: widget.initialCoverImageUrl,
-        sectionType: widget.initialCoverImageUrl != null ? 'cover' : 'content',
-        isCoverPage: widget.initialCoverImageUrl != null,
-      );
-      _sections.add(initialSection);
+      if (widget.initialCoverImageUrl != null) {
+        _useStandardizedProposalLayout = true;
 
-      // Add focus listeners for UI updates
-      initialSection.contentFocus.addListener(() => setState(() {}));
-      initialSection.titleFocus.addListener(() => setState(() {}));
+        final coverSection = DocumentSection(
+          title: '',
+          content: '',
+          backgroundImageUrl: widget.initialCoverImageUrl,
+          sectionType: 'cover',
+          isCoverPage: true,
+        );
+        _sections.add(coverSection);
+
+        final standardizedSections = [
+          DocumentSection(
+            title: 'Company Profile',
+            content:
+                'Add company profile information.\n\nInclude your organization overview, capabilities, and differentiators.',
+            sectionType: 'content',
+          ),
+          DocumentSection(
+            title: 'Title Heading - Left',
+            content:
+                'Add left-column section content.\n\nUse this area for core proposal details and context.',
+            sectionType: 'content',
+          ),
+          DocumentSection(
+            title: 'Title Heading - Right',
+            content:
+                'Add right-column section content.\n\nUse this area for commercial and operational notes.',
+            sectionType: 'content',
+          ),
+          DocumentSection(
+            title: 'Title Heading',
+            content:
+                'Add supporting section details.\n\nInsert additional scope, assumptions, and delivery information.',
+            sectionType: 'content',
+          ),
+          DocumentSection(
+            title: 'Signature & Approval',
+            content:
+                'Signature Name: ______________________\nRole: ______________________\nDate: ______________________\n\nStatus: Verified',
+            sectionType: 'content',
+          ),
+        ];
+        _sections.addAll(standardizedSections);
+
+        for (final section in _sections) {
+          section.contentFocus.addListener(() => setState(() {}));
+          section.titleFocus.addListener(() => setState(() {}));
+          _attachSectionListeners(section);
+        }
+      } else {
+        final initialSection = DocumentSection(
+          title: 'Untitled Section',
+          content: '',
+          sectionType: 'content',
+          isCoverPage: false,
+        );
+        _sections.add(initialSection);
+
+        // Add focus listeners for UI updates
+        initialSection.contentFocus.addListener(() => setState(() {}));
+        initialSection.titleFocus.addListener(() => setState(() {}));
+      }
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -1845,6 +1908,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
               _selectedCurrency = metadata['currency'] ?? _selectedCurrency;
               _headerLogoUrl = metadata['headerLogoUrl'] as String?;
               _footerLogoUrl = metadata['footerLogoUrl'] as String?;
+              _useStandardizedProposalLayout =
+                  metadata['standardizedProposalLayout'] == true;
               _headerLogoPosition =
                   (metadata['headerLogoPosition'] as String?) ?? 'left';
               _footerLogoPosition =
@@ -1855,6 +1920,13 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                   (metadata['footerProposalIdPosition'] as String?) ?? 'right';
               _headerBackgroundImageUrl =
                   metadata['headerBackgroundImageUrl'] as String?;
+              final dateRaw = metadata['standardizedProposalDate']?.toString();
+              if (dateRaw != null && dateRaw.trim().isNotEmpty) {
+                final parsed = DateTime.tryParse(dateRaw);
+                if (parsed != null) {
+                  _standardizedProposalDate = parsed;
+                }
+              }
             }
           });
 
@@ -2271,6 +2343,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     _removeAddCommentOverlay();
     _removeThreadOverlay();
     _commentsScrollController.dispose();
+    _pageScrollController.dispose();
     _threadReplyController.dispose();
     _threadReplyFocusNode.dispose();
     _titleController.dispose();
@@ -4352,6 +4425,9 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
         'footerPageNumberPosition': _footerPageNumberPosition,
         'footerProposalIdPosition': _footerProposalIdPosition,
         'headerBackgroundImageUrl': _headerBackgroundImageUrl,
+        'standardizedProposalLayout': _useStandardizedProposalLayout,
+        'standardizedProposalDate':
+            DateFormat('yyyy-MM-dd').format(_standardizedProposalDate),
       }
     };
     return json.encode(documentData);
@@ -4363,7 +4439,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     setState(() => _isSaving = true);
     try {
       // Save to backend
-      await _saveToBackend();
+      await _saveToBackend(reloadFromBackend: false);
 
       if (!mounted) return;
       // For stricter approver sessions, auto-save should NOT create
@@ -4465,7 +4541,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     }
   }
 
-  Future<void> _saveToBackend() async {
+  Future<void> _saveToBackend({bool reloadFromBackend = true}) async {
     // Get auth token (fresh or cached)
     final token = await _getAuthToken();
 
@@ -4513,8 +4589,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
           print('✅ Proposal created with ID: $_savedProposalId');
           print(
               '💾 Proposal ID saved in state - future saves will UPDATE this proposal');
-          // Reload full proposal data to ensure we have everything
-          if (newProposalId != null) {
+          // Avoid backend round-trip during autosave to prevent UI flicker.
+          if (reloadFromBackend && newProposalId != null) {
             await _loadProposalFromDatabase(newProposalId);
           }
         } else {
@@ -4543,7 +4619,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
           setState(() {
             _proposalData = Map<String, dynamic>.from(result);
           });
-        } else {
+        } else if (reloadFromBackend) {
           // Reload proposal data to ensure we have the latest
           await _loadProposalFromDatabase(_savedProposalId!);
         }
@@ -5469,22 +5545,34 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                             Expanded(
                               child: Stack(
                                 children: [
-                                  SingleChildScrollView(
-                                    child: Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 40,
-                                          vertical: 50,
-                                        ),
-                                        child: Column(
-                                          children: [
-                                            // Generate A4 pages
-                                            ..._buildA4Pages(),
-                                            // Plus button to add new page
-                                            const SizedBox(height: 24),
-                                            _buildAddPageButton(),
-                                            const SizedBox(height: 40),
-                                          ],
+                                  RawScrollbar(
+                                    controller: _pageScrollController,
+                                    thumbVisibility: true,
+                                    trackVisibility: true,
+                                    interactive: true,
+                                    thickness: 12,
+                                    radius: const Radius.circular(10),
+                                    thumbColor: const Color(0xFFC10D00),
+                                    trackColor: Colors.black.withValues(alpha: 0.25),
+                                    trackBorderColor: Colors.white.withValues(alpha: 0.25),
+                                    child: SingleChildScrollView(
+                                      controller: _pageScrollController,
+                                      child: Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 40,
+                                            vertical: 50,
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              // Generate A4 pages
+                                              ..._buildA4Pages(),
+                                              // Plus button to add new page
+                                              const SizedBox(height: 24),
+                                              _buildAddPageButton(),
+                                              const SizedBox(height: 40),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -7308,6 +7396,290 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     );
   }
 
+  Widget _buildStandardizedProposalHeader({
+    required String pageTitle,
+    required bool showRiskIcon,
+    bool showMetaBar = true,
+    bool allowDateEdit = false,
+    TextEditingController? pageTitleController,
+    bool allowTitleEdit = false,
+  }) {
+    return Container(
+      height: 118,
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage(_standardHeaderBgAsset),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.14),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Transform.translate(
+                            offset: const Offset(-8, 0),
+                            child: SizedBox(
+                              height: 50,
+                              child: Image.asset(
+                                _standardHeaderLogoAsset,
+                                fit: BoxFit.contain,
+                                alignment: Alignment.centerLeft,
+                                errorBuilder: (_, __, ___) => const Text(
+                                  'KHONOLOGY',
+                                  style: TextStyle(
+                                    color: Color(0xFFC10D00),
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 2.8,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.only(left: 20),
+                            child: Text(
+                              'PROPOSAL REPORT',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.4,
+                                height: 1.0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (showRiskIcon)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Container(
+                          width: 58,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              width: 2,
+                            ),
+                          ),
+                        padding: const EdgeInsets.all(4),
+                        child: Transform.scale(
+                          scale: 2.0,
+                          child: Image.asset(
+                            _standardRiskGateAsset,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.health_and_safety,
+                              color: Color(0xFFC10D00),
+                            ),
+                          ),
+                        ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (!showMetaBar)
+            Container(
+              width: double.infinity,
+              color: Colors.black.withValues(alpha: 0.22),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: InkWell(
+                  onTap: allowDateEdit
+                      ? () async {
+                          final picked = await showGlassDatePicker(
+                            context: context,
+                            initialDate: _standardizedProposalDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked == null) return;
+                          setState(() => _standardizedProposalDate = picked);
+                          _onContentChanged();
+                        }
+                      : null,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.calendar_month,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          DateFormat('dd/MM/yyyy')
+                              .format(_standardizedProposalDate),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (showMetaBar)
+            Container(
+              width: double.infinity,
+              color: const Color(0xFFC10D00),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Text(
+                          'Title: ',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Expanded(
+                          child: allowTitleEdit && pageTitleController != null
+                              ? TextFormField(
+                                  controller: pageTitleController,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  onChanged: (_) => _onContentChanged(),
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    border: InputBorder.none,
+                                    hintText: 'Untitled Section',
+                                    hintStyle: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  pageTitle.trim().isEmpty
+                                      ? 'Untitled Section'
+                                      : pageTitle,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Date: ${DateFormat('dd/MM/yyyy').format(_standardizedProposalDate)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStandardizedProposalFooter() {
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+      ),
+      child: Center(
+        child: Image.asset(
+          _standardFooterAsset,
+          fit: BoxFit.contain,
+          height: 28,
+          errorBuilder: (_, __, ___) => const Text(
+            'CCC',
+            style: TextStyle(
+              color: Color(0xFFC10D00),
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStandardizedCoverPage({
+    required double pageWidth,
+    required double pageHeight,
+    required String? backgroundImageUrl,
+    required String pageTitle,
+  }) {
+    return Container(
+      width: pageWidth,
+      height: pageHeight,
+      color: Colors.white,
+      child: Column(
+        children: [
+          _buildStandardizedProposalHeader(
+            pageTitle: pageTitle,
+            showRiskIcon: true,
+            showMetaBar: false,
+            allowDateEdit: true,
+          ),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              color: Colors.white,
+              child: backgroundImageUrl == null
+                  ? const SizedBox.shrink()
+                  : SizedBox.expand(
+                      child: Image.network(
+                        backgroundImageUrl,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                      ),
+                    ),
+            ),
+          ),
+          _buildStandardizedProposalFooter(),
+        ],
+      ),
+    );
+  }
+
   List<Widget> _buildA4Pages() {
     // A4 dimensions: 210mm x 297mm (aspect ratio 0.707)
     // Using larger width of 900px for better visibility
@@ -7320,6 +7692,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
       (index) {
         final section = _sections[index];
         final headerLogoWidget = _buildHeaderLogoWidget();
+        final pageTitle = section.titleController.text.trim();
         final isCover = section.isCoverPage ||
             section.sectionType.trim().toLowerCase() == 'cover';
         return Container(
@@ -7353,24 +7726,38 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
             ],
           ),
           child: isCover
-              ? const SizedBox.expand()
+              ? (_useStandardizedProposalLayout
+                  ? _buildStandardizedCoverPage(
+                      pageWidth: pageWidth,
+                      pageHeight: pageHeight,
+                      backgroundImageUrl: section.backgroundImageUrl,
+                      pageTitle: pageTitle,
+                    )
+                  : const SizedBox.expand())
               : Column(
                   children: [
-                    DocumentHeader(
-                      title: null,
-                      subtitle: null,
-                      leading: _headerLogoPosition == 'left'
-                          ? headerLogoWidget
-                          : null,
-                      center: _headerLogoPosition == 'center'
-                          ? headerLogoWidget
-                          : null,
-                      trailing: _headerLogoPosition == 'right'
-                          ? headerLogoWidget
-                          : null,
-                      backgroundImageUrl: _headerBackgroundImageUrl,
-                      onTap: _pickHeaderLogo,
-                    ),
+                    _useStandardizedProposalLayout
+                        ? _buildStandardizedProposalHeader(
+                            pageTitle: pageTitle,
+                            showRiskIcon: true,
+                            pageTitleController: section.titleController,
+                            allowTitleEdit: !widget.readOnly,
+                          )
+                        : DocumentHeader(
+                            title: null,
+                            subtitle: null,
+                            leading: _headerLogoPosition == 'left'
+                                ? headerLogoWidget
+                                : null,
+                            center: _headerLogoPosition == 'center'
+                                ? headerLogoWidget
+                                : null,
+                            trailing: _headerLogoPosition == 'right'
+                                ? headerLogoWidget
+                                : null,
+                            backgroundImageUrl: _headerBackgroundImageUrl,
+                            onTap: _pickHeaderLogo,
+                          ),
                     Expanded(
                       child: SingleChildScrollView(
                         clipBehavior: Clip.none,
@@ -7407,12 +7794,14 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                         ),
                       ),
                     ),
-                    _buildDraggableFooter(
-                      pageNumber: index + 1,
-                      totalPages: _sections.length,
-                      showDivider: true,
-                      enableDragging: true,
-                    ),
+                    _useStandardizedProposalLayout
+                        ? _buildStandardizedProposalFooter()
+                        : _buildDraggableFooter(
+                            pageNumber: index + 1,
+                            totalPages: _sections.length,
+                            showDivider: true,
+                            enableDragging: true,
+                          ),
                   ],
                 ),
         );
@@ -11428,6 +11817,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                               final isCover = section.isCoverPage ||
                                   section.sectionType.trim().toLowerCase() ==
                                       'cover';
+                              final pageTitle = section.titleController.text.trim();
 
                               return Container(
                                 width: pageWidth,
@@ -11458,28 +11848,43 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                                   ],
                                 ),
                                 child: isCover
-                                    ? const SizedBox.expand()
+                                    ? (_useStandardizedProposalLayout
+                                        ? _buildStandardizedCoverPage(
+                                            pageWidth: pageWidth,
+                                            pageHeight: pageHeight,
+                                            backgroundImageUrl:
+                                                section.backgroundImageUrl,
+                                            pageTitle: pageTitle,
+                                          )
+                                        : const SizedBox.expand())
                                     : Column(
                                         children: [
-                                          DocumentHeader(
-                                            title: null,
-                                            subtitle: null,
-                                            leading:
-                                                _headerLogoPosition == 'left'
-                                                    ? headerLogoWidget
-                                                    : null,
-                                            center:
-                                                _headerLogoPosition == 'center'
-                                                    ? headerLogoWidget
-                                                    : null,
-                                            trailing:
-                                                _headerLogoPosition == 'right'
-                                                    ? headerLogoWidget
-                                                    : null,
-                                            backgroundImageUrl:
-                                                _headerBackgroundImageUrl,
-                                            showDivider: false,
-                                          ),
+                                          _useStandardizedProposalLayout
+                                              ? _buildStandardizedProposalHeader(
+                                                  pageTitle: pageTitle,
+                                                  showRiskIcon: true,
+                                                  allowTitleEdit: false,
+                                                )
+                                              : DocumentHeader(
+                                                  title: null,
+                                                  subtitle: null,
+                                                  leading: _headerLogoPosition ==
+                                                          'left'
+                                                      ? headerLogoWidget
+                                                      : null,
+                                                  center: _headerLogoPosition ==
+                                                          'center'
+                                                      ? headerLogoWidget
+                                                      : null,
+                                                  trailing:
+                                                      _headerLogoPosition ==
+                                                              'right'
+                                                          ? headerLogoWidget
+                                                          : null,
+                                                  backgroundImageUrl:
+                                                      _headerBackgroundImageUrl,
+                                                  showDivider: false,
+                                                ),
                                           Expanded(
                                             child: SingleChildScrollView(
                                               child: Padding(
@@ -11557,12 +11962,14 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                                               ),
                                             ),
                                           ),
-                                          _buildDraggableFooter(
-                                            pageNumber: index + 1,
-                                            totalPages: _sections.length,
-                                            showDivider: false,
-                                            enableDragging: false,
-                                          ),
+                                          _useStandardizedProposalLayout
+                                              ? _buildStandardizedProposalFooter()
+                                              : _buildDraggableFooter(
+                                                  pageNumber: index + 1,
+                                                  totalPages: _sections.length,
+                                                  showDivider: false,
+                                                  enableDragging: false,
+                                                ),
                                         ],
                                       ),
                               );
