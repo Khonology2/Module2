@@ -4,12 +4,14 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
 import 'package:web/web.dart' as web;
 import 'dart:async';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'client_proposal_viewer.dart';
 import '../../api.dart';
 import '../../theme/premium_theme.dart';
+import '../../theme/manager_theme_controller.dart';
 
 class ClientDashboardHome extends StatefulWidget {
   final String? initialToken;
@@ -33,7 +35,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
   bool _isLoading = true;
   DateTime? _loadingStartedAt;
-  bool _isLightMode = false;
   String? _error;
   String? _accessToken;
   String? _clientEmail;
@@ -59,8 +60,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     'rejected': 0,
     'viewed': 0,
   };
-  bool _isSidebarCollapsed = false;
-  int? _hoverSidebarIndex;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _proposalsScrollController = ScrollController();
 
@@ -68,12 +67,14 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     {
       'index': 0,
       'label': 'Dashboard',
-      'asset': 'assets/images/new icons for manager/Dashboard.png'
+      'asset':
+          'assets/images/Creator_Dashboard/Project Launch_Start_White Badge_Blue.png'
     },
     {
       'index': 1,
       'label': 'Proposals',
-      'asset': 'assets/images/new icons for manager/proposals.png'
+      'asset':
+          'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Blue.png'
     },
     {
       'index': 2,
@@ -103,10 +104,11 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
   Widget _filterChip(String label, String value) {
     final selected = _dashboardDocFilter == value;
+    final chrome = context.read<ManagerThemeController>().chrome;
     const chipHeight = 26.0;
     const chipRadius = 20.14;
-    const chipBorderWidth = 1.4;
-    const chipBorderColor = Color(0xFF6A6A6A);
+    const chipBorderWidth = 1.23;
+    const chipBorderColor = Color(0xFFC10D00);
 
     return InkWell(
       onTap: () {
@@ -122,10 +124,16 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           decoration: BoxDecoration(
             color: selected
                 ? const Color(0xFFC10D00)
-                : Colors.white.withValues(alpha: 0.08),
+                : chrome.isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.transparent,
             borderRadius: BorderRadius.circular(chipRadius),
             border: Border.all(
-                color: selected ? const Color(0xFFC10D00) : chipBorderColor,
+                color: selected
+                    ? const Color(0xFFC10D00)
+                    : (chrome.isDark
+                        ? const Color(0xFF6A6A6A)
+                        : chipBorderColor),
                 width: chipBorderWidth),
           ),
           child: Center(
@@ -137,110 +145,13 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                 height: 1,
                 color: selected
                     ? Colors.white
-                    : Colors.white.withValues(alpha: 0.75),
+                    : (chrome.isDark
+                        ? Colors.white.withValues(alpha: 0.75)
+                        : Colors.black),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSidebarActionItem({
-    required String label,
-    required String assetPath,
-    required bool isCollapsed,
-    required VoidCallback onTap,
-    required Color activeColor,
-    required Color hoverFill,
-    required Color iconCircleIdle,
-  }) {
-    final bool isHovering = _hoverSidebarIndex == -1;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hoverSidebarIndex = -1),
-      onExit: (_) => setState(() => _hoverSidebarIndex = null),
-      child: Padding(
-        padding: isCollapsed
-            ? const EdgeInsets.symmetric(vertical: 5)
-            : const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        child: Tooltip(
-          message: isCollapsed ? label : '',
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(10),
-            child: isCollapsed
-                ? Center(
-                    child: Container(
-                      width: 62,
-                      height: 62,
-                      decoration: BoxDecoration(
-                        color: Colors.transparent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Image.asset(
-                          assetPath,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.image_not_supported_outlined,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                : Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isHovering ? hoverFill : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: Colors.transparent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(6),
-                            child: Image.asset(
-                              assetPath,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.image_not_supported_outlined,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            label,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                              height: 1.2,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
           ),
         ),
       ),
@@ -499,6 +410,13 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           sessionToken.trim().isNotEmpty) {
         _persistClientSessionToken(sessionToken);
         await _loadClientProposals();
+
+        if (!mounted) return;
+        if (widget.showSummary) {
+          setState(() => _selectedNavIndex = 0);
+        } else {
+          _navigateClient('/client/dashboard');
+        }
         return;
       }
 
@@ -513,6 +431,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       }
 
       await _showOtpDialog(token: token, challengeId: challengeId);
+
+      // If verification succeeded, a session token should now be available.
+      if (!mounted) return;
+      if ((_clientSessionToken ?? '').trim().isNotEmpty) {
+        if (widget.showSummary) {
+          setState(() => _selectedNavIndex = 0);
+        } else {
+          _navigateClient('/client/dashboard');
+          return;
+        }
+      }
 
       if (!mounted) return;
       setState(() {
@@ -610,32 +539,39 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               final logoHeight = (w * 0.10).clamp(56.0, 120.0);
               final loaderHeight = (w * 0.08).clamp(40.0, 90.0);
               final cardWidth = (w * 0.42).clamp(320.0, 520.0);
-              final isLightMode = _isLightMode;
-              final bgAsset = isLightMode
-                  ? 'assets/images/light_mode_bg.png'
-                  : 'assets/images/client_dashboard_bg.png';
-              final loaderAsset = isLightMode
-                  ? 'assets/images/Red_Discs.png'
-                  : 'assets/images/White_khono_loading.png.png';
-              final overlayGradient = isLightMode
+              final chrome = context.read<ManagerThemeController>().chrome;
+              final bgAsset = chrome.backgroundAsset;
+              final loaderAsset = chrome.isDark
+                  ? 'assets/images/White_khono_loading.png.png'
+                  : 'assets/images/Red_Discs.png';
+              final overlayGradient = chrome.isDark
                   ? LinearGradient(
-                      colors: [
-                        Colors.white.withValues(alpha: 0.50),
-                        Colors.white.withValues(alpha: 0.15),
-                      ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    )
-                  : LinearGradient(
                       colors: [
                         Colors.black.withValues(alpha: 0.65),
                         Colors.black.withValues(alpha: 0.35),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
+                    )
+                  : LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.50),
+                        Colors.white.withValues(alpha: 0.15),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
                     );
+              final cardColor = chrome.isDark
+                  ? Colors.black.withValues(alpha: 0.55)
+                  : Colors.black;
               final titleColor = Colors.white;
-              final subtitleColor = Colors.white70;
+              final subtitleColor = Colors.white.withValues(alpha: 0.75);
+              final otpFieldFill = chrome.isDark
+                  ? chrome.fieldFill
+                  : Colors.white.withValues(alpha: 0.10);
+              final otpFieldBorder = chrome.isDark
+                  ? chrome.fieldBorder
+                  : Colors.white.withValues(alpha: 0.35);
 
               return Dialog(
                 insetPadding: EdgeInsets.zero,
@@ -682,7 +618,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                   maxHeight: h * 0.72,
                                 ),
                                 child: Material(
-                                  color: Colors.black.withValues(alpha: 0.55),
+                                  color: cardColor,
                                   borderRadius: BorderRadius.circular(18),
                                   child: Padding(
                                     padding: const EdgeInsets.all(18),
@@ -729,15 +665,16 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                           decoration: InputDecoration(
                                             hintText: 'OTP code',
                                             hintStyle: TextStyle(
-                                              color: Colors.white54,
+                                              color: subtitleColor.withValues(
+                                                  alpha: 0.7),
                                             ),
                                             filled: true,
-                                            fillColor: Colors.white
-                                                .withValues(alpha: 0.10),
+                                            fillColor: otpFieldFill,
                                             border: OutlineInputBorder(
                                               borderRadius:
                                                   BorderRadius.circular(14),
-                                              borderSide: BorderSide.none,
+                                              borderSide: BorderSide(
+                                                  color: otpFieldBorder),
                                             ),
                                             contentPadding:
                                                 const EdgeInsets.symmetric(
@@ -856,11 +793,11 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                           Colors.white.withValues(alpha: 0.18),
                                     ),
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     'ver 2026.04.BE7_SIT',
                                     style: TextStyle(
                                       fontSize: 9,
-                                      color: Colors.white70,
+                                      color: subtitleColor,
                                     ),
                                   ),
                                 ),
@@ -877,8 +814,11 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                   color: Colors.transparent,
                                   child: InkWell(
                                     onTap: () {
-                                      setState(() {
-                                        _isLightMode = !_isLightMode;
+                                      final ctrl = context
+                                          .read<ManagerThemeController>();
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                        ctrl.toggle();
                                       });
                                       setModalState(() {});
                                     },
@@ -887,26 +827,26 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 10, vertical: 8),
                                       decoration: BoxDecoration(
-                                        color: (isLightMode
-                                                ? Colors.white
-                                                : Colors.black)
+                                        color: (chrome.isDark
+                                                ? Colors.black
+                                                : Colors.white)
                                             .withValues(alpha: 0.35),
                                         borderRadius: BorderRadius.circular(18),
                                         border: Border.all(
-                                          color: (isLightMode
-                                                  ? Colors.black
-                                                  : Colors.white)
+                                          color: (chrome.isDark
+                                                  ? Colors.white
+                                                  : Colors.black)
                                               .withValues(alpha: 0.18),
                                         ),
                                       ),
                                       child: Icon(
-                                        isLightMode
-                                            ? Icons.dark_mode_outlined
-                                            : Icons.light_mode_outlined,
+                                        chrome.isDark
+                                            ? Icons.light_mode_outlined
+                                            : Icons.dark_mode_outlined,
                                         size: 16,
-                                        color: isLightMode
-                                            ? Colors.black
-                                            : Colors.white,
+                                        color: chrome.isDark
+                                            ? Colors.white
+                                            : Colors.black,
                                       ),
                                     ),
                                   ),
@@ -1257,356 +1197,295 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   void _handleNavTap(int index, {bool closeDrawer = false}) {
+    if (closeDrawer) Navigator.of(context).pop();
+
+    // In the summary (single-page) client portal, switch tabs without route
+    // navigation to avoid reload spinners.
+    if (widget.showSummary) {
+      setState(() {
+        _selectedNavIndex = index;
+      });
+      return;
+    }
+
+    // In standalone pages (e.g. /client/proposals), navigate to the other route.
     if (index == 0) {
-      if (closeDrawer) Navigator.of(context).pop();
-      if (!widget.showSummary) {
-        _navigateClient('/client/dashboard');
-      }
+      _navigateClient('/client/dashboard');
       return;
     }
+
     if (index == 1) {
-      if (closeDrawer) Navigator.of(context).pop();
-      if (widget.showSummary) {
-        _navigateClient('/client/proposals');
-      }
+      _navigateClient('/client/proposals');
       return;
     }
+
     setState(() {
       _selectedNavIndex = index;
     });
-    if (closeDrawer) Navigator.of(context).pop();
   }
 
-  Widget _buildSidebar() {
-    const Color activeColor = Color(0xFFC10D00);
-    const Color sidebarBg = Color(0xFF2A2A2A);
-    const Color hoverFill = Color(0xFF3A3A3A);
-    const Color iconCircleIdle = Color(0xFF4A4A4A);
+  Widget _buildSidebar({bool inDrawer = false}) {
+    final chrome = context.watch<ManagerThemeController>().chrome;
+    final theme = Theme.of(context);
+    final isDark = chrome.isDark;
+    final unselectedColor = isDark
+        ? Colors.white
+        : theme.colorScheme.onSurface.withValues(alpha: 0.84);
+    final subItemUnselectedColor = isDark
+        ? Colors.white.withValues(alpha: 0.9)
+        : theme.colorScheme.onSurface.withValues(alpha: 0.78);
+    final welcomeTextColor = isDark
+        ? Colors.white
+        : theme.colorScheme.onSurface.withValues(alpha: 0.82);
     const Color leftAccent = Color(0xFF1565C0);
+    const Color activeColor = Color(0xFFC10D00);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: _isSidebarCollapsed ? 80 : 270,
-      decoration: BoxDecoration(
-        color: sidebarBg,
-        border: Border(
-          left: const BorderSide(color: leftAccent, width: 3),
-          right: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-      ),
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_isSidebarCollapsed)
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-                child: InkWell(
-                  onTap: () => setState(() => _isSidebarCollapsed = false),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Container(),
-                  ),
-                ),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 30, 16, 20),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: InkWell(
-                        onTap: () => setState(() => _isSidebarCollapsed = true),
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.keyboard_arrow_left,
-                            color: Colors.transparent,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Column(
-                      children: [
-                        const SizedBox(height: 4),
-                        Image.asset(
-                          'assets/images/new icons for manager/khonology_logo.png',
-                          height: 36,
-                          fit: BoxFit.contain,
-                        ),
-                        const SizedBox(height: 20),
-                        const Text(
-                          'Welcome to',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w400,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Proposal & SOW Builder',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 22),
-                        const Divider(color: Color(0x33FFFFFF), height: 1),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Column(
-                  children: [
-                    for (final item in _clientNavItems)
-                      _buildSidebarNavItem(
-                        index: item['index'] as int,
-                        label: item['label'] as String,
-                        assetPath: item['asset'] as String,
-                        isCollapsed: _isSidebarCollapsed,
-                        activeColor: activeColor,
-                        hoverFill: hoverFill,
-                        iconCircleIdle: iconCircleIdle,
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            if (!_isSidebarCollapsed)
-              Container(
-                margin:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                height: 1,
-                color: Colors.white.withValues(alpha: 0.14),
-              ),
-            _buildSidebarNavItem(
-              index: 3,
-              label: 'Account Profile',
-              assetPath: 'assets/images/User_Profile.png',
-              isCollapsed: _isSidebarCollapsed,
-              activeColor: activeColor,
-              hoverFill: hoverFill,
-              iconCircleIdle: iconCircleIdle,
-            ),
-            _buildSidebarActionItem(
-              label: 'Logout',
-              assetPath: 'assets/images/Logout_KhonoBuzz.png',
-              isCollapsed: _isSidebarCollapsed,
-              onTap: _logoutClient,
-              activeColor: activeColor,
-              hoverFill: hoverFill,
-              iconCircleIdle: iconCircleIdle,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSidebarNavItem({
-    required int index,
-    required String label,
-    required String assetPath,
-    required bool isCollapsed,
-    required Color activeColor,
-    required Color hoverFill,
-    required Color iconCircleIdle,
-  }) {
-    final bool selected = _selectedNavIndex == index;
-    final bool isHovering = _hoverSidebarIndex == index;
-    final int badgeCount =
-        label == 'Proposals' ? _proposalsRequiringActionCount() : 0;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hoverSidebarIndex = index),
-      onExit: (_) => setState(() => _hoverSidebarIndex = null),
-      child: Padding(
-        padding: isCollapsed
-            ? const EdgeInsets.symmetric(vertical: 5)
-            : const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        child: Tooltip(
-          message: isCollapsed ? label : '',
-          child: InkWell(
-            onTap: () => _handleNavTap(index),
-            borderRadius: BorderRadius.circular(10),
-            child: isCollapsed
-                ? Center(
-                    child: Container(
-                      width: 62,
-                      height: 62,
-                      decoration: BoxDecoration(
-                        color: selected ? activeColor : Colors.transparent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Image.asset(
-                          assetPath,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.image_not_supported_outlined,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                : Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? activeColor
-                          : isHovering
-                              ? hoverFill
-                              : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: Colors.transparent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Image.asset(
-                              assetPath,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.image_not_supported_outlined,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            label,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight:
-                                  selected ? FontWeight.w600 : FontWeight.w500,
-                              height: 1.2,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (badgeCount > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              badgeCount > 99 ? '99+' : badgeCount.toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+    Widget buildSidebarIcon({
+      required String assetPath,
+      required double chipSize,
+      required double iconSize,
+      required bool selected,
+    }) {
+      return SizedBox(
+        width: chipSize,
+        height: chipSize,
+        child: Image.asset(
+          assetPath,
+          width: iconSize,
+          height: iconSize,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => Icon(
+            Icons.image_not_supported_outlined,
+            size: iconSize,
+            color: chrome.textPrimary,
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildSidebarDrawer() {
-    return Drawer(
-      backgroundColor: const Color(0xFF2A2A2A),
+    Widget buildNavRow({
+      required int index,
+      required String label,
+      required String assetPath,
+      required double chipSize,
+      required double iconSize,
+      required double navVerticalPadding,
+      required double navFontSize,
+      Color? labelColor,
+      VoidCallback? onTap,
+    }) {
+      final selected = _selectedNavIndex == index;
+      final badgeCount =
+          label == 'Proposals' ? _proposalsRequiringActionCount() : 0;
+
+      return Padding(
+        padding:
+            EdgeInsets.symmetric(horizontal: 14, vertical: navVerticalPadding),
+        child: InkWell(
+          onTap: onTap ?? () => _handleNavTap(index, closeDrawer: inDrawer),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected ? activeColor : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                buildSidebarIcon(
+                  assetPath: assetPath,
+                  chipSize: chipSize,
+                  iconSize: iconSize,
+                  selected: selected,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected
+                          ? Colors.white
+                          : (labelColor ?? unselectedColor),
+                      fontSize: navFontSize,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      fontFamily: 'Poppins',
+                    ),
+                  ),
+                ),
+                if (!selected && badgeCount > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: chrome.isDark
+                          ? Colors.white.withValues(alpha: 0.18)
+                          : Colors.black.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      badgeCount > 99 ? '99+' : badgeCount.toString(),
+                      style: TextStyle(
+                        color: chrome.textPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: 285,
+      decoration: BoxDecoration(
+        color: chrome.sidebarBackground,
+        border: Border(
+          left: const BorderSide(color: leftAccent, width: 3),
+          right: BorderSide(color: chrome.sidebarRightBorder, width: 1),
+        ),
+      ),
       child: SafeArea(
-        child: Builder(
-          builder: (context) {
-            return Container(
-              color: const Color(0xFF2A2A2A),
-              child: SingleChildScrollView(
-                  child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 14),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 8, 10),
-                    child: Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxHeight < 760;
+            final isVeryCompact = constraints.maxHeight < 660;
+            final isUltraCompact = constraints.maxHeight < 580;
+
+            final double sidebarChipSize = isUltraCompact
+                ? 38
+                : (isVeryCompact ? 42 : (isCompact ? 44.87 : 46));
+            final double sidebarIconSize = isUltraCompact
+                ? 38
+                : (isVeryCompact ? 42 : (isCompact ? 44.87 : 46));
+            final double navVerticalPadding =
+                isUltraCompact ? 1.5 : (isVeryCompact ? 2 : 3);
+            final double navFontSize =
+                isUltraCompact ? 11.0 : (isVeryCompact ? 12.0 : 13.0);
+            final double sectionGap =
+                isUltraCompact ? 2 : (isVeryCompact ? 4 : 6);
+            final double bottomGap =
+                isUltraCompact ? 6 : (isVeryCompact ? 8 : 10);
+
+            return Column(
+              children: [
+                SizedBox(height: isUltraCompact ? 4 : 8),
+                Image.asset(
+                  'assets/icons/khono.png',
+                  width: isUltraCompact ? 150 : (isVeryCompact ? 190 : 228),
+                  height: isUltraCompact ? 28 : (isVeryCompact ? 35 : 44),
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/images/new icons for manager/khonology_logo.png',
+                    width: isUltraCompact ? 150 : (isVeryCompact ? 190 : 228),
+                    height: isUltraCompact ? 28 : (isVeryCompact ? 35 : 44),
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                SizedBox(height: isUltraCompact ? 4 : 6),
+                Text(
+                  'Welcome to',
+                  style: TextStyle(
+                    color: welcomeTextColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize:
+                        isUltraCompact ? 11.0 : (isVeryCompact ? 12.0 : 12.5),
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Proposal & SOW Builder',
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: welcomeTextColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize:
+                        isUltraCompact ? 11.0 : (isVeryCompact ? 12.0 : 12.5),
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                SizedBox(height: sectionGap),
+                Divider(color: chrome.divider, height: 1),
+                SizedBox(height: sectionGap),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
                       children: [
-                        const Expanded(
-                          child: Text(
-                            'Client Portal',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        for (final item in _clientNavItems)
+                          buildNavRow(
+                            index: item['index'] as int,
+                            label: item['label'] as String,
+                            assetPath: item['asset'] as String,
+                            chipSize: sidebarChipSize,
+                            iconSize: sidebarIconSize,
+                            navVerticalPadding: navVerticalPadding,
+                            navFontSize: navFontSize,
                           ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.close, color: Colors.white70),
-                          tooltip: 'Close',
-                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  _buildDrawerNavItem(
-                      context,
-                      0,
-                      'assets/images/new icons for manager/Dashboard.png',
-                      'Dashboard'),
-                  _buildDrawerNavItem(
-                      context,
-                      1,
-                      'assets/images/new icons for manager/proposals.png',
-                      'Proposals'),
-                  _buildDrawerNavItem(
-                      context,
-                      2,
-                      'assets/images/client_icons/Data Approval_White Badge_Blue.png',
-                      'Documents'),
-                  _buildDrawerNavItem(context, 3,
-                      'assets/images/User_Profile.png', 'Account Profile'),
-                  const Spacer(),
-                ],
-              )),
+                ),
+                SizedBox(height: bottomGap),
+                Divider(color: chrome.divider, height: 1),
+                buildNavRow(
+                  index: 3,
+                  label: 'Account Profile',
+                  assetPath: 'assets/images/User_Profile.png',
+                  chipSize: sidebarChipSize,
+                  iconSize: sidebarIconSize,
+                  navVerticalPadding: navVerticalPadding,
+                  navFontSize: navFontSize,
+                  labelColor: subItemUnselectedColor,
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 14, vertical: navVerticalPadding),
+                  child: InkWell(
+                    onTap: _logoutClient,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          buildSidebarIcon(
+                            assetPath: 'assets/images/Logout_KhonoBuzz.png',
+                            chipSize: sidebarChipSize,
+                            iconSize: sidebarIconSize,
+                            selected: false,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Logout',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: subItemUnselectedColor,
+                                fontSize: navFontSize,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Poppins',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: bottomGap),
+              ],
             );
           },
         ),
@@ -1614,88 +1493,18 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     );
   }
 
-  Widget _buildDrawerNavItem(
-      BuildContext context, int index, String assetPath, String label,
-      {VoidCallback? onTap, double itemHeight = 37.77, double? itemWidth}) {
-    final selected = _selectedNavIndex == index;
-    final badgeCount =
-        label == 'Proposals' ? _proposalsRequiringActionCount() : 0;
-    return InkWell(
-      onTap: () {
-        _handleNavTap(index, closeDrawer: true);
-        onTap?.call();
-      },
-      child: Container(
-        width: itemWidth,
-        height: itemHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: selected
-              ? Colors.white.withValues(alpha: 0.12)
-              : Colors.transparent,
-          border: selected
-              ? Border(
-                  left: BorderSide(color: PremiumTheme.primaryRed, width: 3),
-                )
-              : null,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 26,
-              height: 26,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE5E7EB),
-                shape: BoxShape.circle,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Image.asset(
-                  assetPath,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.image_not_supported_outlined,
-                    color: Color(0xFF1F2937),
-                    size: 14,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: selected ? Colors.white : Colors.white70,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                ),
-              ),
-            ),
-            if (badgeCount > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: PremiumTheme.primaryRed,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  badgeCount > 99 ? '99+' : badgeCount.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-          ],
-        ),
+  Widget _buildSidebarDrawer() {
+    final chrome = context.read<ManagerThemeController>().chrome;
+    return Drawer(
+      backgroundColor: chrome.sidebarBackground,
+      child: SafeArea(
+        child: _buildSidebar(inDrawer: true),
       ),
     );
   }
 
   Widget _buildTopHeader({required bool useDrawer}) {
+    final chrome = context.read<ManagerThemeController>().chrome;
     final isDocumentsTab = _selectedNavIndex == 2;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -1707,7 +1516,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                 final scaffold = Scaffold.maybeOf(context);
                 scaffold?.openDrawer();
               },
-              icon: const Icon(Icons.menu, color: Colors.white70),
+              icon: Icon(Icons.menu, color: chrome.textSecondary),
               tooltip: 'Menu',
             ),
           if (useDrawer) const SizedBox(width: 6),
@@ -1718,23 +1527,21 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   isDocumentsTab
                       ? 'Client Portal Signed Documents'
                       : 'Client Portal',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: chrome.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (!isDocumentsTab) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    'Hello, ${_getClientDisplayName()}',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
+                const SizedBox(width: 8),
+                Text(
+                  'Hello, ${_getClientDisplayName()}',
+                  style: TextStyle(
+                    color: chrome.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
                   ),
-                ],
+                ),
               ],
             ),
           ),
@@ -1760,6 +1567,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildSummaryTiles() {
+    final chrome = context.read<ManagerThemeController>().chrome;
     final allDocs = List<Map<String, dynamic>>.from(_proposals);
     final activeCount = allDocs.length;
     final pendingSignatureCount = allDocs.where((d) {
@@ -1770,10 +1578,9 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           s.contains('review') ||
           s.contains('signature');
     }).length;
-    final signedSowCount = allDocs.where((d) {
-      if (!_isSow(d)) return false;
+    final signedCount = allDocs.where((d) {
       final s = (d['status'] ?? '').toString().toLowerCase();
-      return s.contains('signed');
+      return s.contains('signed') || s.contains('approved');
     }).length;
     final pendingApprovalsCount = pendingSignatureCount;
 
@@ -1789,7 +1596,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         height: tileHeight,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.14),
+          color: chrome.floatingFill,
           borderRadius: BorderRadius.circular(5.32),
           boxShadow: [
             BoxShadow(
@@ -1815,8 +1622,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                         label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: chrome.textPrimary,
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1827,7 +1634,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.55),
+                          color: chrome.textSecondary,
                           fontSize: 10,
                           height: 1.25,
                           fontWeight: FontWeight.w400,
@@ -1837,8 +1644,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   ),
                   Text(
                     value,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: chrome.textPrimary,
                       fontSize: 28,
                       height: 1.0,
                       fontWeight: FontWeight.w800,
@@ -1871,7 +1678,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       ),
       tile(
         label: 'Signed',
-        value: signedSowCount.toString(),
+        value: signedCount.toString(),
         subtitle: 'Signature provided',
         iconAssetPath: 'assets/images/Admin_new_icons/Client_Approved.png',
       ),
@@ -1885,31 +1692,30 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 920;
-        if (!wide) {
-          return SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(width: 320, child: children[0]),
-                const SizedBox(width: 12),
-                SizedBox(width: 320, child: children[1]),
-                const SizedBox(width: 12),
-                SizedBox(width: 320, child: children[2]),
-              ],
-            ),
+        final wide = constraints.maxWidth >= 840;
+        if (wide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: children[0]),
+              const SizedBox(width: 12),
+              Expanded(child: children[1]),
+              const SizedBox(width: 12),
+              Expanded(child: children[2]),
+            ],
           );
         }
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        final maxWidth = constraints.maxWidth;
+        final tileWidth = maxWidth >= 560 ? (maxWidth - 12) / 2 : maxWidth;
+
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
           children: [
-            Expanded(child: children[0]),
-            const SizedBox(width: 12),
-            Expanded(child: children[1]),
-            const SizedBox(width: 12),
-            Expanded(child: children[2]),
+            SizedBox(width: tileWidth, child: children[0]),
+            SizedBox(width: tileWidth, child: children[1]),
+            SizedBox(width: tileWidth, child: children[2]),
           ],
         );
       },
@@ -1943,6 +1749,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildRecentDocuments({double? width, double? height}) {
+    final chrome = context.read<ManagerThemeController>().chrome;
     final docs = _filteredDocuments();
     final isDocumentsTab = _selectedNavIndex == 2;
     final isProposalsTab = _selectedNavIndex == 1;
@@ -2010,7 +1817,9 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   decoration: BoxDecoration(
                     color: badgeBg,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(
+                        color: chrome.isDark ? Colors.white : Colors.white,
+                        width: 2),
                   ),
                   alignment: Alignment.center,
                   child: Text(
@@ -2038,7 +1847,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           clipBehavior: Clip.antiAlias,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.14),
+            color: chrome.floatingFill,
             borderRadius: BorderRadius.circular(5.32),
             boxShadow: [
               BoxShadow(
@@ -2066,8 +1875,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   Expanded(
                     child: Text(
                       listTitle,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: chrome.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -2098,7 +1907,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       : isProposalsTab
                           ? 'No proposals are currently awaiting signature.'
                           : 'No documents available for this link.',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.70)),
+                  style: TextStyle(color: chrome.textSecondary),
                 )
               else
                 Expanded(
@@ -2106,7 +1915,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                     itemCount: docs.length > 6 ? 6 : docs.length,
                     separatorBuilder: (_, __) => Divider(
                       height: 14,
-                      color: Colors.white.withValues(alpha: 0.08),
+                      color: chrome.divider,
                     ),
                     itemBuilder: (context, index) {
                       final doc = docs[index];
@@ -2115,8 +1924,10 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       Widget _statusChip(String rawStatus) {
                         final normalizedLabel = _normalizeStatus(rawStatus);
                         final lower = normalizedLabel.toLowerCase().trim();
-                        Color bg = Colors.white.withValues(alpha: 0.10);
-                        Color fg = Colors.white;
+                        Color bg = chrome.isDark
+                            ? Colors.white.withValues(alpha: 0.10)
+                            : Colors.black.withValues(alpha: 0.10);
+                        Color fg = chrome.textPrimary;
                         String label = normalizedLabel.isEmpty
                             ? (rawStatus.isEmpty ? 'Unknown' : rawStatus)
                             : normalizedLabel;
@@ -2211,7 +2022,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                             fit: BoxFit.contain,
                             errorBuilder: (_, __, ___) => Icon(
                               Icons.check_box_outline_blank,
-                              color: Colors.white70,
+                              color: chrome.textSecondary,
                               size: 18,
                             ),
                           ),
@@ -2243,8 +2054,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       text: TextSpan(
-                                        style: const TextStyle(
-                                          color: Colors.white,
+                                        style: TextStyle(
+                                          color: chrome.textPrimary,
                                           fontFamily: 'Poppins',
                                           fontSize: 11.5,
                                           height: 1.05,
@@ -2328,6 +2139,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildRightPanel() {
+    final chrome = context.read<ManagerThemeController>().chrome;
     final doc = _selectedDocument;
 
     Widget panelCard({
@@ -2341,7 +2153,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         clipBehavior: Clip.antiAlias,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.14),
+          color: chrome.floatingFill,
           borderRadius: BorderRadius.circular(5.32),
           boxShadow: [
             BoxShadow(
@@ -2358,8 +2170,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
             if (showTitle) ...[
               Text(
                 title,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: chrome.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
@@ -2400,10 +2212,10 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       'Project Chat',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: chrome.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
@@ -2454,11 +2266,11 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
+                    Text(
                       'Download Document',
                       maxLines: 2,
                       style: TextStyle(
-                        color: Colors.white,
+                        color: chrome.textPrimary,
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         height: 1.15,
@@ -2495,6 +2307,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildComingSoon(String title) {
+    final chrome = context.read<ManagerThemeController>().chrome;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -2511,7 +2324,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               color: Colors.white.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.hourglass_top, color: Colors.white70),
+            child: Icon(Icons.hourglass_top, color: chrome.textSecondary),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -2520,8 +2333,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: chrome.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -2530,7 +2343,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                 Text(
                   'Coming soon. This section is part of the client portal experience but is not enabled in this build.',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.75),
+                    color: chrome.textSecondary,
                     fontSize: 12,
                   ),
                 ),
@@ -2543,6 +2356,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildProposalsHeaderBar() {
+    final chrome = context.read<ManagerThemeController>().chrome;
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -2550,10 +2364,10 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Title
-          const Text(
+          Text(
             'Client Portal Proposals',
             style: TextStyle(
-              color: Colors.white,
+              color: chrome.textPrimary,
               fontSize: 20,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.2,
@@ -2567,15 +2381,15 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               text: TextSpan(
                 text: 'Hello, ',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.70),
+                  color: chrome.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.w400,
                 ),
                 children: [
                   TextSpan(
                     text: _getClientDisplayName(),
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: chrome.textPrimary,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -2678,16 +2492,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildProposalsContentCard() {
+    final chrome = context.read<ManagerThemeController>().chrome;
     final docs = _filteredDocuments();
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0x24FFFFFF),
+        color: chrome.floatingFill,
         borderRadius: BorderRadius.circular(5.32),
         boxShadow: [
           BoxShadow(
-            color: const Color(0x40000000),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 3.55,
             offset: const Offset(0, 3.55),
           ),
@@ -2706,7 +2521,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Divider(
-              color: Colors.white.withValues(alpha: 0.15),
+              color: chrome.divider,
               height: 1,
               thickness: 1,
             ),
@@ -2757,6 +2572,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildProposalsSectionHeader() {
+    final chrome = context.read<ManagerThemeController>().chrome;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -2773,9 +2589,9 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               color: Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(28),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.handshake_outlined,
-              color: Colors.white,
+              color: chrome.textPrimary,
               size: 32,
             ),
           ),
@@ -2786,14 +2602,14 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Proposals Awaiting Signature',
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
                   letterSpacing: 0.2,
-                  color: Colors.white,
+                  color: chrome.textPrimary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -2801,7 +2617,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                 'The following proposal documents are waiting on your attention and action.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.white.withValues(alpha: 0.70),
+                  color: chrome.textSecondary,
                 ),
               ),
             ],
@@ -2815,6 +2631,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildSearchBar() {
+    final chrome = context.read<ManagerThemeController>().chrome;
     return SizedBox(
       width: 245,
       height: 43,
@@ -2826,7 +2643,9 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               padding: const EdgeInsets.only(left: 22),
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3D3D3D),
+                  color: chrome.isDark
+                      ? const Color(0xFF3D3D3D)
+                      : Colors.white.withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(22),
                 ),
                 child: Padding(
@@ -2834,11 +2653,15 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   child: Center(
                     child: TextField(
                       controller: _searchController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
+                      style: TextStyle(
+                        color: chrome.isDark ? Colors.white : Colors.black,
+                      ),
+                      decoration: InputDecoration(
                         hintText: 'Search Proposals...',
                         hintStyle: TextStyle(
-                          color: Color(0xFF9CA3AF),
+                          color: chrome.isDark
+                              ? const Color(0xFF9CA3AF)
+                              : Colors.black.withValues(alpha: 0.45),
                           fontSize: 14,
                         ),
                         border: InputBorder.none,
@@ -2881,6 +2704,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildProposalsList(List<Map<String, dynamic>> docs) {
+    final chrome = context.read<ManagerThemeController>().chrome;
     if (_isLoading) {
       return const Center(
         child: Padding(
@@ -2898,14 +2722,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.description_outlined,
-                size: 64, color: Colors.white.withValues(alpha: 0.5)),
+                size: 64,
+                color: chrome.isDark
+                    ? Colors.white.withValues(alpha: 0.5)
+                    : Colors.black.withValues(alpha: 0.45)),
             const SizedBox(height: 16),
             Text(
               'No proposals are currently awaiting signature.',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Colors.white.withValues(alpha: 0.70),
+                color: chrome.textSecondary,
               ),
             ),
           ],
@@ -2931,6 +2758,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildProposalListItem(Map<String, dynamic> doc) {
+    final chrome = context.read<ManagerThemeController>().chrome;
     final status = (doc['status'] ?? '').toString();
     final title = (doc['title'] ?? 'Untitled Proposal').toString();
     final clientName =
@@ -3002,24 +2830,24 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               text: TextSpan(
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.w700,
                   fontSize: 11,
                   height: 9.38 / 11,
                   letterSpacing: 0.11,
-                  color: Colors.white,
+                  color: chrome.textPrimary,
                 ),
                 children: [
                   TextSpan(
                     text: title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
                       height: 9.38 / 13,
                       letterSpacing: 0.13,
-                      color: Colors.white,
+                      color: chrome.textPrimary,
                     ),
                   ),
                   TextSpan(
@@ -3030,7 +2858,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       fontSize: 13,
                       height: 9.38 / 13,
                       letterSpacing: 0.13,
-                      color: Colors.white.withValues(alpha: 0.70),
+                      color: chrome.textSecondary,
                     ),
                   ),
                 ],
@@ -3049,7 +2877,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                 fontSize: 10.5,
                 height: 9.38 / 10.5,
                 letterSpacing: 0.105,
-                color: Colors.white.withValues(alpha: 0.70),
+                color: chrome.textSecondary,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -3122,42 +2950,9 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSummaryTiles(),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const rightPanelWidth = 420.0;
-              final leftPanelWidth =
-                  (constraints.maxWidth - rightPanelWidth - 16).clamp(
-                520.0,
-                constraints.maxWidth,
-              );
-              final stackLowerCards = constraints.maxWidth < 980;
-              if (stackLowerCards) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildRecentDocuments(
-                      width: constraints.maxWidth,
-                      height: 380,
-                    ),
-                    const SizedBox(height: 14),
-                    SizedBox(width: rightPanelWidth, child: _buildRightPanel()),
-                  ],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildRecentDocuments(
-                    width: leftPanelWidth,
-                    height: 380,
-                  ),
-                  const SizedBox(width: 16),
-                  SizedBox(width: rightPanelWidth, child: _buildRightPanel()),
-                ],
-              );
-            },
+          _buildRecentDocuments(
+            width: double.infinity,
+            height: 380,
           ),
         ],
       );
@@ -3187,13 +2982,12 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           },
         );
       }
+      if (_selectedNavIndex == 1) {
+        return _buildProposalsContent();
+      }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (widget.showSummary) ...[
-            _buildSummaryTiles(),
-            const SizedBox(height: 16),
-          ],
           _buildRecentDocuments(),
         ],
       );
@@ -3205,8 +2999,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSummaryTiles(),
-        const SizedBox(height: 16),
         _buildComingSoon(titles[_selectedNavIndex] ?? 'Coming Soon'),
       ],
     );
@@ -4359,26 +4151,24 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       final w = MediaQuery.sizeOf(context).width;
       final logoHeight = (w * 0.10).clamp(56.0, 120.0);
       final loaderHeight = (w * 0.08).clamp(40.0, 90.0);
-      final isLightMode = _isLightMode;
-      final bgAsset = isLightMode
-          ? 'assets/images/light_mode_bg.png'
-          : 'assets/images/client_dashboard_bg.png';
-      final loaderAsset = isLightMode
-          ? 'assets/images/Red_Discs.png'
-          : 'assets/images/White_khono_loading.png.png';
-      final overlayGradient = isLightMode
+      final chrome = context.read<ManagerThemeController>().chrome;
+      final bgAsset = chrome.backgroundAsset;
+      final loaderAsset = chrome.isDark
+          ? 'assets/images/White_khono_loading.png.png'
+          : 'assets/images/Red_Discs.png';
+      final overlayGradient = chrome.isDark
           ? LinearGradient(
               colors: [
-                Colors.white.withValues(alpha: 0.50),
-                Colors.white.withValues(alpha: 0.15),
+                Colors.black.withValues(alpha: 0.65),
+                Colors.black.withValues(alpha: 0.35),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             )
           : LinearGradient(
               colors: [
-                Colors.black.withValues(alpha: 0.65),
-                Colors.black.withValues(alpha: 0.35),
+                Colors.white.withValues(alpha: 0.50),
+                Colors.white.withValues(alpha: 0.15),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -4423,7 +4213,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       child: Text(
                         'Loading your proposals ...',
                         style: TextStyle(
-                          color: isLightMode ? Colors.black : Colors.white,
+                          color: chrome.textPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
                         ),
@@ -4464,8 +4254,10 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                           color: Colors.transparent,
                           child: InkWell(
                             onTap: () {
-                              setState(() {
-                                _isLightMode = !_isLightMode;
+                              final ctrl =
+                                  context.read<ManagerThemeController>();
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                ctrl.toggle();
                               });
                             },
                             borderRadius: BorderRadius.circular(18),
@@ -4473,24 +4265,25 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 8),
                               decoration: BoxDecoration(
-                                color:
-                                    (isLightMode ? Colors.white : Colors.black)
-                                        .withValues(alpha: 0.35),
+                                color: (chrome.isDark
+                                        ? Colors.black
+                                        : Colors.white)
+                                    .withValues(alpha: 0.35),
                                 borderRadius: BorderRadius.circular(18),
                                 border: Border.all(
-                                  color: (isLightMode
-                                          ? Colors.black
-                                          : Colors.white)
+                                  color: (chrome.isDark
+                                          ? Colors.white
+                                          : Colors.black)
                                       .withValues(alpha: 0.18),
                                 ),
                               ),
                               child: Icon(
-                                isLightMode
-                                    ? Icons.dark_mode_outlined
-                                    : Icons.light_mode_outlined,
+                                chrome.isDark
+                                    ? Icons.light_mode_outlined
+                                    : Icons.dark_mode_outlined,
                                 size: 16,
                                 color:
-                                    isLightMode ? Colors.black : Colors.white,
+                                    chrome.isDark ? Colors.white : Colors.black,
                               ),
                             ),
                           ),
@@ -4520,26 +4313,24 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     if (_error != null) {
       final w = MediaQuery.sizeOf(context).width;
       final loaderHeight = (w * 0.08).clamp(40.0, 90.0);
-      final isLightMode = _isLightMode;
-      final bgAsset = isLightMode
-          ? 'assets/images/light_mode_bg.png'
-          : 'assets/images/client_dashboard_bg.png';
-      final loaderAsset = isLightMode
-          ? 'assets/images/Red_Discs.png'
-          : 'assets/images/White_khono_loading.png.png';
-      final overlayGradient = isLightMode
+      final chrome = context.read<ManagerThemeController>().chrome;
+      final bgAsset = chrome.backgroundAsset;
+      final loaderAsset = chrome.isDark
+          ? 'assets/images/White_khono_loading.png.png'
+          : 'assets/images/Red_Discs.png';
+      final overlayGradient = chrome.isDark
           ? LinearGradient(
               colors: [
-                Colors.white.withValues(alpha: 0.50),
-                Colors.white.withValues(alpha: 0.15),
+                Colors.black.withValues(alpha: 0.65),
+                Colors.black.withValues(alpha: 0.35),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             )
           : LinearGradient(
               colors: [
-                Colors.black.withValues(alpha: 0.65),
-                Colors.black.withValues(alpha: 0.35),
+                Colors.white.withValues(alpha: 0.50),
+                Colors.white.withValues(alpha: 0.15),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -4602,7 +4393,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color:
-                                    isLightMode ? Colors.black : Colors.white,
+                                    chrome.isDark ? Colors.white : Colors.black,
                                 fontSize: 22,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -4612,9 +4403,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                               subtitle,
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: isLightMode
-                                    ? Colors.black87
-                                    : Colors.white70,
+                                color: chrome.textSecondary,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -4679,8 +4468,10 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                           color: Colors.transparent,
                           child: InkWell(
                             onTap: () {
-                              setState(() {
-                                _isLightMode = !_isLightMode;
+                              final ctrl =
+                                  context.read<ManagerThemeController>();
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                ctrl.toggle();
                               });
                             },
                             borderRadius: BorderRadius.circular(18),
@@ -4688,24 +4479,25 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 8),
                               decoration: BoxDecoration(
-                                color:
-                                    (isLightMode ? Colors.white : Colors.black)
-                                        .withValues(alpha: 0.35),
+                                color: (chrome.isDark
+                                        ? Colors.black
+                                        : Colors.white)
+                                    .withValues(alpha: 0.35),
                                 borderRadius: BorderRadius.circular(18),
                                 border: Border.all(
-                                  color: (isLightMode
-                                          ? Colors.black
-                                          : Colors.white)
+                                  color: (chrome.isDark
+                                          ? Colors.white
+                                          : Colors.black)
                                       .withValues(alpha: 0.18),
                                 ),
                               ),
                               child: Icon(
-                                isLightMode
-                                    ? Icons.dark_mode_outlined
-                                    : Icons.light_mode_outlined,
+                                chrome.isDark
+                                    ? Icons.light_mode_outlined
+                                    : Icons.dark_mode_outlined,
                                 size: 16,
                                 color:
-                                    isLightMode ? Colors.black : Colors.white,
+                                    chrome.isDark ? Colors.white : Colors.black,
                               ),
                             ),
                           ),
@@ -4732,6 +4524,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       );
     }
 
+    final chrome = context.watch<ManagerThemeController>().chrome;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final useDrawer = constraints.maxWidth < 900;
@@ -4739,26 +4533,48 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         final scaffold = Scaffold(
           backgroundColor: Colors.transparent,
           drawer: useDrawer ? _buildSidebarDrawer() : null,
-          // floatingActionButton: _buildChatSupportButton(), // Removed per user request
+          floatingActionButton: FloatingActionButton(
+            heroTag: 'client_dashboard_theme_toggle',
+            backgroundColor: ManagerChromeTheme.accentRed,
+            onPressed: () {
+              final ctrl = context.read<ManagerThemeController>();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                ctrl.toggle();
+              });
+            },
+            child: Icon(
+              chrome.isDark ? Icons.wb_sunny_rounded : Icons.dark_mode_rounded,
+              color: Colors.white,
+            ),
+          ),
           body: Stack(
             fit: StackFit.expand,
             children: [
               Positioned.fill(
                 child: Image.asset(
-                  'assets/images/client_dashboard_bg.png',
+                  chrome.backgroundAsset,
                   fit: BoxFit.cover,
                 ),
               ),
               Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.black.withValues(alpha: 0.65),
-                      Colors.black.withValues(alpha: 0.35),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
+                  gradient: chrome.isDark
+                      ? LinearGradient(
+                          colors: [
+                            Colors.black.withValues(alpha: 0.65),
+                            Colors.black.withValues(alpha: 0.35),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : LinearGradient(
+                          colors: [
+                            Colors.white.withValues(alpha: 0.50),
+                            Colors.white.withValues(alpha: 0.15),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
                 ),
               ),
               Row(
@@ -4771,46 +4587,53 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       child: Column(
                         children: [
                           // Hide top header on proposals page (has its own header)
-                          if (!(widget.showSummary == false &&
-                              _selectedNavIndex == 1))
+                          if (!(_selectedNavIndex == 1))
                             _buildTopHeader(useDrawer: useDrawer),
                           Expanded(
                             child: SingleChildScrollView(
                               padding: const EdgeInsets.all(18),
-                              child: LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final narrow = constraints.maxWidth < 980;
-                                  final leftContent = _buildMainLeftContent();
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (_selectedNavIndex == 0) ...[
+                                    _buildSummaryTiles(),
+                                    const SizedBox(height: 14),
+                                  ],
+                                  LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final narrow = constraints.maxWidth < 980;
+                                      final leftContent =
+                                          _buildMainLeftContent();
 
-                                  if (narrow) {
-                                    return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        leftContent,
-                                        const SizedBox(height: 16),
-                                        if (_selectedNavIndex == 1 &&
-                                            widget.showSummary)
-                                          _buildRightPanel(),
-                                      ],
-                                    );
-                                  }
+                                      if (narrow) {
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            leftContent,
+                                            const SizedBox(height: 16),
+                                            if (_selectedNavIndex == 0)
+                                              _buildRightPanel(),
+                                          ],
+                                        );
+                                      }
 
-                                  return Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(child: leftContent),
-                                      const SizedBox(width: 16),
-                                      if (_selectedNavIndex == 1 &&
-                                          widget.showSummary)
-                                        SizedBox(
-                                          width: 380,
-                                          child: _buildRightPanel(),
-                                        ),
-                                    ],
-                                  );
-                                },
+                                      return Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(child: leftContent),
+                                          const SizedBox(width: 16),
+                                          if (_selectedNavIndex == 0)
+                                            SizedBox(
+                                              width: 420,
+                                              child: _buildRightPanel(),
+                                            ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -4830,11 +4653,12 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildHeader() {
+    final chrome = context.read<ManagerThemeController>().chrome;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      decoration: const BoxDecoration(
-        color: Color(0xFF2C3E50),
-        boxShadow: [
+      decoration: BoxDecoration(
+        color: chrome.sidebarBackground,
+        boxShadow: const [
           BoxShadow(
             color: Colors.black12,
             blurRadius: 4,
@@ -4844,15 +4668,15 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.dashboard, color: Colors.white, size: 28),
+          Icon(Icons.dashboard, color: chrome.textPrimary, size: 28),
           const SizedBox(width: 12),
           Expanded(
             child: Row(
               children: [
-                const Text(
+                Text(
                   'Client Portal',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: chrome.textPrimary,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
@@ -4860,8 +4684,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                 const SizedBox(width: 8),
                 Text(
                   'Hello, ${_getClientDisplayName()}',
-                  style: const TextStyle(
-                    color: Colors.white70,
+                  style: TextStyle(
+                    color: chrome.textSecondary,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -4870,7 +4694,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
+            icon: Icon(Icons.refresh, color: chrome.textPrimary),
             onPressed: _loadClientProposals,
             tooltip: 'Refresh',
           ),
