@@ -14,7 +14,6 @@ import '../../theme/premium_theme.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/manager_theme_controller.dart';
 import '../shared/proposal_insights_modal.dart';
-import '../../widgets/app_side_nav.dart';
 import '../../widgets/manager_page_background.dart';
 import '../../utils/manager_session_actions.dart';
 
@@ -790,26 +789,7 @@ class _DashboardPageState extends State<DashboardPage>
         child: Row(
           children: [
             // Sidebar
-            Consumer<AppState>(
-              builder: (context, app, child) {
-                final role = (app.currentUser?['role'] ?? '')
-                    .toString()
-                    .toLowerCase()
-                    .trim();
-                final isAdmin =
-                    role == 'admin' || role == 'ceo' || role == 'approver';
-                return AppSideNav(
-                  isCollapsed: app.isSidebarCollapsed,
-                  currentLabel: app.currentNavLabel,
-                  isAdmin: isAdmin,
-                  onToggle: app.toggleSidebar,
-                  onSelect: (label) {
-                    app.setCurrentNavLabel(label);
-                    _navigateToPage(context, label);
-                  },
-                );
-              },
-            ),
+            _buildFixedSidebar(context),
 
             // Main Content Area
             Expanded(
@@ -1023,32 +1003,21 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   Widget _buildFixedSidebar(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmall =
-        screenWidth < 1200; // Increased breakpoint for better 100% zoom support
-    final effectiveCollapsed = isSmall ? true : _isSidebarCollapsed;
+    final effectiveCollapsed = _isSidebarCollapsed;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isCompact = constraints.maxHeight < 760;
-        final isVeryCompact = constraints.maxHeight < 660;
-        final isUltraCompact = constraints.maxHeight < 580;
-        final headerHeight = isUltraCompact
-            ? 58.0
-            : (isVeryCompact ? 66.0 : (isCompact ? 72.0 : AppColors.headerHeight));
-        final toggleHeight = isUltraCompact
-            ? 32.0
-            : (isVeryCompact ? 34.0 : (isCompact ? 36.0 : AppColors.itemHeight));
-        final navTopGap = isUltraCompact ? 4.0 : (isCompact ? 6.0 : 8.0);
-        final midGap = isUltraCompact ? 10.0 : (isCompact ? 14.0 : 20.0);
-        final dividerGap = isUltraCompact ? 8.0 : (isCompact ? 10.0 : 12.0);
-        final navTitleSize = isUltraCompact ? 12.0 : 14.0;
-        final navArrowSize = isUltraCompact ? 18.0 : 20.0;
-        final headerPadding = isUltraCompact
-            ? const EdgeInsets.fromLTRB(8, 8, 8, 6)
-            : (isCompact
-                ? const EdgeInsets.fromLTRB(10, 10, 10, 8)
-                : AppSpacing.sidebarHeaderPadding);
+        // Keep sidebar visual sizing fixed while resizing screen.
+        const isCompact = false;
+        const isUltraCompact = false;
+        final headerHeight = AppColors.headerHeight;
+        final toggleHeight = AppColors.itemHeight;
+        const navTopGap = 8.0;
+        const midGap = 20.0;
+        const dividerGap = 12.0;
+        const navTitleSize = 14.0;
+        const navArrowSize = 20.0;
+        final headerPadding = AppSpacing.sidebarHeaderPadding;
 
         return AnimatedContainer(
           duration: AppColors.animationDuration,
@@ -1077,10 +1046,7 @@ class _DashboardPageState extends State<DashboardPage>
                   padding: headerPadding,
                   child: InkWell(
                     onTap: () {
-                      if (!isSmall) {
-                        setState(
-                            () => _isSidebarCollapsed = !_isSidebarCollapsed);
-                      }
+                      setState(() => _isSidebarCollapsed = !_isSidebarCollapsed);
                     },
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
@@ -1195,7 +1161,7 @@ class _DashboardPageState extends State<DashboardPage>
                       ),
                       // This trailing gap ensures visible separation from bottom actions
                       // even when content fits without scrolling.
-                      SizedBox(height: isUltraCompact ? 18 : (isCompact ? 24 : 32)),
+                      const SizedBox(height: 32),
                     ],
                   ),
                 ),
@@ -1516,6 +1482,9 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   void _navigateToPage(BuildContext context, String label) {
+    setState(() => _currentPage = label);
+    context.read<AppState>().setCurrentNavLabel(label);
+
     switch (label) {
       case 'Dashboard':
         // Already on dashboard

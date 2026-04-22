@@ -98,75 +98,65 @@ class _AppSideNavState extends State<AppSideNav> {
     final chrome = context.watch<ManagerThemeController>().chrome;
     final items = widget.isAdmin ? AppSideNav._adminItems : AppSideNav._items;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isCompact = constraints.maxHeight < 900;
-        final isVeryCompact = constraints.maxHeight < 780;
-        final isUltraCompact = constraints.maxHeight < 660;
-        final navScrollEnabled = constraints.maxHeight < 560;
-        final navToBottomGap = isUltraCompact ? 18.0 : (isVeryCompact ? 28.0 : 42.0);
+    // Keep the creator/manager sidebar visually stable while the window resizes.
+    const isCompact = true;
+    const isVeryCompact = false;
+    const isUltraCompact = false;
+    const navToBottomGap = 42.0;
 
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: widget.isCollapsed
-              ? AppSideNav.collapsedWidth
-              : AppSideNav.expandedWidth,
-          decoration: BoxDecoration(
-            color: chrome.sidebarBackground,
-            border: Border(
-              left: const BorderSide(color: AppSideNav.leftAccentColor, width: 3),
-              right: BorderSide(color: chrome.sidebarRightBorder, width: 1),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: widget.isCollapsed
+          ? AppSideNav.collapsedWidth
+          : AppSideNav.expandedWidth,
+      decoration: BoxDecoration(
+        color: chrome.sidebarBackground,
+        border: Border(
+          left: const BorderSide(color: AppSideNav.leftAccentColor, width: 3),
+          right: BorderSide(color: chrome.sidebarRightBorder, width: 1),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildHeader(
+              widget.isCollapsed,
+              chrome,
+              isCompact: isCompact,
+              isVeryCompact: isVeryCompact,
+              isUltraCompact: isUltraCompact,
             ),
-          ),
-          child: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHeader(
-                  widget.isCollapsed,
-                  chrome,
-                  isCompact: isCompact,
-                  isVeryCompact: isVeryCompact,
-                  isUltraCompact: isUltraCompact,
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  children: [
+                    for (final item in items)
+                      _buildNavItem(
+                        label: item['label']!,
+                        assetPath: item['icon']!,
+                        isCollapsed: widget.isCollapsed,
+                        chrome: chrome,
+                        isCompact: isCompact,
+                        isVeryCompact: isVeryCompact,
+                        isUltraCompact: isUltraCompact,
+                      ),
+                    SizedBox(height: navToBottomGap),
+                  ],
                 ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: navScrollEnabled
-                        ? const AlwaysScrollableScrollPhysics()
-                        : const NeverScrollableScrollPhysics(),
-                    padding: EdgeInsets.symmetric(
-                      vertical: isUltraCompact ? 2 : (isCompact ? 4 : 6),
-                    ),
-                    child: Column(
-                      children: [
-                        for (final item in items)
-                          _buildNavItem(
-                            label: item['label']!,
-                            assetPath: item['icon']!,
-                            isCollapsed: widget.isCollapsed,
-                            chrome: chrome,
-                            isCompact: isCompact,
-                            isVeryCompact: isVeryCompact,
-                            isUltraCompact: isUltraCompact,
-                          ),
-                        // Keep a visible gap between top nav and fixed bottom actions,
-                        // matching the Figma separation before Account Profile.
-                        SizedBox(height: navToBottomGap),
-                      ],
-                    ),
-                  ),
-                ),
-                _buildBottom(
-                  widget.isCollapsed,
-                  chrome,
-                  isCompact: isCompact,
-                  isUltraCompact: isUltraCompact,
-                ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
+            _buildBottom(
+              widget.isCollapsed,
+              chrome,
+              isCompact: isCompact,
+              isUltraCompact: isUltraCompact,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
