@@ -14,6 +14,7 @@ import '../../theme/premium_theme.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/manager_theme_controller.dart';
 import '../shared/proposal_insights_modal.dart';
+import '../../widgets/creator_dashboard_sidebar.dart';
 import '../../widgets/manager_page_background.dart';
 import '../../utils/manager_session_actions.dart';
 
@@ -789,7 +790,12 @@ class _DashboardPageState extends State<DashboardPage>
         child: Row(
           children: [
             // Sidebar
-            _buildFixedSidebar(context),
+            CreatorDashboardSidebar(
+              isCollapsed: _isSidebarCollapsed,
+              currentLabel: _currentPage,
+              onToggle: _toggleSidebar,
+              onSelect: (label) => _navigateToPage(context, label),
+            ),
 
             // Main Content Area
             Expanded(
