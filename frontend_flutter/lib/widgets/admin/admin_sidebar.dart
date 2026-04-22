@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../config/app_constants.dart';
 import '../../services/asset_service.dart';
 import '../../theme/manager_theme_controller.dart';
 
@@ -23,6 +22,9 @@ class AdminSidebar extends StatelessWidget {
   final ValueChanged<String> onSelect;
   final String bottomLabel;
   final ManagerChromeTheme? managerChrome;
+
+  static const double collapsedWidth = 76.0;
+  static const double expandedWidth = 220.0;
 
   // Legacy default when [managerChrome] is null (other admin surfaces).
   static const Color _adminBase = Color(0xFF2A2A2A);
@@ -62,28 +64,23 @@ class AdminSidebar extends StatelessWidget {
   Color _sidebarBorder(ManagerChromeTheme? c) =>
       c?.sidebarRightBorder ?? const Color(0x24FFFFFF);
 
-  Color _subtleFill(ManagerChromeTheme? c) {
-    if (c == null) return Colors.white.withOpacity(0.14);
-    return c.isDark
-        ? Colors.white.withOpacity(0.14)
-        : Colors.black.withOpacity(0.06);
-  }
+  Color _subtleFill(ManagerChromeTheme? c) => c?.sidebarHoverFill ??
+      Colors.white.withValues(alpha: 0.14);
 
   Color _iconFg(ManagerChromeTheme? c) =>
       c == null ? Colors.white : c.textPrimary;
 
-  Color _dividerLine(ManagerChromeTheme? c) =>
-      c?.divider ?? Colors.white.withOpacity(0.14);
+  Color _dividerLine(ManagerChromeTheme? c) => const Color(0xFFFFFFFF);
 
   Widget _buildHeader(bool effectiveCollapsed, ManagerChromeTheme? c) {
     if (effectiveCollapsed) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
         child: InkWell(
           onTap: onToggle,
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            height: 44,
+            height: 36,
             decoration: BoxDecoration(
               color: _subtleFill(c),
               borderRadius: BorderRadius.circular(10),
@@ -92,15 +89,15 @@ class AdminSidebar extends StatelessWidget {
             child: Icon(
               Icons.keyboard_arrow_right,
               color: _iconFg(c),
-              size: 24,
+              size: 20,
             ),
           ),
         ),
       );
     }
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 30, 16, 20),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
       child: Stack(
         children: [
           Positioned(
@@ -110,8 +107,8 @@ class AdminSidebar extends StatelessWidget {
               onTap: onToggle,
               borderRadius: BorderRadius.circular(10),
               child: Container(
-                width: 30,
-                height: 30,
+                width: 28,
+                height: 28,
                 decoration: BoxDecoration(
                   color: _subtleFill(c),
                   borderRadius: BorderRadius.circular(10),
@@ -120,41 +117,41 @@ class AdminSidebar extends StatelessWidget {
                 child: Icon(
                   Icons.keyboard_arrow_left,
                   color: _iconFg(c),
-                  size: 20,
+                  size: 18,
                 ),
               ),
             ),
           ),
           Column(
             children: [
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Image.asset(
                 'assets/images/new icons for manager/khonology_logo.png',
-                height: 36,
+                height: 22,
                 fit: BoxFit.contain,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
               Text(
                 'Welcome to',
                 style: TextStyle(
-                  color: c?.textSecondary ?? Colors.white.withOpacity(0.7),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
+                  color:
+                      c?.textSecondary ?? Colors.white.withValues(alpha: 0.7),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 'Proposal & SOW Builder',
                 style: TextStyle(
                   color: _iconFg(c),
-                  fontSize: 18,
+                  fontSize: 12.8,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 12),
               Container(
                 height: 1,
                 color: _dividerLine(c),
@@ -171,7 +168,7 @@ class AdminSidebar extends StatelessWidget {
     final c = managerChrome;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: isCollapsed ? 90.0 : 250.0,
+      width: isCollapsed ? collapsedWidth : expandedWidth,
       decoration: BoxDecoration(
         color: _sidebarBg(c),
         border: Border(
@@ -181,85 +178,74 @@ class AdminSidebar extends StatelessWidget {
           ),
         ),
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final effectiveCollapsed = constraints.maxWidth < 160;
-
-          return Column(
-            children: [
-              _buildHeader(effectiveCollapsed, c),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      for (final item in _items)
-                        _AdminSidebarNavItem(
-                          label: item.displayLabel,
-                          assetPath: item.assetPath,
-                          isActive: currentPage == item.pageLabel,
-                          isCollapsed: effectiveCollapsed,
-                          onTap: () => onSelect(item.pageLabel),
-                          accent: _adminAccent,
-                          managerChrome: c,
-                        ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
-              ),
-              if (!effectiveCollapsed)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  height: 1,
-                  color: _dividerLine(c),
-                ),
-              const SizedBox(height: 12),
-              _AdminSidebarNavItem(
-                label: 'Account Profile',
-                assetPath: 'assets/images/User_Profile.png',
-                isActive: currentPage == 'Account Profile',
-                isCollapsed: effectiveCollapsed,
-                onTap: () => onSelect('Account Profile'),
-                accent: _adminAccent,
-                managerChrome: c,
-              ),
-              const SizedBox(height: 4),
-              _AdminSidebarNavItem(
-                label: bottomLabel == 'Sign Out' ? 'Logout' : bottomLabel,
-                assetPath: 'assets/images/Logout_KhonoBuzz.png',
-                isActive: false,
-                isCollapsed: effectiveCollapsed,
-                onTap: () => onSelect(bottomLabel),
-                accent: _adminAccent,
-                managerChrome: c,
-              ),
-              if (!effectiveCollapsed) ...[
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: _subtleFill(c),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      AppConstants.fullVersion,
-                      style: TextStyle(
-                        color: _iconFg(c),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
+      child: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(isCollapsed, c),
+            Expanded(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.only(
+                        top: isCollapsed ? 8 : 6,
+                        left: isCollapsed ? 0 : 4,
+                        right: isCollapsed ? 0 : 4,
                       ),
-                      textAlign: TextAlign.center,
+                      child: Column(
+                        children: [
+                          for (final item in _items)
+                            _AdminSidebarNavItem(
+                              label: item.displayLabel,
+                              assetPath: item.assetPath,
+                              isActive: currentPage == item.pageLabel,
+                              isCollapsed: isCollapsed,
+                              onTap: () => onSelect(item.pageLabel),
+                              accent: _adminAccent,
+                              managerChrome: c,
+                            ),
+                          SizedBox(height: isCollapsed ? 18 : 40),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-              const SizedBox(height: 20),
-            ],
-          );
-        },
+                  SizedBox(height: isCollapsed ? 8 : 10),
+                  _AdminSidebarNavItem(
+                    label: 'Account Profile',
+                    assetPath: 'assets/images/User_Profile.png',
+                    isActive: currentPage == 'Account Profile',
+                    isCollapsed: isCollapsed,
+                    onTap: () => onSelect('Account Profile'),
+                    accent: _adminAccent,
+                    managerChrome: c,
+                    isBottomItem: true,
+                  ),
+                  if (!isCollapsed)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 4),
+                      child: Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: _dividerLine(c),
+                      ),
+                    ),
+                  _AdminSidebarNavItem(
+                    label: bottomLabel == 'Sign Out' ? 'Logout' : bottomLabel,
+                    assetPath: 'assets/images/Logout_KhonoBuzz.png',
+                    isActive: false,
+                    isCollapsed: isCollapsed,
+                    onTap: () => onSelect(bottomLabel),
+                    accent: _adminAccent,
+                    managerChrome: c,
+                    isBottomItem: true,
+                  ),
+                  SizedBox(height: isCollapsed ? 8 : 10),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -287,6 +273,7 @@ class _AdminSidebarNavItem extends StatelessWidget {
     this.assetPath,
     this.iconData,
     this.managerChrome,
+    this.isBottomItem = false,
   }) : assert(assetPath != null || iconData != null);
 
   final String label;
@@ -297,17 +284,10 @@ class _AdminSidebarNavItem extends StatelessWidget {
   final VoidCallback onTap;
   final Color accent;
   final ManagerChromeTheme? managerChrome;
-  static const Color _lightTabFill = Color(0x4D838383);
-  static const double _iconWidth = 33.988162994384766;
-  static const double _iconHeight = 33.998130798339844;
+  final bool isBottomItem;
 
   Color _idleRail(ManagerChromeTheme? c) {
     return Colors.transparent;
-  }
-
-  Color _iconWell(ManagerChromeTheme? c) {
-    if (c == null) return Colors.white.withOpacity(0.14);
-    return c.isDark ? Colors.white.withOpacity(0.14) : c.fieldFill;
   }
 
   Color _labelColor(ManagerChromeTheme? c, {required bool onAccent}) {
@@ -317,19 +297,20 @@ class _AdminSidebarNavItem extends StatelessWidget {
   }
 
   Widget _buildNavIcon({required bool active}) {
+    final iconSize = isBottomItem ? 31.0 : 34.0;
     if (assetPath != null) {
       return Center(
         child: SizedBox(
-          width: _iconWidth,
-          height: _iconHeight,
+          width: iconSize,
+          height: iconSize,
           child: AssetService.buildImageWidget(assetPath!, fit: BoxFit.contain),
         ),
       );
     }
     return Center(
       child: SizedBox(
-        width: _iconWidth,
-        height: _iconHeight,
+        width: iconSize,
+        height: iconSize,
         child: Icon(
           iconData,
           size: 20,
@@ -345,7 +326,7 @@ class _AdminSidebarNavItem extends StatelessWidget {
     final c = managerChrome;
     if (isCollapsed) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.symmetric(vertical: isBottomItem ? 4 : 6),
         child: Tooltip(
           message: label,
           child: Material(
@@ -354,13 +335,12 @@ class _AdminSidebarNavItem extends StatelessWidget {
               onTap: onTap,
               borderRadius: BorderRadius.circular(10),
               child: Container(
-                width: 50,
-                height: 50,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: isActive ? accent : _idleRail(c),
-                  shape: BoxShape.circle,
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                padding: const EdgeInsets.all(6),
                 child: _buildNavIcon(active: isActive),
               ),
             ),
@@ -370,48 +350,37 @@ class _AdminSidebarNavItem extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: isBottomItem ? 1 : 2,
+      ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            height: isBottomItem ? 38 : 40,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
               color: isActive ? accent : _idleRail(c),
-              borderRadius:
-                  isActive ? BorderRadius.circular(10) : BorderRadius.zero,
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? Colors.white.withOpacity(0.22)
-                        : _iconWell(c),
-                    shape: BoxShape.circle,
-                  ),
-                  padding: const EdgeInsets.all(6),
-                  child: _buildNavIcon(active: isActive),
-                ),
-                const SizedBox(width: 12),
+                _buildNavIcon(active: isActive),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     label,
                     style: TextStyle(
                       color: _labelColor(c, onAccent: isActive),
-                      fontSize: 14,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                      fontSize: isBottomItem ? 11.2 : 11.8,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (isActive)
-                  const Icon(Icons.arrow_forward_ios,
-                      size: 12, color: Colors.white),
               ],
             ),
           ),
