@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../config/app_constants.dart';
 import '../../services/asset_service.dart';
 import '../../theme/manager_theme_controller.dart';
 import '../../theme/premium_theme.dart';
@@ -27,6 +26,8 @@ class FinanceSidebar extends StatelessWidget {
   final int? pendingBadge;
   final ManagerChromeTheme? managerChrome;
 
+  static const double collapsedWidth = 76.0;
+  static const double expandedWidth = 220.0;
   static const Color _base = Color(0xFF252525);
   static const Color _accent = Color(0xFFC10D00);
 
@@ -61,7 +62,7 @@ class FinanceSidebar extends StatelessWidget {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: isCollapsed ? 90.0 : 250.0,
+      width: isCollapsed ? collapsedWidth : expandedWidth,
       decoration: BoxDecoration(
         color: c?.sidebarBackground ?? _base,
         border: Border(
@@ -71,88 +72,76 @@ class FinanceSidebar extends StatelessWidget {
           ),
         ),
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final effectiveCollapsed = constraints.maxWidth < 160;
-
-          return Column(
-            children: [
-              _buildHeader(effectiveCollapsed, c),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      for (final item in items)
-                        _FinanceSidebarNavItem(
-                          label: item.label,
-                          assetPath: item.assetPath,
-                          badge: item.badge,
-                          isActive: currentPage == item.label,
-                          isCollapsed: effectiveCollapsed,
-                          onTap: () => onSelect(item.label),
-                          accent: _accent,
-                          managerChrome: c,
-                        ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
-              ),
-              if (!effectiveCollapsed)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  height: 1,
-                  color: c?.divider ?? Colors.white.withValues(alpha: 0.14),
-                ),
-              const SizedBox(height: 12),
-              _FinanceSidebarNavItem(
-                label: 'Account Profile',
-                assetPath: 'assets/images/User_Profile.png',
-                badge: null,
-                isActive: currentPage == 'Account Profile',
-                isCollapsed: effectiveCollapsed,
-                onTap: () => onSelect('Account Profile'),
-                accent: _accent,
-                managerChrome: c,
-              ),
-              const SizedBox(height: 4),
-              _FinanceSidebarNavItem(
-                label: bottomLabel,
-                assetPath: 'assets/images/Logout_KhonoBuzz.png',
-                badge: null,
-                isActive: false,
-                isCollapsed: effectiveCollapsed,
-                onTap: () => onSelect(bottomLabel),
-                accent: _accent,
-                managerChrome: c,
-              ),
-              if (!effectiveCollapsed) ...[
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: _subtleFill(c),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      AppConstants.fullVersion,
-                      style: TextStyle(
-                        color: c?.textPrimary ?? Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
+      child: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(isCollapsed, c),
+            Expanded(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.only(
+                        top: isCollapsed ? 8 : 6,
+                        left: isCollapsed ? 0 : 4,
+                        right: isCollapsed ? 0 : 4,
                       ),
-                      textAlign: TextAlign.center,
+                      child: Column(
+                        children: [
+                          for (final item in items)
+                            _FinanceSidebarNavItem(
+                              label: item.label,
+                              assetPath: item.assetPath,
+                              badge: item.badge,
+                              isActive: currentPage == item.label,
+                              isCollapsed: isCollapsed,
+                              onTap: () => onSelect(item.label),
+                              accent: _accent,
+                              managerChrome: c,
+                            ),
+                          SizedBox(height: isCollapsed ? 18 : 40),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-              const SizedBox(height: 20),
-            ],
-          );
-        },
+                  SizedBox(height: isCollapsed ? 8 : 10),
+                  _FinanceSidebarNavItem(
+                    label: 'Account Profile',
+                    assetPath: 'assets/images/User_Profile.png',
+                    badge: null,
+                    isActive: currentPage == 'Account Profile',
+                    isCollapsed: isCollapsed,
+                    onTap: () => onSelect('Account Profile'),
+                    accent: _accent,
+                    managerChrome: c,
+                    isBottomItem: true,
+                  ),
+                  if (!isCollapsed)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      child: Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Color(0xFFFFFFFF),
+                      ),
+                    ),
+                  _FinanceSidebarNavItem(
+                    label: bottomLabel,
+                    assetPath: 'assets/images/Logout_KhonoBuzz.png',
+                    badge: null,
+                    isActive: false,
+                    isCollapsed: isCollapsed,
+                    onTap: () => onSelect(bottomLabel),
+                    accent: _accent,
+                    managerChrome: c,
+                    isBottomItem: true,
+                  ),
+                  SizedBox(height: isCollapsed ? 8 : 10),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -169,12 +158,12 @@ class FinanceSidebar extends StatelessWidget {
   Widget _buildHeader(bool effectiveCollapsed, ManagerChromeTheme? c) {
     if (effectiveCollapsed) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
         child: InkWell(
           onTap: onToggle,
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            height: 44,
+            height: 36,
             decoration: BoxDecoration(
               color: _subtleFill(c),
               borderRadius: BorderRadius.circular(10),
@@ -183,15 +172,15 @@ class FinanceSidebar extends StatelessWidget {
             child: Icon(
               Icons.keyboard_arrow_right,
               color: _iconFg(c),
-              size: 24,
+              size: 20,
             ),
           ),
         ),
       );
     }
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 30, 16, 20),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
       child: Stack(
         children: [
           Positioned(
@@ -201,8 +190,8 @@ class FinanceSidebar extends StatelessWidget {
               onTap: onToggle,
               borderRadius: BorderRadius.circular(10),
               child: Container(
-                width: 30,
-                height: 30,
+                width: 28,
+                height: 28,
                 decoration: BoxDecoration(
                   color: _subtleFill(c),
                   borderRadius: BorderRadius.circular(10),
@@ -211,41 +200,40 @@ class FinanceSidebar extends StatelessWidget {
                 child: Icon(
                   Icons.keyboard_arrow_left,
                   color: _iconFg(c),
-                  size: 20,
+                  size: 18,
                 ),
               ),
             ),
           ),
           Column(
             children: [
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Image.asset(
                 'assets/images/new icons for manager/khonology_logo.png',
-                height: 36,
+                height: 22,
                 fit: BoxFit.contain,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
               Text(
                 'Welcome to',
                 style: TextStyle(
                   color: c?.textSecondary ?? Colors.white.withValues(alpha: 0.7),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 'Proposal & SOW Builder',
                 style: TextStyle(
                   color: _iconFg(c),
-                  fontSize: 18,
+                  fontSize: 12.8,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 12),
               Container(
                 height: 1,
                 color: c?.divider ?? Colors.white.withValues(alpha: 0.14),
@@ -280,6 +268,7 @@ class _FinanceSidebarNavItem extends StatelessWidget {
     required this.onTap,
     required this.accent,
     this.managerChrome,
+    this.isBottomItem = false,
   });
 
   final String label;
@@ -290,15 +279,9 @@ class _FinanceSidebarNavItem extends StatelessWidget {
   final VoidCallback onTap;
   final Color accent;
   final ManagerChromeTheme? managerChrome;
-  static const double _iconWidth = 33.988162994384766;
-  static const double _iconHeight = 33.998130798339844;
+  final bool isBottomItem;
 
   Color _idleRail(ManagerChromeTheme? c) => Colors.transparent;
-
-  Color _iconWell(ManagerChromeTheme? c) {
-    if (c == null) return Colors.white.withValues(alpha: 0.14);
-    return c.isDark ? Colors.white.withValues(alpha: 0.14) : c.fieldFill;
-  }
 
   Color _labelColor(ManagerChromeTheme? c, {required bool onAccent}) {
     if (onAccent) return Colors.white;
@@ -307,10 +290,11 @@ class _FinanceSidebarNavItem extends StatelessWidget {
   }
 
   Widget _buildNavIcon() {
+    final iconSize = isBottomItem ? 31.0 : 34.0;
     return Center(
       child: SizedBox(
-        width: _iconWidth,
-        height: _iconHeight,
+        width: iconSize,
+        height: iconSize,
         child: AssetService.buildImageWidget(assetPath, fit: BoxFit.contain),
       ),
     );
@@ -323,7 +307,7 @@ class _FinanceSidebarNavItem extends StatelessWidget {
 
     if (isCollapsed) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.symmetric(vertical: isBottomItem ? 4 : 6),
         child: Tooltip(
           message: label,
           child: Material(
@@ -335,13 +319,12 @@ class _FinanceSidebarNavItem extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
-                      color: isActive ? accent : _idleRail(c),
-                      shape: BoxShape.circle,
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    padding: const EdgeInsets.all(6),
                     child: _buildNavIcon(),
                   ),
                   if (badge != null)
@@ -381,40 +364,35 @@ class _FinanceSidebarNavItem extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: isBottomItem ? 1 : 2,
+      ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            height: isBottomItem ? 38 : 40,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
               color: isActive ? accent : _idleRail(c),
-              borderRadius: isActive ? BorderRadius.circular(10) : BorderRadius.zero,
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: isActive ? Colors.white.withValues(alpha: 0.22) : _iconWell(c),
-                    shape: BoxShape.circle,
-                  ),
-                  padding: const EdgeInsets.all(6),
-                  child: _buildNavIcon(),
-                ),
-                const SizedBox(width: 12),
+                _buildNavIcon(),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     displayLabel,
                     style: TextStyle(
                       color: _labelColor(c, onAccent: isActive),
-                      fontSize: displayLabel == 'Client Management' ? 13 : 14,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                      letterSpacing:
-                          displayLabel == 'Client Management' ? -0.2 : 0,
+                      fontSize: isBottomItem
+                          ? 11.2
+                          : (displayLabel == 'Client Management' ? 11.4 : 11.8),
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -442,15 +420,6 @@ class _FinanceSidebarNavItem extends StatelessWidget {
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                       ),
-                    ),
-                  ),
-                if (isActive)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 10),
-                    child: Icon(
-                      Icons.arrow_forward_ios,
-                      size: 12,
-                      color: Colors.white,
                     ),
                   ),
               ],
