@@ -428,6 +428,8 @@ asgi_app = WsgiToAsgi(app)
 
 # Mark if database has been initialized
 _db_initialized = False
+# True while background schema initialization is in progress.
+_pg_schema_init_in_progress = False
 # After first schema init attempt (success or failure); avoids hammering Postgres.
 _pg_schema_init_attempted = False
 
@@ -951,7 +953,7 @@ def init_pg_schema():
 @app.before_request
 def init_db():
     """Initialize PostgreSQL schema on first request"""
-    global _db_initialized, _pg_schema_init_attempted
+    global _db_initialized, _pg_schema_init_attempted, _pg_schema_init_in_progress
     # If someone calls init_db() manually (e.g., from __main__ or a script),
     # Flask's request proxy won't be available. Handle that gracefully.
     if not has_request_context():
@@ -985,6 +987,10 @@ def init_db():
     ):
         return
     if _db_initialized:
+        return
+    if _pg_schema_init_in_progress:
+        # Background startup initialization is still running; avoid hard-failing
+        # requests during this short warmup window.
         return
     if _pg_schema_init_attempted:
         # Schema init already failed; do not retry every request.
@@ -7310,19 +7316,28 @@ def initialize_database():
 
 if __name__ == '__main__':
     # When running with 'python app.py'
-    try:
-        # Initialize schema up-front for local runs. Don't call init_db() here
-        # because it expects a Flask request context.
-        print("[*] Initializing PostgreSQL schema (startup)...")
-        init_pg_schema()
-        _db_initialized = True
-        app.config['PG_SCHEMA_AVAILABLE'] = True
-        _pg_schema_init_attempted = True
-        print("[OK] Database schema initialized successfully")
-    except Exception as e:
-        _pg_schema_init_attempted = True
-        app.config['PG_SCHEMA_AVAILABLE'] = False
-        print(f"Warning: Database initialization failed: {e}")
+    import threading
+    _pg_schema_init_in_progress = True
+    app.config['PG_SCHEMA_AVAILABLE'] = False
+
+    def _init_schema_background():
+        global _db_initialized, _pg_schema_init_attempted, _pg_schema_init_in_progress
+        try:
+            # Initialize schema without blocking server startup.
+            print("[*] Initializing PostgreSQL schema (startup, background)...")
+            init_pg_schema()
+            _db_initialized = True
+            app.config['PG_SCHEMA_AVAILABLE'] = True
+            _pg_schema_init_attempted = True
+            print("[OK] Database schema initialized successfully")
+        except Exception as e:
+            _pg_schema_init_attempted = True
+            app.config['PG_SCHEMA_AVAILABLE'] = False
+            print(f"Warning: Database initialization failed: {e}")
+        finally:
+            _pg_schema_init_in_progress = False
+
+    threading.Thread(target=_init_schema_background, daemon=True).start()
     import os
     # Local dev expects 5000 (frontend is hardcoded to 127.0.0.1:5000).
     # Some environments set PORT=8000 by default, which breaks the client portal.
@@ -7333,4 +7348,9 @@ if __name__ == '__main__':
         or (os.getenv('PORT') if os.getenv('USE_PORT_ENV') == '1' else '')
         or '5000'
     )
-    app.run(debug=True, host='0.0.0.0', port=port)
+    app.run(
+        debug=True,
+        host='0.0.0.0',
+        port=port,
+        use_reloader=False,  # Keep one stable local process in PowerShell.
+    )
