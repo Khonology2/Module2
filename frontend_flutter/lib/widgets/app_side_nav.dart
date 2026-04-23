@@ -107,6 +107,9 @@ class _AppSideNavState extends State<AppSideNav> {
     final items = widget.items ??
         (widget.isAdmin ? AppSideNav._adminItems : AppSideNav._items);
 
+    final leftBorderColor =
+        widget.isAdmin ? AppSideNav.leftAccentColor : Colors.transparent;
+
     final collapsedWidth =
         widget.collapsedWidthOverride ?? AppSideNav.collapsedWidth;
     final expandedWidth =
@@ -127,7 +130,7 @@ class _AppSideNavState extends State<AppSideNav> {
       decoration: BoxDecoration(
         color: chrome.sidebarBackground,
         border: Border(
-          left: const BorderSide(color: AppSideNav.leftAccentColor, width: 3),
+          left: BorderSide(color: leftBorderColor, width: 3),
           right: BorderSide(color: chrome.sidebarRightBorder, width: 1),
         ),
       ),
