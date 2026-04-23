@@ -14,7 +14,7 @@ import '../../theme/premium_theme.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/manager_theme_controller.dart';
 import '../shared/proposal_insights_modal.dart';
-import '../../widgets/app_side_nav.dart';
+import '../../widgets/creator_dashboard_sidebar.dart';
 import '../../widgets/manager_page_background.dart';
 import '../../utils/manager_session_actions.dart';
 
@@ -787,67 +787,50 @@ class _DashboardPageState extends State<DashboardPage>
             )
           : null,
       body: ManagerPageBackground(
-        child: SafeArea(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Sidebar
-              Consumer<AppState>(
-                builder: (context, app, child) {
-                  final role = (app.currentUser?['role'] ?? '')
-                      .toString()
-                      .toLowerCase()
-                      .trim();
-                  final isAdmin =
-                      role == 'admin' || role == 'ceo' || role == 'approver';
-                  return AppSideNav(
-                    isCollapsed: app.isSidebarCollapsed,
-                    currentLabel: app.currentNavLabel,
-                    isAdmin: isAdmin,
-                    onToggle: app.toggleSidebar,
-                    onSelect: (label) {
-                      app.setCurrentNavLabel(label);
-                      _navigateToPage(context, label);
-                    },
-                  );
-                },
-              ),
+        child: Row(
+          children: [
+            // Sidebar
+            CreatorDashboardSidebar(
+              isCollapsed: _isSidebarCollapsed,
+              currentLabel: _currentPage,
+              onToggle: _toggleSidebar,
+              onSelect: (label) => _navigateToPage(context, label),
+            ),
 
-              // Main Content Area
-              Expanded(
-                child: Column(
-                  children: [
-                    // ── Header bar ────────────────────────────────────────────
-                    _buildHeaderBar(app, userRole, chrome),
+            // Main Content Area
+            Expanded(
+              child: Column(
+                children: [
+                  // ── Header bar ────────────────────────────────────────────
+                  _buildHeaderBar(app, userRole, chrome),
 
-                    // ── Scrollable body ───────────────────────────────────────
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                        child: CustomScrollbar(
-                          controller: _scrollController,
-                          child: RefreshIndicator(
-                            onRefresh: _refreshData,
-                            color: const Color(0xFFC10D00),
-                            child: SingleChildScrollView(
-                              controller: _scrollController,
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.only(bottom: 16),
-                              child: _buildRoleSpecificContent(
-                                  userRole, counts, app, chrome),
-                            ),
+                  // ── Scrollable body ───────────────────────────────────────
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: CustomScrollbar(
+                        controller: _scrollController,
+                        child: RefreshIndicator(
+                          onRefresh: _refreshData,
+                          color: const Color(0xFFC10D00),
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: _buildRoleSpecificContent(
+                                userRole, counts, app, chrome),
                           ),
                         ),
                       ),
                     ),
+                  ),
 
-                    // Footer
-                    const Footer(),
-                  ],
-                ),
+                  // Footer
+                  const Footer(),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -945,9 +928,9 @@ class _DashboardPageState extends State<DashboardPage>
           onTap: onTap,
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            width: 64,
-            height: 64,
-            padding: const EdgeInsets.all(12),
+            width: 80,
+            height: 80,
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: chrome.floatingFill,
               shape: BoxShape.circle,
@@ -957,8 +940,8 @@ class _DashboardPageState extends State<DashboardPage>
         ),
         if (badge != null && badge > 0)
           Positioned(
-            right: 2,
-            top: 2,
+            right: 4,
+            top: 4,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: const BoxDecoration(
@@ -1026,46 +1009,54 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   Widget _buildFixedSidebar(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmall =
-        screenWidth < 1200; // Increased breakpoint for better 100% zoom support
-    final effectiveCollapsed = isSmall ? true : _isSidebarCollapsed;
+    final effectiveCollapsed = _isSidebarCollapsed;
 
-    return AnimatedContainer(
-      duration: AppColors.animationDuration,
-      width: effectiveCollapsed
-          ? AppColors.collapsedWidth
-          : AppColors.expandedWidth,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.backgroundColor
-                .withValues(alpha: AppColors.backgroundOpacity),
-            border: Border(
-              right: BorderSide(
-                color: AppColors.borderColor,
-                width: 1,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Keep sidebar visual sizing fixed while resizing screen.
+        const isCompact = false;
+        const isUltraCompact = false;
+        final headerHeight = AppColors.headerHeight;
+        final toggleHeight = AppColors.itemHeight;
+        const navTopGap = 8.0;
+        const midGap = 20.0;
+        const dividerGap = 12.0;
+        const navTitleSize = 14.0;
+        const navArrowSize = 20.0;
+        final headerPadding = AppSpacing.sidebarHeaderPadding;
+
+        return AnimatedContainer(
+          duration: AppColors.animationDuration,
+          width: effectiveCollapsed
+              ? AppColors.collapsedWidth
+              : AppColors.expandedWidth,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.backgroundColor
+                    .withValues(alpha: AppColors.backgroundOpacity),
+                border: Border(
+                  right: BorderSide(
+                    color: AppColors.borderColor,
+                    width: 1,
+                  ),
+                ),
               ),
-            ),
-          ),
-          child: Column(
-            children: [
+              child: Column(
+                children: [
               // Header Section
               SizedBox(
-                height: AppColors.headerHeight,
+                height: headerHeight,
                 child: Padding(
-                  padding: AppSpacing.sidebarHeaderPadding,
+                  padding: headerPadding,
                   child: InkWell(
                     onTap: () {
-                      if (!isSmall) {
-                        setState(
-                            () => _isSidebarCollapsed = !_isSidebarCollapsed);
-                      }
+                      setState(() => _isSidebarCollapsed = !_isSidebarCollapsed);
                     },
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      height: AppColors.itemHeight,
+                      height: toggleHeight,
                       decoration: BoxDecoration(
                         color: AppColors.hoverColor,
                         borderRadius: BorderRadius.circular(10),
@@ -1081,7 +1072,7 @@ class _DashboardPageState extends State<DashboardPage>
                                 'Navigation',
                                 style: TextStyle(
                                   color: AppColors.textPrimary,
-                                  fontSize: 14,
+                                  fontSize: navTitleSize,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -1091,7 +1082,7 @@ class _DashboardPageState extends State<DashboardPage>
                                 ? Icons.keyboard_arrow_right
                                 : Icons.keyboard_arrow_left,
                             color: AppColors.textPrimary,
-                            size: 20,
+                            size: navArrowSize,
                           ),
                         ],
                       ),
@@ -1105,12 +1096,14 @@ class _DashboardPageState extends State<DashboardPage>
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                      const SizedBox(height: 8),
+                      SizedBox(height: navTopGap),
                       _buildSidebarNavItem(
                         label: 'Dashboard',
                         assetPath: 'assets/images/Dahboard.png',
                         isSelected: _currentPage == 'Dashboard',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () => _navigateToPage(context, 'Dashboard'),
                       ),
                       _buildSidebarNavItem(
@@ -1118,6 +1111,8 @@ class _DashboardPageState extends State<DashboardPage>
                         assetPath: 'assets/images/My_Proposals.png',
                         isSelected: _currentPage == 'My Proposals',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () => _navigateToPage(context, 'My Proposals'),
                       ),
                       _buildSidebarNavItem(
@@ -1125,6 +1120,8 @@ class _DashboardPageState extends State<DashboardPage>
                         assetPath: 'assets/images/content_library.png',
                         isSelected: _currentPage == 'Templates',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () => _navigateToPage(context, 'Templates'),
                       ),
                       _buildSidebarNavItem(
@@ -1132,6 +1129,8 @@ class _DashboardPageState extends State<DashboardPage>
                         assetPath: 'assets/images/content_library.png',
                         isSelected: _currentPage == 'Content Library',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () =>
                             _navigateToPage(context, 'Content Library'),
                       ),
@@ -1140,6 +1139,8 @@ class _DashboardPageState extends State<DashboardPage>
                         assetPath: 'assets/images/collaborations.png',
                         isSelected: _currentPage == 'Client Management',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () =>
                             _navigateToPage(context, 'Client Management'),
                       ),
@@ -1149,6 +1150,8 @@ class _DashboardPageState extends State<DashboardPage>
                             'assets/images/Time Allocation_Approval_Blue.png',
                         isSelected: _currentPage == 'Approved Proposals',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () =>
                             _navigateToPage(context, 'Approved Proposals'),
                       ),
@@ -1157,37 +1160,52 @@ class _DashboardPageState extends State<DashboardPage>
                         assetPath: 'assets/images/analytics.png',
                         isSelected: _currentPage == 'Analytics (My Pipeline)',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () =>
                             _navigateToPage(context, 'Analytics (My Pipeline)'),
                       ),
-                      const SizedBox(height: 20),
-
-                      // Divider
-                      if (!effectiveCollapsed)
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16),
-                          height: 1,
-                          color: AppColors.borderColor,
-                        ),
-                      const SizedBox(height: 12),
-
-                      // Logout
-                      _buildSidebarNavItem(
-                        label: 'Logout',
-                        assetPath: 'assets/images/Logout_KhonoBuzz.png',
-                        isSelected: false,
-                        isCollapsed: effectiveCollapsed,
-                        onTap: () => _handleLogout(context),
-                      ),
-                      const SizedBox(height: 20),
+                      // This trailing gap ensures visible separation from bottom actions
+                      // even when content fits without scrolling.
+                      const SizedBox(height: 32),
                     ],
                   ),
                 ),
               ),
+
+              // Bottom fixed actions
+              if (!effectiveCollapsed)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  height: 1,
+                  color: AppColors.borderColor,
+                ),
+              SizedBox(height: dividerGap),
+              _buildSidebarNavItem(
+                label: 'Account Profile',
+                assetPath: 'assets/images/User_Profile.png',
+                isSelected: _currentPage == 'Account Profile',
+                isCollapsed: effectiveCollapsed,
+                isCompact: isCompact,
+                isUltraCompact: isUltraCompact,
+                onTap: () => _navigateToPage(context, 'Account Profile'),
+              ),
+              _buildSidebarNavItem(
+                label: 'Logout',
+                assetPath: 'assets/images/Logout_KhonoBuzz.png',
+                isSelected: false,
+                isCollapsed: effectiveCollapsed,
+                isCompact: isCompact,
+                isUltraCompact: isUltraCompact,
+                onTap: () => _handleLogout(context),
+              ),
+              SizedBox(height: midGap),
             ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1197,6 +1215,8 @@ class _DashboardPageState extends State<DashboardPage>
     required bool isSelected,
     required bool isCollapsed,
     required VoidCallback onTap,
+    bool isCompact = false,
+    bool isUltraCompact = false,
     bool showProfileIndicator = false,
   }) {
     bool hovering = false;
@@ -1204,7 +1224,10 @@ class _DashboardPageState extends State<DashboardPage>
     return StatefulBuilder(
       builder: (context, setState) {
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          padding: EdgeInsets.symmetric(
+            horizontal: isUltraCompact ? 6 : 8,
+            vertical: isUltraCompact ? 1 : (isCompact ? 1.5 : 2),
+          ),
           child: MouseRegion(
             onEnter: (_) => setState(() => hovering = true),
             onExit: (_) => setState(() => hovering = false),
@@ -1213,15 +1236,28 @@ class _DashboardPageState extends State<DashboardPage>
               borderRadius: BorderRadius.circular(10),
               child: AnimatedContainer(
                 duration: AppColors.animationDuration,
-                height: AppColors.itemHeight,
+                height: isUltraCompact
+                    ? 38
+                    : (isCompact ? 42 : AppColors.itemHeight),
                 decoration: BoxDecoration(
                   color: _getItemColor(isSelected, hovering, isCollapsed),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: isCollapsed
                     ? _buildCollapsedItem(
-                        assetPath, isSelected, showProfileIndicator)
-                    : _buildExpandedItem(label, assetPath, isSelected),
+                        assetPath,
+                        isSelected,
+                        showProfileIndicator,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
+                      )
+                    : _buildExpandedItem(
+                        label,
+                        assetPath,
+                        isSelected,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
+                      ),
               ),
             ),
           ),
@@ -1231,13 +1267,19 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   Widget _buildCollapsedItem(
-      String assetPath, bool isSelected, bool showProfileIndicator) {
+    String assetPath,
+    bool isSelected,
+    bool showProfileIndicator, {
+    bool isCompact = false,
+    bool isUltraCompact = false,
+  }) {
+    final iconSize = isUltraCompact ? 26.0 : (isCompact ? 30.0 : 40.0);
     return Center(
       child: Stack(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: iconSize,
+            height: iconSize,
             decoration: BoxDecoration(
               color: Colors.transparent,
               shape: BoxShape.circle,
@@ -1273,14 +1315,27 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
-  Widget _buildExpandedItem(String label, String assetPath, bool isSelected) {
+  Widget _buildExpandedItem(
+    String label,
+    String assetPath,
+    bool isSelected, {
+    bool isCompact = false,
+    bool isUltraCompact = false,
+  }) {
+    final iconSize = isUltraCompact ? 26.0 : (isCompact ? 30.0 : 40.0);
+    final fontSize = isUltraCompact ? 12.0 : (isCompact ? 13.0 : 14.0);
+    final itemPadding = isUltraCompact
+        ? const EdgeInsets.symmetric(horizontal: 8, vertical: 6)
+        : (isCompact
+            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 7)
+            : AppSpacing.sidebarItemPadding);
     return Padding(
-      padding: AppSpacing.sidebarItemPadding,
+      padding: itemPadding,
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: iconSize,
+            height: iconSize,
             decoration: BoxDecoration(
               color: Colors.transparent,
               shape: BoxShape.circle,
@@ -1296,11 +1351,13 @@ class _DashboardPageState extends State<DashboardPage>
           Expanded(
             child: Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: isSelected
                     ? AppColors.textPrimary
                     : AppColors.textSecondary,
-                fontSize: 14,
+                fontSize: fontSize,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
@@ -1431,6 +1488,9 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   void _navigateToPage(BuildContext context, String label) {
+    setState(() => _currentPage = label);
+    context.read<AppState>().setCurrentNavLabel(label);
+
     switch (label) {
       case 'Dashboard':
         // Already on dashboard
@@ -1684,19 +1744,18 @@ class _DashboardPageState extends State<DashboardPage>
               ),
             ),
             const SizedBox(width: 8),
-            Container(
-              width: 84,
-              height: 84,
-              decoration: BoxDecoration(
-                color: const Color(0xFFC10D00).withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFFC10D00).withValues(alpha: 0.30),
-                  width: 1,
+            // Icon (~2× for visual prominence)
+            Padding(
+              padding: const EdgeInsets.only(right: 2, top: 20),
+              child: SizedBox(
+                width: 52,
+                height: 52,
+                child: Image.asset(
+                  iconAsset,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.bottomRight,
                 ),
               ),
-              padding: const EdgeInsets.all(14),
-              child: Image.asset(iconAsset, fit: BoxFit.contain),
             ),
           ],
         ),
@@ -1763,7 +1822,7 @@ class _DashboardPageState extends State<DashboardPage>
         },
         borderRadius: BorderRadius.circular(10),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(
             children: [
               SizedBox(
@@ -2169,8 +2228,6 @@ class _DashboardPageState extends State<DashboardPage>
   Widget _buildRecentProposals(
       List<dynamic> proposals, ManagerChromeTheme chrome) {
     final filteredProposals = _getFilteredProposals(proposals);
-    final size = MediaQuery.sizeOf(context);
-    final listMaxHeight = size.height < 800 ? 200.0 : 260.0;
 
     filteredProposals.sort((a, b) {
       DateTime? parseDate(dynamic value) {
@@ -2297,27 +2354,19 @@ class _DashboardPageState extends State<DashboardPage>
             ),
           )
         else
-          SizedBox(
-            height: listMaxHeight,
-            child: ListView.builder(
-              padding: EdgeInsets.zero,
-              itemCount:
-                  filteredProposals.length > 5 ? 5 : filteredProposals.length,
-              itemBuilder: (context, index) {
-                final proposal = filteredProposals[index];
-                String status = proposal['status'] ?? 'Draft';
-                Color statusColor = _getStatusColor(status);
-                Color textColor = _getStatusTextColor(status);
-                return _buildProposalItem(
-                  proposal,
-                  status,
-                  statusColor,
-                  textColor,
-                  chrome,
-                );
-              },
-            ),
-          ),
+          ...filteredProposals.take(5).map((proposal) {
+            String status = proposal['status'] ?? 'Draft';
+            Color statusColor = _getStatusColor(status);
+            Color textColor = _getStatusTextColor(status);
+
+            return _buildProposalItem(
+              proposal,
+              status,
+              statusColor,
+              textColor,
+              chrome,
+            );
+          }).toList(),
       ],
     );
   }

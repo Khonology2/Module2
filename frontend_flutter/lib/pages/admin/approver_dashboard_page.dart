@@ -606,16 +606,16 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
           onTap: onTap,
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            width: 64,
-            height: 64,
-            padding: const EdgeInsets.all(12),
+            width: 80,
+            height: 80,
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: chrome.floatingFill,
               shape: BoxShape.circle,
               border: Border.all(
                 color: chrome.isDark
-                    ? Colors.white.withValues(alpha: 0.90)
-                    : ManagerChromeTheme.textDark.withValues(alpha: 0.20),
+                    ? Colors.white.withOpacity(0.9)
+                    : ManagerChromeTheme.textDark.withOpacity(0.2),
                 width: 2,
               ),
             ),
@@ -624,8 +624,8 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
         ),
         if (badge != null && badge > 0)
           Positioned(
-            right: 2,
-            top: 2,
+            right: 4,
+            top: 4,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: const BoxDecoration(
@@ -1150,6 +1150,7 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
   static const double _figmaPendingListRowIconSize = 22;
   static const String _assetPendingApprovalRowIcon =
       'assets/images/Admin_new_icons/Group522.png';
+
   /// Section header bell (Proposals Pending Your Approval) — from Figma asset.
   static const String _assetSectionNotificationBell =
       'assets/images/Admin_new_icons/Group3988.png';
@@ -1386,17 +1387,17 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
             ),
             const SizedBox(width: 8),
             Container(
-              width: 84,
-              height: 84,
+              width: 104,
+              height: 104,
               decoration: BoxDecoration(
-                color: const Color(0xFFC10D00).withValues(alpha: 0.15),
+                color: const Color(0xFFC10D00).withOpacity(0.15),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: const Color(0xFFC10D00).withValues(alpha: 0.30),
+                  color: const Color(0xFFC10D00).withOpacity(0.3),
                   width: 1,
                 ),
               ),
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               child: Image.asset(iconAsset, fit: BoxFit.contain),
             ),
           ],
@@ -1558,7 +1559,7 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     bool useFigmaSizes = false,
   }) {
     final compact = MediaQuery.sizeOf(context).height < 860;
-    final iconDiameter = useFigmaSizes ? 48.0 : 72.0;
+    final iconDiameter = useFigmaSizes ? 48.0 : 80.0;
     final pad = useFigmaSizes
         ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
         : EdgeInsets.all(compact ? 18 : 24);
@@ -1628,8 +1629,8 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
                 border: Border.all(color: chrome.divider),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black
-                        .withValues(alpha: chrome.isDark ? 0.25 : 0.08),
+                    color:
+                        Colors.black.withOpacity(chrome.isDark ? 0.25 : 0.08),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -1688,7 +1689,7 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     final pad = useFigmaSizes
         ? const EdgeInsets.all(12)
         : EdgeInsets.all(compact ? 16 : 20);
-    final headerIconDiameter = useFigmaSizes ? 52.0 : 72.0;
+    final headerIconDiameter = useFigmaSizes ? 52.0 : 80.0;
 
     Widget inner = _buildDarkGlass(
       chrome: chrome,
@@ -2342,7 +2343,7 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     final pad = useFigmaSizes
         ? const EdgeInsets.all(12)
         : EdgeInsets.all(compact ? 18 : 24);
-    final sectionIconDiameter = useFigmaSizes ? 52.0 : 72.0;
+    final sectionIconDiameter = useFigmaSizes ? 52.0 : 80.0;
     final gapAfterHeader = useFigmaSizes ? 10.0 : (compact ? 12.0 : 20.0);
     final gapBeforeHeaderDivider =
         useFigmaSizes ? 10.0 : (compact ? 12.0 : 16.0);
@@ -3194,6 +3195,50 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     return null;
   }
 
+  String? _findNestedStringValue(dynamic node, Set<String> keys) {
+    if (node == null) return null;
+
+    if (node is Map) {
+      for (final entry in node.entries) {
+        final k = entry.key?.toString();
+        if (k != null && keys.contains(k)) {
+          final v = entry.value;
+          if (v is String && v.trim().isNotEmpty) return v;
+          if (v is num) return v.toString();
+          if (v is Map) {
+            final inner = v['value'] ??
+                v['label'] ??
+                v['status'] ??
+                v['level'] ??
+                v['decision'] ??
+                v['result'] ??
+                v['outcome'];
+            if (inner is String && inner.trim().isNotEmpty) return inner;
+            if (inner is num) return inner.toString();
+          }
+        }
+      }
+
+      for (final v in node.values) {
+        final found = _findNestedStringValue(v, keys);
+        if (found != null && found.trim().isNotEmpty) return found;
+      }
+      return null;
+    }
+
+    if (node is Iterable) {
+      for (final item in node) {
+        final found = _findNestedStringValue(item, keys);
+        if (found != null && found.trim().isNotEmpty) return found;
+      }
+      return null;
+    }
+
+    if (node is String) return node;
+    if (node is num) return node.toString();
+    return null;
+  }
+
   Map<String, dynamic>? _extractRiskGateObject(Map<String, dynamic> proposal) {
     final raw = proposal['risk_gate'] ??
         proposal['riskGate'] ??
@@ -3240,24 +3285,37 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
 
   String _extractRiskLevel(Map<String, dynamic> proposal) {
     final gate = _extractRiskGateObject(proposal);
+    final nested = _findNestedStringValue(
+      gate,
+      {
+        'risk_status',
+        'riskStatus',
+        'status',
+        'decision',
+        'outcome',
+        'result',
+        'risk_level',
+        'riskLevel',
+        'riskLevelLabel',
+        'level',
+        'risk_level_label',
+        'riskLevelLabel',
+      },
+    );
+
     final level = (proposal['risk_level'] ??
             proposal['riskLevel'] ??
             proposal['riskLevelLabel'] ??
             proposal['risk_status'] ??
             proposal['riskStatus'] ??
-            gate?['risk_level'] ??
-            gate?['riskLevel'] ??
-            gate?['level'] ??
-            gate?['risk_level_label'] ??
-            gate?['riskLevelLabel'] ??
+            nested ??
             '')
         .toString()
         .toLowerCase()
         .trim();
-
-    if (level == 'block') return 'critical';
-    if (level == 'review') return 'high';
-    if (level == 'pass') return 'low';
+    if (level.contains('block')) return 'critical';
+    if (level.contains('review')) return 'high';
+    if (level.contains('pass')) return 'low';
     return level;
   }
 

@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 import 'template_builder.dart';
 import '../../theme/premium_theme.dart';
 import '../../api.dart';
-import '../../services/auth_service.dart';
 import '../../services/asset_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/manager_theme_controller.dart';
@@ -468,13 +467,11 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
   Widget _buildFixedSidebar(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmall = screenWidth < 768;
-    final effectiveCollapsed = isSmall ? true : _isSidebarCollapsed;
+    final effectiveCollapsed = false;
 
     return AnimatedContainer(
       duration: AppColors.animationDuration,
-      width: effectiveCollapsed
-          ? AppColors.collapsedWidth
-          : AppColors.expandedWidth,
+      width: AppColors.expandedWidth,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
@@ -496,12 +493,7 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
                 child: Padding(
                   padding: AppSpacing.sidebarHeaderPadding,
                   child: InkWell(
-                    onTap: () {
-                      if (!isSmall) {
-                        setState(
-                            () => _isSidebarCollapsed = !_isSidebarCollapsed);
-                      }
-                    },
+                    onTap: null,
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       height: AppColors.itemHeight,
@@ -510,27 +502,17 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
-                        mainAxisAlignment: effectiveCollapsed
-                            ? MainAxisAlignment.center
-                            : MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          if (!effectiveCollapsed)
-                            Expanded(
-                              child: Text(
-                                'Navigation',
-                                style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                          Expanded(
+                            child: Text(
+                              'Navigation',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          Icon(
-                            effectiveCollapsed
-                                ? Icons.keyboard_arrow_right
-                                : Icons.keyboard_arrow_left,
-                            color: AppColors.textPrimary,
-                            size: 20,
                           ),
                         ],
                       ),
@@ -616,7 +598,8 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
                         assetPath: 'assets/images/Logout_KhonoBuzz.png',
                         isSelected: false,
                         isCollapsed: effectiveCollapsed,
-                        onTap: () => ManagerSessionActions.showLogoutDialog(context),
+                        onTap: () =>
+                            ManagerSessionActions.showLogoutDialog(context),
                       ),
                       const SizedBox(height: 20),
                     ],
@@ -1171,8 +1154,7 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
     final panelDecoration = chrome.isDark
         ? PremiumTheme.glassCard(borderRadius: 16)
         : chrome.floatingPanelDecoration(radius: 10);
-    final badgeBg =
-        chrome.isDark ? PremiumTheme.darkBg3 : chrome.fieldFill;
+    final badgeBg = chrome.isDark ? PremiumTheme.darkBg3 : chrome.fieldFill;
 
     return Container(
       decoration: panelDecoration,
@@ -1244,8 +1226,7 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
     final panelDecoration = chrome.isDark
         ? PremiumTheme.glassCard(borderRadius: 16)
         : chrome.floatingPanelDecoration(radius: 10);
-    final badgeBg =
-        chrome.isDark ? PremiumTheme.darkBg3 : chrome.fieldFill;
+    final badgeBg = chrome.isDark ? PremiumTheme.darkBg3 : chrome.fieldFill;
 
     return Container(
       decoration: panelDecoration,
@@ -1393,8 +1374,7 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
                           child: Text(
                             template.templateType.toUpperCase(),
                             style: TextStyle(
-                                fontSize: 10,
-                                color: chrome.textSecondary),
+                                fontSize: 10, color: chrome.textSecondary),
                           ),
                         ),
                         Container(
@@ -1507,8 +1487,8 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => _cloneTemplate(template),
-                    icon: Icon(Icons.copy,
-                        size: 16, color: chrome.textSecondary),
+                    icon:
+                        Icon(Icons.copy, size: 16, color: chrome.textSecondary),
                     label: Text('Clone',
                         style: TextStyle(color: chrome.textSecondary)),
                     style: OutlinedButton.styleFrom(

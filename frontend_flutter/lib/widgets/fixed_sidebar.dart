@@ -10,6 +10,7 @@ class FixedSidebar extends StatefulWidget {
   final Function(String) onNavigate;
   final VoidCallback onLogout;
   final Map<String, String>? customAssets;
+  final bool showCollapseToggle;
 
   const FixedSidebar({
     super.key,
@@ -19,6 +20,7 @@ class FixedSidebar extends StatefulWidget {
     required this.onNavigate,
     required this.onLogout,
     this.customAssets,
+    this.showCollapseToggle = false,
   });
 
   @override
@@ -30,7 +32,9 @@ class _FixedSidebarState extends State<FixedSidebar> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmall = screenWidth < 768;
-    final effectiveCollapsed = isSmall ? true : widget.isCollapsed;
+    final effectiveCollapsed = widget.showCollapseToggle
+        ? (isSmall ? true : widget.isCollapsed)
+        : false;
 
     return AnimatedContainer(
       duration: AppColors.animationDuration,
@@ -58,11 +62,13 @@ class _FixedSidebarState extends State<FixedSidebar> {
                 child: Padding(
                   padding: AppSpacing.sidebarHeaderPadding,
                   child: InkWell(
-                    onTap: () {
-                      if (!isSmall) {
-                        widget.onToggle();
-                      }
-                    },
+                    onTap: widget.showCollapseToggle
+                        ? () {
+                            if (!isSmall) {
+                              widget.onToggle();
+                            }
+                          }
+                        : null,
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       height: AppColors.itemHeight,
@@ -73,13 +79,14 @@ class _FixedSidebarState extends State<FixedSidebar> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            effectiveCollapsed
-                                ? Icons.keyboard_arrow_right
-                                : Icons.keyboard_arrow_left,
-                            color: AppColors.textPrimary,
-                            size: 20,
-                          ),
+                          if (widget.showCollapseToggle)
+                            Icon(
+                              effectiveCollapsed
+                                  ? Icons.keyboard_arrow_right
+                                  : Icons.keyboard_arrow_left,
+                              color: AppColors.textPrimary,
+                              size: 20,
+                            ),
                         ],
                       ),
                     ),

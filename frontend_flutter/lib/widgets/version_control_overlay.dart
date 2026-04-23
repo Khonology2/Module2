@@ -4,10 +4,10 @@ class VersionControlOverlay extends StatelessWidget {
   const VersionControlOverlay({super.key});
 
   static const int _versionYear = 2026;
-  static const String _versionMonth = '03';
+  static const String _versionMonth = '04';
   static const String _versionWeekCode = 'C';
   static const String _versionDayCode = 'D';
-  static const int _versionCommitNumber = 3;
+  static const int _versionCommitNumber = 5;
   static const String _versionEnvironment = 'SIT';
 
   static const String versionLabel = 'Ver $_versionYear.$_versionMonth.'

@@ -107,8 +107,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       '$_financeIconDir/Top clients by rev_intab.png';
   static const String _recentSignedInTabIcon =
       '$_financeIconDir/Recent_signed_deals_intab.png';
-  static const double _adminLikeIconDiameter = 72.0;
-  static const double _adminLikeIconPadding = 12.0;
+  static const double _adminLikeIconDiameter = 80.0;
+  static const double _adminLikeIconPadding = 14.0;
 
   BoxDecoration _panelDecoration() => BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -1054,63 +1054,55 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     VoidCallback? onAction,
     required Widget child,
   }) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final hasHeight = constraints.hasBoundedHeight;
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: _panelDecoration(),
-          child: Column(
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _panelDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title, style: PremiumTheme.titleMedium),
-                        const SizedBox(height: 6),
-                        Text(
-                          subtitle,
-                          style: PremiumTheme.bodyMedium
-                              .copyWith(color: Colors.white70),
-                        ),
-                      ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: PremiumTheme.titleMedium),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: PremiumTheme.bodyMedium
+                          .copyWith(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              _panelIcon(iconPath),
+              if (actionLabel != null)
+                TextButton(
+                  onPressed: onAction,
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFFC10D00),
+                    foregroundColor: Colors.white,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  ),
+                  child: Text(
+                    actionLabel,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  _panelIcon(iconPath),
-                  if (actionLabel != null)
-                    TextButton(
-                      onPressed: onAction,
-                      style: TextButton.styleFrom(
-                        backgroundColor: const Color(0xFFC10D00),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                      ),
-                      child: Text(
-                        actionLabel,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (hasHeight)
-                Expanded(child: child)
-              else
-                child,
+                ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
     );
   }
 
@@ -1573,85 +1565,57 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       future: future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final h = constraints.hasBoundedHeight
-                  ? constraints.maxHeight
-                  : 220.0;
-              return SizedBox(
-                height: h,
-                child: Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.white.withOpacity(0.7)),
-                  ),
-                ),
-              );
-            },
+          return SizedBox(
+            height: 220,
+            child: Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(
+                    Colors.white.withOpacity(0.7)),
+              ),
+            ),
           );
         }
         final items = snapshot.data ?? [];
         if (items.isEmpty) {
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final h = constraints.hasBoundedHeight
-                  ? constraints.maxHeight
-                  : 80.0;
-              return SizedBox(
-                height: h,
-                child: Center(
-                  child: Text('No stalled deals > 30 days',
-                      style: PremiumTheme.bodyMedium
-                          .copyWith(color: Colors.white60)),
-                ),
-              );
-            },
+          return SizedBox(
+            height: 80,
+            child: Center(
+              child: Text('No stalled deals > 30 days',
+                  style:
+                      PremiumTheme.bodyMedium.copyWith(color: Colors.white60)),
+            ),
           );
         }
 
-        final shown = items.take(20).toList();
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final available = constraints.hasBoundedHeight
-                ? constraints.maxHeight
-                : 220.0;
-            final h = available.clamp(0.0, 220.0);
-            return SizedBox(
-              height: h,
-              child: ListView.separated(
-                padding: EdgeInsets.zero,
-                itemCount: shown.length,
-                separatorBuilder: (context, index) => Divider(
-                  color: Colors.white.withOpacity(0.06),
-                  height: 14,
-                ),
-                itemBuilder: (context, index) {
-                  final row = shown[index];
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          (row['proposal'] ?? '').toString(),
-                          style: PremiumTheme.bodyMedium
-                              .copyWith(color: Colors.white),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        '${row['days_in_stage'] ?? ''}d',
-                        style: PremiumTheme.bodyMedium.copyWith(
-                          color: Colors.orange,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  );
-                },
+        final shown = items.take(8).toList();
+        return Column(
+          children: [
+            for (int i = 0; i < shown.length; i++) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      (shown[i]['proposal'] ?? '').toString(),
+                      style:
+                          PremiumTheme.bodyMedium.copyWith(color: Colors.white),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${shown[i]['days_in_stage'] ?? ''}d',
+                    style: PremiumTheme.bodyMedium.copyWith(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
-            );
-          },
+              if (i != shown.length - 1)
+                Divider(color: Colors.white.withOpacity(0.06), height: 14),
+            ],
+          ],
         );
       },
     );
@@ -2340,13 +2304,13 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   }
 
   Widget _buildNotificationButton(AppState app) {
-    final unread = app.unreadNotifications;
+    final unread = _unreadNotificationCount(app, messagesOnly: false);
     return Stack(
       clipBehavior: Clip.none,
       children: [
         SizedBox(
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           child: IconButton(
             tooltip: 'Notifications',
             icon: Icon(
@@ -2354,19 +2318,18 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   ? Icons.notifications_active
                   : Icons.notifications_none,
               color: Colors.white,
-              size: 20,
             ),
             onPressed: () async {
               await app.fetchNotifications();
               if (!mounted) return;
-              _showNotificationsSheet(app);
+              _showNotificationsSheet(app, messagesOnly: false);
             },
           ),
         ),
         if (unread > 0)
           Positioned(
-            right: 2,
-            top: 2,
+            right: 6,
+            top: 6,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: const BoxDecoration(
@@ -2387,7 +2350,51 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     );
   }
 
-  void _showNotificationsSheet(AppState app) {
+  static bool _notificationIsCommentMessage(Map<String, dynamic> n) {
+    final t =
+        (n['notification_type'] ?? n['type'] ?? '').toString().toLowerCase();
+    return t.contains('comment') || t == 'mentioned' || t.contains('mention');
+  }
+
+  static Map<String, dynamic> _asNotificationMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      try {
+        return raw.cast<String, dynamic>();
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }
+    return <String, dynamic>{};
+  }
+
+  int _unreadNotificationCount(AppState app, {required bool messagesOnly}) {
+    var n = 0;
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      final isComment = _notificationIsCommentMessage(item);
+      if (messagesOnly != isComment) continue;
+      if (item['is_read'] != true) n++;
+    }
+    return n;
+  }
+
+  List<Map<String, dynamic>> _notificationsFiltered(
+    AppState app, {
+    required bool messagesOnly,
+  }) {
+    final out = <Map<String, dynamic>>[];
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      if (messagesOnly != _notificationIsCommentMessage(item)) continue;
+      out.add(item);
+    }
+    return out;
+  }
+
+  void _showNotificationsSheet(AppState app, {bool messagesOnly = false}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2400,8 +2407,10 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
           ),
           child: StatefulBuilder(
             builder: (context, setModalState) {
-              final notifications = app.notifications;
-              final unreadCount = app.unreadNotifications;
+              final notifications =
+                  _notificationsFiltered(app, messagesOnly: messagesOnly);
+              final unreadCount =
+                  _unreadNotificationCount(app, messagesOnly: messagesOnly);
 
               return Container(
                 constraints: BoxConstraints(
@@ -2430,8 +2439,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
-                                'Notifications',
+                              Text(
+                                messagesOnly ? 'Messages' : 'Notifications',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -2473,10 +2482,12 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                           horizontal: 16,
                         ),
                         child: notifications.isEmpty
-                            ? const Center(
+                            ? Center(
                                 child: Text(
-                                  'No notifications yet.',
-                                  style: TextStyle(
+                                  messagesOnly
+                                      ? 'No comment messages yet.'
+                                      : 'No notifications yet.',
+                                  style: const TextStyle(
                                     color: Color(0xFF4A4A4A),
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -2533,9 +2544,13 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                                       );
                                     },
                                     leading: Icon(
-                                      isRead
-                                          ? Icons.notifications_none_outlined
-                                          : Icons.notifications_active,
+                                      messagesOnly
+                                          ? (isRead
+                                              ? Icons.chat_bubble_outline
+                                              : Icons.mark_chat_unread_outlined)
+                                          : (isRead
+                                              ? Icons.notifications_none_outlined
+                                              : Icons.notifications_active),
                                       color: isRead
                                           ? const Color(0xFF95A5A6)
                                           : const Color(0xFF3498DB),
@@ -3928,7 +3943,9 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
         app.currentUser?['first_name'] ??
         app.currentUser?['email'] ??
         'Finance User';
-    final unread = app.unreadNotifications;
+    final unreadMessages = _unreadNotificationCount(app, messagesOnly: true);
+    final unreadNotifications =
+        _unreadNotificationCount(app, messagesOnly: false);
 
     return Container(
       height: 70,
@@ -3944,133 +3961,151 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final headerWidth = constraints.hasBoundedWidth
-                ? constraints.maxWidth
-                : MediaQuery.sizeOf(context).width;
-
-            return SizedBox(
-              width: headerWidth,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Text(
-                          _currentTab == 'proposals'
-                              ? 'Finance Proposal Management'
-                              : 'Finance Dashboard',
-                          style: TextStyle(
-                            color: chrome.textPrimary,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.2,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(width: 14),
-                        if (!isMobile)
-                          Flexible(
-                            child: Text(
-                              'Hello, ${userName.toString()}',
-                              style: TextStyle(
-                                color: chrome.textSecondary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
+                  Text(
+                    _currentTab == 'proposals'
+                        ? 'Finance Proposal Management'
+                        : 'Finance Dashboard',
+                    style: TextStyle(
+                      color: chrome.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: _adminLikeIconDiameter,
-                        height: _adminLikeIconDiameter,
-                        child: IconButton(
-                          tooltip: 'Messages',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          splashColor: Colors.transparent,
-                          highlightColor: Colors.transparent,
-                          hoverColor: Colors.transparent,
-                          onPressed: () async {
-                            await app.fetchNotifications();
-                            if (!mounted) return;
-                            _showNotificationsSheet(app);
-                          },
-                          icon: Image.asset(
-                            'assets/images/new icons for manager/messages.png',
-                            width: 52,
-                            height: 52,
-                            fit: BoxFit.contain,
-                          ),
+                  const SizedBox(width: 14),
+                  if (!isMobile)
+                    Flexible(
+                      child: Text(
+                        'Hello, ${userName.toString()}',
+                        style: TextStyle(
+                          color: chrome.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(width: 0),
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          SizedBox(
-                            width: _adminLikeIconDiameter,
-                            height: _adminLikeIconDiameter,
-                            child: IconButton(
-                              tooltip: 'Notifications',
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              splashColor: Colors.transparent,
-                              highlightColor: Colors.transparent,
-                              hoverColor: Colors.transparent,
-                              onPressed: () async {
-                                await app.fetchNotifications();
-                                if (!mounted) return;
-                                _showNotificationsSheet(app);
-                              },
-                              icon: Image.asset(
-                                'assets/images/new icons for manager/notifications.png',
-                                width: 52,
-                                height: 52,
-                                fit: BoxFit.contain,
-                              ),
-                            ),
-                          ),
-                          if (unread > 0)
-                            Positioned(
-                              right: -2,
-                              top: -2,
-                              child: Container(
-                                width: 18,
-                                height: 18,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFC10D00),
-                                  shape: BoxShape.circle,
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  unread > 9 ? '9+' : unread.toString(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
+                    ),
                 ],
               ),
-            );
-          },
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    SizedBox(
+                      width: _adminLikeIconDiameter,
+                      height: _adminLikeIconDiameter,
+                      child: IconButton(
+                        tooltip: 'Messages',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                        hoverColor: Colors.transparent,
+                        onPressed: () async {
+                          await app.fetchNotifications();
+                          if (!mounted) return;
+                          _showNotificationsSheet(app, messagesOnly: true);
+                        },
+                        icon: Image.asset(
+                          'assets/images/new icons for manager/messages.png',
+                          width: 52,
+                          height: 52,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                    if (unreadMessages > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          width: 18,
+                          height: 18,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFC10D00),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            unreadMessages > 9 ? '9+' : unreadMessages.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 0),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    SizedBox(
+                      width: _adminLikeIconDiameter,
+                      height: _adminLikeIconDiameter,
+                      child: IconButton(
+                        tooltip: 'Notifications',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                        hoverColor: Colors.transparent,
+                        onPressed: () async {
+                          await app.fetchNotifications();
+                          if (!mounted) return;
+                          _showNotificationsSheet(app, messagesOnly: false);
+                        },
+                        icon: Image.asset(
+                          'assets/images/new icons for manager/notifications.png',
+                          width: 52,
+                          height: 52,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                    if (unreadNotifications > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          width: 18,
+                          height: 18,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFC10D00),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            unreadNotifications > 9
+                                ? '9+'
+                                : unreadNotifications.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
