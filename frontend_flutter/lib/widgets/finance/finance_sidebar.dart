@@ -146,99 +146,47 @@ class FinanceSidebar extends StatelessWidget {
     );
   }
 
-  Color _subtleFill(ManagerChromeTheme? c) {
-    if (c == null) return Colors.white.withValues(alpha: 0.14);
-    return c.isDark
-        ? Colors.white.withValues(alpha: 0.14)
-        : Colors.black.withValues(alpha: 0.06);
-  }
-
   Color _iconFg(ManagerChromeTheme? c) => c == null ? Colors.white : c.textPrimary;
 
   Widget _buildHeader(bool effectiveCollapsed, ManagerChromeTheme? c) {
     if (effectiveCollapsed) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        child: InkWell(
-          onTap: onToggle,
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            height: 36,
-            decoration: BoxDecoration(
-              color: _subtleFill(c),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            alignment: Alignment.center,
-            child: Icon(
-              Icons.keyboard_arrow_right,
-              color: _iconFg(c),
-              size: 20,
-            ),
-          ),
-        ),
-      );
+      return const SizedBox(height: 12);
     }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-      child: Stack(
+      child: Column(
         children: [
-          Positioned(
-            top: 0,
-            right: 0,
-            child: InkWell(
-              onTap: onToggle,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: _subtleFill(c),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.keyboard_arrow_left,
-                  color: _iconFg(c),
-                  size: 18,
-                ),
-              ),
-            ),
+          const SizedBox(height: 2),
+          Image.asset(
+            'assets/images/new icons for manager/khonology_logo.png',
+            height: 22,
+            fit: BoxFit.contain,
           ),
-          Column(
-            children: [
-              const SizedBox(height: 2),
-              Image.asset(
-                'assets/images/new icons for manager/khonology_logo.png',
-                height: 22,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Welcome to',
-                style: TextStyle(
-                  color: c?.textSecondary ?? Colors.white.withValues(alpha: 0.7),
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Proposal & SOW Builder',
-                style: TextStyle(
-                  color: _iconFg(c),
-                  fontSize: 12.8,
-                  fontWeight: FontWeight.w700,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Container(
-                height: 1,
-                color: c?.divider ?? Colors.white.withValues(alpha: 0.14),
-              ),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            'Welcome to',
+            style: TextStyle(
+              color: c?.textSecondary ?? Colors.white.withValues(alpha: 0.7),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Proposal & SOW Builder',
+            style: TextStyle(
+              color: _iconFg(c),
+              fontSize: 12.8,
+              fontWeight: FontWeight.w700,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 1,
+            color: c?.divider ?? Colors.white.withValues(alpha: 0.14),
           ),
         ],
       ),

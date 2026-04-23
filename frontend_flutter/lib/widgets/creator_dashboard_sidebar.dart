@@ -151,88 +151,43 @@ class _SidebarHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isCollapsed) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        child: InkWell(
-          onTap: onToggle,
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.hoverColor,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.keyboard_arrow_right,
-              color: AppColors.textPrimary,
-              size: 20,
-            ),
-          ),
-        ),
-      );
+      return const SizedBox(height: 12);
     }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-      child: Stack(
+      child: Column(
         children: [
-          Positioned(
-            top: 0,
-            right: 0,
-            child: InkWell(
-              onTap: onToggle,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: AppColors.hoverColor,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.keyboard_arrow_left,
-                  color: AppColors.textPrimary,
-                  size: 18,
-                ),
-              ),
+          const SizedBox(height: 2),
+          Image.asset(
+            'assets/images/new icons for manager/khonology_logo.png',
+            height: 22,
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Welcome to',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          Column(
-            children: [
-              const SizedBox(height: 2),
-              Image.asset(
-                'assets/images/new icons for manager/khonology_logo.png',
-                height: 22,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Welcome to',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 2),
-              const Text(
-                'Proposal & SOW Builder',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 12.8,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                height: 1,
-                color: AppColors.borderColor,
-              ),
-            ],
+          const SizedBox(height: 2),
+          const Text(
+            'Proposal & SOW Builder',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 12.8,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 1,
+            color: AppColors.borderColor,
           ),
         ],
       ),
