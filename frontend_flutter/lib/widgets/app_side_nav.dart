@@ -12,6 +12,10 @@ class AppSideNav extends StatefulWidget {
     required this.onSelect,
     required this.onToggle,
     required this.isAdmin,
+    this.items,
+    this.collapsedWidthOverride,
+    this.expandedWidthOverride,
+    this.showCollapseToggle = false,
   });
 
   final bool isCollapsed;
@@ -19,6 +23,10 @@ class AppSideNav extends StatefulWidget {
   final ValueChanged<String> onSelect;
   final VoidCallback onToggle;
   final bool isAdmin;
+  final List<Map<String, String>>? items;
+  final double? collapsedWidthOverride;
+  final double? expandedWidthOverride;
+  final bool showCollapseToggle;
 
   static const Color activeColor = Color(0xFFC10D00);
   static const Color leftAccentColor = Color(0xFF1565C0);
@@ -96,7 +104,16 @@ class _AppSideNavState extends State<AppSideNav> {
   @override
   Widget build(BuildContext context) {
     final chrome = context.watch<ManagerThemeController>().chrome;
-    final items = widget.isAdmin ? AppSideNav._adminItems : AppSideNav._items;
+    final items = widget.items ??
+        (widget.isAdmin ? AppSideNav._adminItems : AppSideNav._items);
+
+    final collapsedWidth =
+        widget.collapsedWidthOverride ?? AppSideNav.collapsedWidth;
+    final expandedWidth =
+        widget.expandedWidthOverride ?? AppSideNav.expandedWidth;
+
+    final effectiveCollapsed =
+        widget.showCollapseToggle ? widget.isCollapsed : false;
 
     // Keep the creator/manager sidebar visually stable while the window resizes.
     const isCompact = true;
@@ -106,9 +123,7 @@ class _AppSideNavState extends State<AppSideNav> {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: widget.isCollapsed
-          ? AppSideNav.collapsedWidth
-          : AppSideNav.expandedWidth,
+      width: effectiveCollapsed ? collapsedWidth : expandedWidth,
       decoration: BoxDecoration(
         color: chrome.sidebarBackground,
         border: Border(
@@ -121,7 +136,7 @@ class _AppSideNavState extends State<AppSideNav> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildHeader(
-              widget.isCollapsed,
+              effectiveCollapsed,
               chrome,
               isCompact: isCompact,
               isVeryCompact: isVeryCompact,
@@ -137,7 +152,7 @@ class _AppSideNavState extends State<AppSideNav> {
                       _buildNavItem(
                         label: item['label']!,
                         assetPath: item['icon']!,
-                        isCollapsed: widget.isCollapsed,
+                        isCollapsed: effectiveCollapsed,
                         chrome: chrome,
                         isCompact: isCompact,
                         isVeryCompact: isVeryCompact,
@@ -149,7 +164,7 @@ class _AppSideNavState extends State<AppSideNav> {
               ),
             ),
             _buildBottom(
-              widget.isCollapsed,
+              effectiveCollapsed,
               chrome,
               isCompact: isCompact,
               isUltraCompact: isUltraCompact,
@@ -174,7 +189,7 @@ class _AppSideNavState extends State<AppSideNav> {
           horizontal: 10,
         ),
         child: InkWell(
-          onTap: widget.onToggle,
+          onTap: widget.showCollapseToggle ? widget.onToggle : null,
           borderRadius: BorderRadius.circular(10),
           child: Container(
             height: isUltraCompact ? 34 : (isCompact ? 38 : 44),
@@ -183,11 +198,13 @@ class _AppSideNavState extends State<AppSideNav> {
               borderRadius: BorderRadius.circular(10),
             ),
             alignment: Alignment.center,
-            child: Icon(
-              Icons.keyboard_arrow_right,
-              color: chrome.textPrimary,
-              size: isUltraCompact ? 20 : 24,
-            ),
+            child: widget.showCollapseToggle
+                ? Icon(
+                    Icons.keyboard_arrow_right,
+                    color: chrome.textPrimary,
+                    size: isUltraCompact ? 20 : 24,
+                  )
+                : const SizedBox.shrink(),
           ),
         ),
       );
@@ -202,28 +219,29 @@ class _AppSideNavState extends State<AppSideNav> {
       ),
       child: Stack(
         children: [
-          Positioned(
-            top: 0,
-            right: 0,
-            child: InkWell(
-              onTap: widget.onToggle,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: isUltraCompact ? 26 : 30,
-                height: isUltraCompact ? 26 : 30,
-                decoration: BoxDecoration(
-                  color: chrome.sidebarHoverFill,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.keyboard_arrow_left,
-                  color: chrome.textPrimary,
-                  size: isUltraCompact ? 18 : 20,
+          if (widget.showCollapseToggle)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: InkWell(
+                onTap: widget.onToggle,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: isUltraCompact ? 26 : 30,
+                  height: isUltraCompact ? 26 : 30,
+                  decoration: BoxDecoration(
+                    color: chrome.sidebarHoverFill,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.keyboard_arrow_left,
+                    color: chrome.textPrimary,
+                    size: isUltraCompact ? 18 : 20,
+                  ),
                 ),
               ),
             ),
-          ),
           Column(
             children: [
               SizedBox(height: isUltraCompact ? 0 : 2),
@@ -326,8 +344,7 @@ class _AppSideNavState extends State<AppSideNav> {
     String assetPath,
     bool isActive,
     bool isHovering,
-    ManagerChromeTheme chrome,
-    {
+    ManagerChromeTheme chrome, {
     bool isCompact = false,
     bool isVeryCompact = false,
     bool isUltraCompact = false,
@@ -346,7 +363,8 @@ class _AppSideNavState extends State<AppSideNav> {
         : (isUltraCompact ? 11.2 : (isVeryCompact ? 11.6 : 12.0));
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: rowVerticalPadding),
+      padding:
+          EdgeInsets.symmetric(horizontal: 12, vertical: rowVerticalPadding),
       decoration: BoxDecoration(
         color: isActive ? AppSideNav.activeColor : rowHover,
         borderRadius: BorderRadius.circular(10),
@@ -356,7 +374,8 @@ class _AppSideNavState extends State<AppSideNav> {
           SizedBox(
             width: iconSize,
             height: iconSize,
-            child: AssetService.buildImageWidget(assetPath, fit: BoxFit.contain),
+            child:
+                AssetService.buildImageWidget(assetPath, fit: BoxFit.contain),
           ),
           SizedBox(width: isUltraCompact ? 10 : 12),
           Expanded(
@@ -388,8 +407,7 @@ class _AppSideNavState extends State<AppSideNav> {
     String assetPath,
     bool isActive,
     bool isHovering,
-    ManagerChromeTheme chrome,
-    {
+    ManagerChromeTheme chrome, {
     bool isCompact = false,
     bool isUltraCompact = false,
   }) {

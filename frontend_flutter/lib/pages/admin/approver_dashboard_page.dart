@@ -58,6 +58,7 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
 
   bool _isSidebarCollapsed = false;
   String _currentPage = 'Dashboard';
+
   /// Matches manager dashboard metric cards (visual + tap feedback).
   int _selectedMetricIndex = 0;
 
@@ -455,7 +456,8 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(height: compact ? 16 : 24),
-        _buildSection(chrome, 'Pipeline Health', _buildPipelineHealthInline(chrome)),
+        _buildSection(
+            chrome, 'Pipeline Health', _buildPipelineHealthInline(chrome)),
         SizedBox(height: compact ? 16 : 24),
         _buildSection(
           chrome,
@@ -1148,6 +1150,7 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
   static const double _figmaPendingListRowIconSize = 22;
   static const String _assetPendingApprovalRowIcon =
       'assets/images/Admin_new_icons/Group522.png';
+
   /// Section header bell (Proposals Pending Your Approval) — from Figma asset.
   static const String _assetSectionNotificationBell =
       'assets/images/Admin_new_icons/Group3988.png';
@@ -1336,9 +1339,8 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
           color: chrome.floatingFill,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: showBlue
-                ? ManagerChromeTheme.leftAccentBlue
-                : chrome.divider,
+            color:
+                showBlue ? ManagerChromeTheme.leftAccentBlue : chrome.divider,
             width: showBlue ? 2 : 1,
           ),
         ),
@@ -1627,7 +1629,8 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
                 border: Border.all(color: chrome.divider),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(chrome.isDark ? 0.25 : 0.08),
+                    color:
+                        Colors.black.withOpacity(chrome.isDark ? 0.25 : 0.08),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -1931,8 +1934,7 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     if (s.contains('sent') || s.contains('released')) {
       return ('Released', const Color(0xFF1565C0));
     }
-    final short =
-        raw.length > 14 ? '${raw.substring(0, 12)}…' : raw;
+    final short = raw.length > 14 ? '${raw.substring(0, 12)}…' : raw;
     return (short, ManagerChromeTheme.leftAccentBlue);
   }
 
@@ -1967,8 +1969,8 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
   ) {
     final title = (p['title'] ?? 'Untitled').toString();
     final statusRaw = (p['status'] ?? p['stage'] ?? 'Draft').toString();
-    final client = (p['client_name'] ?? p['client'] ?? 'Client Name')
-        .toString();
+    final client =
+        (p['client_name'] ?? p['client'] ?? 'Client Name').toString();
     final updated = _parseDate(p['updated_at'] ?? p['updatedAt']);
     final updatedLabel = updated != null
         ? DateFormat("dd MMM ''yy").format(updated.toLocal())
@@ -2059,10 +2061,22 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
       return raw.toString().trim().toLowerCase().replaceAll('_', ' ');
     }
 
-    bool isSigned(String s) => s == 'signed' || s == 'client signed' || s == 'completed';
-    bool isReleased(String s) => s.contains('released') || s.contains('sent to client') || s.contains('sent for signature') || s.contains('out for signature');
-    bool isReview(String s) => s.contains('review') || s.contains('submitted') || s.contains('pending');
-    bool isDraft(String s) => s.isEmpty || s == 'draft' || s.contains('pricing') || s.contains('in progress');
+    bool isSigned(String s) =>
+        s == 'signed' || s == 'client signed' || s == 'completed';
+    bool isReleased(String s) =>
+        s.contains('released') ||
+        s.contains('sent to client') ||
+        s.contains('sent for signature') ||
+        s.contains('out for signature');
+    bool isReview(String s) =>
+        s.contains('review') ||
+        s.contains('submitted') ||
+        s.contains('pending');
+    bool isDraft(String s) =>
+        s.isEmpty ||
+        s == 'draft' ||
+        s.contains('pricing') ||
+        s.contains('in progress');
 
     void bump(String k) => reasons[k] = (reasons[k] ?? 0) + 1;
 
@@ -2088,21 +2102,27 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
 
       if (status.contains('pending')) needsApproval.add(p);
       if (isReleased(status) && !isSigned(status)) awaitingSignature.add(p);
-      if (isSigned(status) && updatedAt != null && now.difference(updatedAt).inDays <= 14) {
+      if (isSigned(status) &&
+          updatedAt != null &&
+          now.difference(updatedAt).inDays <= 14) {
         recentlySigned.add(p);
       }
-      if (!isSigned(status) && updatedAt != null && now.difference(updatedAt).inDays >= 14) {
+      if (!isSigned(status) &&
+          updatedAt != null &&
+          now.difference(updatedAt).inDays >= 14) {
         delayed.add(p);
       }
 
       final title = (p['title'] ?? '').toString().trim();
-      final clientEmail = (p['client_email'] ?? p['clientEmail'] ?? '').toString().trim();
+      final clientEmail =
+          (p['client_email'] ?? p['clientEmail'] ?? '').toString().trim();
       final budget = _parseBudget(p['budget']);
       final missingTitle = title.isEmpty;
       final missingBudget = budget <= 0;
       final missingEmailForRelease = isReleased(status) && clientEmail.isEmpty;
 
-      if (highRisk || missingTitle || missingBudget || missingEmailForRelease) blocked.add(p);
+      if (highRisk || missingTitle || missingBudget || missingEmailForRelease)
+        blocked.add(p);
 
       if (highRisk) bump('High risk score');
       if (missingEmailForRelease) bump('Missing client email');
@@ -2110,10 +2130,13 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
       if (missingTitle) bump('Missing title');
     }
 
-    blocked.sort((a, b) => (_parseDate(b['updated_at'] ?? b['updatedAt']) ?? DateTime(1970))
-        .compareTo(_parseDate(a['updated_at'] ?? a['updatedAt']) ?? DateTime(1970)));
+    blocked.sort((a, b) => (_parseDate(b['updated_at'] ?? b['updatedAt']) ??
+            DateTime(1970))
+        .compareTo(
+            _parseDate(a['updated_at'] ?? a['updatedAt']) ?? DateTime(1970)));
 
-    final topReasons = reasons.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final topReasons = reasons.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     final trimmedReasons = <String, int>{};
     for (final e in topReasons.take(3)) {
       trimmedReasons[e.key] = e.value;
@@ -3172,6 +3195,50 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     return null;
   }
 
+  String? _findNestedStringValue(dynamic node, Set<String> keys) {
+    if (node == null) return null;
+
+    if (node is Map) {
+      for (final entry in node.entries) {
+        final k = entry.key?.toString();
+        if (k != null && keys.contains(k)) {
+          final v = entry.value;
+          if (v is String && v.trim().isNotEmpty) return v;
+          if (v is num) return v.toString();
+          if (v is Map) {
+            final inner = v['value'] ??
+                v['label'] ??
+                v['status'] ??
+                v['level'] ??
+                v['decision'] ??
+                v['result'] ??
+                v['outcome'];
+            if (inner is String && inner.trim().isNotEmpty) return inner;
+            if (inner is num) return inner.toString();
+          }
+        }
+      }
+
+      for (final v in node.values) {
+        final found = _findNestedStringValue(v, keys);
+        if (found != null && found.trim().isNotEmpty) return found;
+      }
+      return null;
+    }
+
+    if (node is Iterable) {
+      for (final item in node) {
+        final found = _findNestedStringValue(item, keys);
+        if (found != null && found.trim().isNotEmpty) return found;
+      }
+      return null;
+    }
+
+    if (node is String) return node;
+    if (node is num) return node.toString();
+    return null;
+  }
+
   Map<String, dynamic>? _extractRiskGateObject(Map<String, dynamic> proposal) {
     final raw = proposal['risk_gate'] ??
         proposal['riskGate'] ??
@@ -3218,18 +3285,38 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
 
   String _extractRiskLevel(Map<String, dynamic> proposal) {
     final gate = _extractRiskGateObject(proposal);
-    return (proposal['risk_level'] ??
+    final nested = _findNestedStringValue(
+      gate,
+      {
+        'risk_status',
+        'riskStatus',
+        'status',
+        'decision',
+        'outcome',
+        'result',
+        'risk_level',
+        'riskLevel',
+        'riskLevelLabel',
+        'level',
+        'risk_level_label',
+        'riskLevelLabel',
+      },
+    );
+
+    final level = (proposal['risk_level'] ??
             proposal['riskLevel'] ??
             proposal['riskLevelLabel'] ??
-            gate?['risk_level'] ??
-            gate?['riskLevel'] ??
-            gate?['level'] ??
-            gate?['risk_level_label'] ??
-            gate?['riskLevelLabel'] ??
+            proposal['risk_status'] ??
+            proposal['riskStatus'] ??
+            nested ??
             '')
         .toString()
         .toLowerCase()
         .trim();
+    if (level.contains('block')) return 'critical';
+    if (level.contains('review')) return 'high';
+    if (level.contains('pass')) return 'low';
+    return level;
   }
 
   bool _isHighRisk({required double? riskScore, required String riskLevel}) {
@@ -3238,7 +3325,9 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
     return riskLevel == 'high' ||
         riskLevel == 'critical' ||
         riskLevel.contains('high') ||
-        riskLevel.contains('critical');
+        riskLevel.contains('critical') ||
+        riskLevel.contains('block') ||
+        riskLevel.contains('review');
   }
 
   String _formatCurrency(double value) {
