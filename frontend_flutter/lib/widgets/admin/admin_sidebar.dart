@@ -11,9 +11,11 @@ class AdminSidebar extends StatelessWidget {
     required this.onToggle,
     required this.onSelect,
     this.bottomLabel = 'Logout',
+
     /// When set (e.g. admin dashboard + manager theme), sidebar and nav
     /// chrome follow light/dark manager spec instead of legacy fixed dark UI.
     this.managerChrome,
+    this.showCollapseToggle = false,
   });
 
   final bool isCollapsed;
@@ -22,6 +24,7 @@ class AdminSidebar extends StatelessWidget {
   final ValueChanged<String> onSelect;
   final String bottomLabel;
   final ManagerChromeTheme? managerChrome;
+  final bool showCollapseToggle;
 
   static const double collapsedWidth = 76.0;
   static const double expandedWidth = 220.0;
@@ -54,18 +57,18 @@ class AdminSidebar extends StatelessWidget {
     _AdminNavItem(
       pageLabel: 'Content Library',
       displayLabel: 'Content History',
-      assetPath: 'assets/images/admin_side bar/Admin_sidebar_content_library.png',
+      assetPath:
+          'assets/images/admin_side bar/Admin_sidebar_content_library.png',
     ),
   ];
 
-  Color _sidebarBg(ManagerChromeTheme? c) =>
-      c?.sidebarBackground ?? _adminBase;
+  Color _sidebarBg(ManagerChromeTheme? c) => c?.sidebarBackground ?? _adminBase;
 
   Color _sidebarBorder(ManagerChromeTheme? c) =>
       c?.sidebarRightBorder ?? const Color(0x24FFFFFF);
 
-  Color _subtleFill(ManagerChromeTheme? c) => c?.sidebarHoverFill ??
-      Colors.white.withValues(alpha: 0.14);
+  Color _subtleFill(ManagerChromeTheme? c) =>
+      c?.sidebarHoverFill ?? Colors.white.withValues(alpha: 0.14);
 
   Color _iconFg(ManagerChromeTheme? c) =>
       c == null ? Colors.white : c.textPrimary;
@@ -77,7 +80,7 @@ class AdminSidebar extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
         child: InkWell(
-          onTap: onToggle,
+          onTap: showCollapseToggle ? onToggle : null,
           borderRadius: BorderRadius.circular(10),
           child: Container(
             height: 36,
@@ -86,11 +89,13 @@ class AdminSidebar extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             alignment: Alignment.center,
-            child: Icon(
-              Icons.keyboard_arrow_right,
-              color: _iconFg(c),
-              size: 20,
-            ),
+            child: showCollapseToggle
+                ? Icon(
+                    Icons.keyboard_arrow_right,
+                    color: _iconFg(c),
+                    size: 20,
+                  )
+                : const SizedBox.shrink(),
           ),
         ),
       );
@@ -100,28 +105,29 @@ class AdminSidebar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
       child: Stack(
         children: [
-          Positioned(
-            top: 0,
-            right: 0,
-            child: InkWell(
-              onTap: onToggle,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: _subtleFill(c),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.keyboard_arrow_left,
-                  color: _iconFg(c),
-                  size: 18,
+          if (showCollapseToggle)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: InkWell(
+                onTap: onToggle,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: _subtleFill(c),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.keyboard_arrow_left,
+                    color: _iconFg(c),
+                    size: 18,
+                  ),
                 ),
               ),
             ),
-          ),
           Column(
             children: [
               const SizedBox(height: 2),
@@ -166,9 +172,10 @@ class AdminSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = managerChrome;
+    final effectiveCollapsed = showCollapseToggle ? isCollapsed : false;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: isCollapsed ? collapsedWidth : expandedWidth,
+      width: effectiveCollapsed ? collapsedWidth : expandedWidth,
       decoration: BoxDecoration(
         color: _sidebarBg(c),
         border: Border(
@@ -181,16 +188,16 @@ class AdminSidebar extends StatelessWidget {
       child: SafeArea(
         child: Column(
           children: [
-            _buildHeader(isCollapsed, c),
+            _buildHeader(effectiveCollapsed, c),
             Expanded(
               child: Column(
                 children: [
                   Expanded(
                     child: SingleChildScrollView(
                       padding: EdgeInsets.only(
-                        top: isCollapsed ? 8 : 6,
-                        left: isCollapsed ? 0 : 4,
-                        right: isCollapsed ? 0 : 4,
+                        top: effectiveCollapsed ? 8 : 6,
+                        left: effectiveCollapsed ? 0 : 4,
+                        right: effectiveCollapsed ? 0 : 4,
                       ),
                       child: Column(
                         children: [
@@ -199,28 +206,28 @@ class AdminSidebar extends StatelessWidget {
                               label: item.displayLabel,
                               assetPath: item.assetPath,
                               isActive: currentPage == item.pageLabel,
-                              isCollapsed: isCollapsed,
+                              isCollapsed: effectiveCollapsed,
                               onTap: () => onSelect(item.pageLabel),
                               accent: _adminAccent,
                               managerChrome: c,
                             ),
-                          SizedBox(height: isCollapsed ? 18 : 40),
+                          SizedBox(height: effectiveCollapsed ? 18 : 40),
                         ],
                       ),
                     ),
                   ),
-                  SizedBox(height: isCollapsed ? 8 : 10),
+                  SizedBox(height: effectiveCollapsed ? 8 : 10),
                   _AdminSidebarNavItem(
                     label: 'Account Profile',
                     assetPath: 'assets/images/User_Profile.png',
                     isActive: currentPage == 'Account Profile',
-                    isCollapsed: isCollapsed,
+                    isCollapsed: effectiveCollapsed,
                     onTap: () => onSelect('Account Profile'),
                     accent: _adminAccent,
                     managerChrome: c,
                     isBottomItem: true,
                   ),
-                  if (!isCollapsed)
+                  if (!effectiveCollapsed)
                     Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 4),
@@ -234,13 +241,13 @@ class AdminSidebar extends StatelessWidget {
                     label: bottomLabel == 'Sign Out' ? 'Logout' : bottomLabel,
                     assetPath: 'assets/images/Logout_KhonoBuzz.png',
                     isActive: false,
-                    isCollapsed: isCollapsed,
+                    isCollapsed: effectiveCollapsed,
                     onTap: () => onSelect(bottomLabel),
                     accent: _adminAccent,
                     managerChrome: c,
                     isBottomItem: true,
                   ),
-                  SizedBox(height: isCollapsed ? 8 : 10),
+                  SizedBox(height: effectiveCollapsed ? 8 : 10),
                 ],
               ),
             ),
@@ -314,8 +321,9 @@ class _AdminSidebarNavItem extends StatelessWidget {
         child: Icon(
           iconData,
           size: 20,
-          color:
-              active ? Colors.white : (managerChrome?.textPrimary ?? Colors.white),
+          color: active
+              ? Colors.white
+              : (managerChrome?.textPrimary ?? Colors.white),
         ),
       ),
     );

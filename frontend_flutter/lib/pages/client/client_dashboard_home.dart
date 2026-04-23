@@ -12,6 +12,7 @@ import 'client_proposal_viewer.dart';
 import '../../api.dart';
 import '../../theme/premium_theme.dart';
 import '../../theme/manager_theme_controller.dart';
+import '../../widgets/app_side_nav.dart';
 
 class ClientDashboardHome extends StatefulWidget {
   final String? initialToken;
@@ -50,6 +51,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   List<Map<String, dynamic>> _proposals = [];
   Map<String, dynamic>? _selectedDocument;
   int _selectedNavIndex = 0;
+  bool _isSidebarCollapsed = false;
   bool _overviewLoading = false;
   String? _overviewError;
   Map<String, dynamic>? _overview;
@@ -82,6 +84,58 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       'asset': 'assets/images/client_icons/Data Approval_White Badge_Blue.png'
     },
   ];
+
+  static const List<Map<String, String>> _clientAppSideNavItems = [
+    {
+      'label': 'Dashboard',
+      'icon':
+          'assets/images/Creator_Dashboard/Project Launch_Start_White Badge_Blue.png',
+    },
+    {
+      'label': 'Proposals',
+      'icon':
+          'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Blue.png',
+    },
+    {
+      'label': 'Documents',
+      'icon': 'assets/images/client_icons/Data Approval_White Badge_Blue.png',
+    },
+  ];
+
+  String _clientNavLabelForIndex(int index) {
+    switch (index) {
+      case 0:
+        return 'Dashboard';
+      case 1:
+        return 'Proposals';
+      case 2:
+        return 'Documents';
+      case 3:
+        return 'Account Profile';
+      default:
+        return 'Dashboard';
+    }
+  }
+
+  void _handleClientSideNavSelect(String label, {required bool closeDrawer}) {
+    if (label == 'Logout') {
+      if (closeDrawer) Navigator.of(context).pop();
+      _logoutClient();
+      return;
+    }
+
+    if (label == 'Account Profile') {
+      if (closeDrawer) Navigator.of(context).pop();
+      setState(() => _selectedNavIndex = 3);
+      return;
+    }
+
+    int idx = 0;
+    if (label == 'Dashboard') idx = 0;
+    if (label == 'Proposals') idx = 1;
+    if (label == 'Documents') idx = 2;
+    _handleNavTap(idx, closeDrawer: closeDrawer);
+  }
 
   bool _isSow(Map<String, dynamic> p) {
     final t =
@@ -1219,6 +1273,11 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       return;
     }
 
+    if (index == 2) {
+      _navigateClient('/client/documents');
+      return;
+    }
+
     setState(() {
       _selectedNavIndex = index;
     });
@@ -1498,7 +1557,18 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     return Drawer(
       backgroundColor: chrome.sidebarBackground,
       child: SafeArea(
-        child: _buildSidebar(inDrawer: true),
+        child: AppSideNav(
+          isCollapsed: _isSidebarCollapsed,
+          currentLabel: _clientNavLabelForIndex(_selectedNavIndex),
+          onSelect: (label) =>
+              _handleClientSideNavSelect(label, closeDrawer: true),
+          onToggle: () =>
+              setState(() => _isSidebarCollapsed = !_isSidebarCollapsed),
+          isAdmin: false,
+          items: _clientAppSideNavItems,
+          collapsedWidthOverride: 76,
+          expandedWidthOverride: 220,
+        ),
       ),
     );
   }
@@ -4580,7 +4650,20 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (!useDrawer) _buildSidebar(),
+                  if (!useDrawer)
+                    AppSideNav(
+                      isCollapsed: _isSidebarCollapsed,
+                      currentLabel: _clientNavLabelForIndex(_selectedNavIndex),
+                      onSelect: (label) =>
+                          _handleClientSideNavSelect(label, closeDrawer: false),
+                      onToggle: () => setState(
+                        () => _isSidebarCollapsed = !_isSidebarCollapsed,
+                      ),
+                      isAdmin: false,
+                      items: _clientAppSideNavItems,
+                      collapsedWidthOverride: 76,
+                      expandedWidthOverride: 220,
+                    ),
                   Expanded(
                     child: SafeArea(
                       left: false,
