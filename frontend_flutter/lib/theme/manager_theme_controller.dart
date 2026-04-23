@@ -15,7 +15,7 @@ class ManagerChromeTheme {
   static const Color textDark = Color(0xFF090812);
 
   /// Light floating panels (RRGGBBAA → Flutter ARGB: #7F7F7F73).
-  static const Color floatingLightFill = Color(0x737F7F7F);
+  static const Color floatingLightFill = Color(0xB3F2F2F2);
 
   static const String darkBgAsset =
       'assets/images/new icons for manager/new_universal_bg_darkmode.png';
@@ -24,7 +24,8 @@ class ManagerChromeTheme {
 
   String get backgroundAsset => isDark ? darkBgAsset : lightBgAsset;
 
-  Color get sidebarBackground => isDark ? const Color(0xFF2A2A2A) : Colors.white;
+  Color get sidebarBackground =>
+      isDark ? const Color(0xFF2A2A2A) : Colors.white;
 
   Color get sidebarRightBorder =>
       isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.08);
@@ -73,13 +74,11 @@ class ManagerChromeTheme {
   Color get filterBorder => const Color(0xFFC10D00);
 
   /// Text fields / search on floating panels
-  Color get fieldFill => isDark
-      ? Colors.white.withOpacity(0.06)
-      : Colors.white.withOpacity(0.72);
+  Color get fieldFill =>
+      isDark ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.72);
 
-  Color get fieldBorder => isDark
-      ? Colors.white.withOpacity(0.12)
-      : Colors.black.withOpacity(0.14);
+  Color get fieldBorder =>
+      isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.14);
 
   Color get dropdownSurface => isDark ? const Color(0xFF2A2A2A) : Colors.white;
 
@@ -87,8 +86,7 @@ class ManagerChromeTheme {
   Color get scrollbarTrack =>
       isDark ? const Color(0xFF1A1F26) : Colors.black.withOpacity(0.06);
 
-  Color get scrollbarThumb =>
-      isDark ? const Color(0xFF3498DB) : accentRed;
+  Color get scrollbarThumb => isDark ? const Color(0xFF3498DB) : accentRed;
 
   static const Color accentRed = Color(0xFFC10D00);
   static const Color leftAccentBlue = Color(0xFF1565C0);

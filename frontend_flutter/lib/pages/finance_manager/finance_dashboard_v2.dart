@@ -2304,7 +2304,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   }
 
   Widget _buildNotificationButton(AppState app) {
-    final unread = app.unreadNotifications;
+    final unread = _unreadNotificationCount(app, messagesOnly: false);
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -2322,7 +2322,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             onPressed: () async {
               await app.fetchNotifications();
               if (!mounted) return;
-              _showNotificationsSheet(app);
+              _showNotificationsSheet(app, messagesOnly: false);
             },
           ),
         ),
@@ -2350,7 +2350,51 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     );
   }
 
-  void _showNotificationsSheet(AppState app) {
+  static bool _notificationIsCommentMessage(Map<String, dynamic> n) {
+    final t =
+        (n['notification_type'] ?? n['type'] ?? '').toString().toLowerCase();
+    return t.contains('comment') || t == 'mentioned' || t.contains('mention');
+  }
+
+  static Map<String, dynamic> _asNotificationMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      try {
+        return raw.cast<String, dynamic>();
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }
+    return <String, dynamic>{};
+  }
+
+  int _unreadNotificationCount(AppState app, {required bool messagesOnly}) {
+    var n = 0;
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      final isComment = _notificationIsCommentMessage(item);
+      if (messagesOnly != isComment) continue;
+      if (item['is_read'] != true) n++;
+    }
+    return n;
+  }
+
+  List<Map<String, dynamic>> _notificationsFiltered(
+    AppState app, {
+    required bool messagesOnly,
+  }) {
+    final out = <Map<String, dynamic>>[];
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      if (messagesOnly != _notificationIsCommentMessage(item)) continue;
+      out.add(item);
+    }
+    return out;
+  }
+
+  void _showNotificationsSheet(AppState app, {bool messagesOnly = false}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2363,8 +2407,10 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
           ),
           child: StatefulBuilder(
             builder: (context, setModalState) {
-              final notifications = app.notifications;
-              final unreadCount = app.unreadNotifications;
+              final notifications =
+                  _notificationsFiltered(app, messagesOnly: messagesOnly);
+              final unreadCount =
+                  _unreadNotificationCount(app, messagesOnly: messagesOnly);
 
               return Container(
                 constraints: BoxConstraints(
@@ -2393,8 +2439,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
-                                'Notifications',
+                              Text(
+                                messagesOnly ? 'Messages' : 'Notifications',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -2436,10 +2482,12 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                           horizontal: 16,
                         ),
                         child: notifications.isEmpty
-                            ? const Center(
+                            ? Center(
                                 child: Text(
-                                  'No notifications yet.',
-                                  style: TextStyle(
+                                  messagesOnly
+                                      ? 'No comment messages yet.'
+                                      : 'No notifications yet.',
+                                  style: const TextStyle(
                                     color: Color(0xFF4A4A4A),
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -2496,9 +2544,13 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                                       );
                                     },
                                     leading: Icon(
-                                      isRead
-                                          ? Icons.notifications_none_outlined
-                                          : Icons.notifications_active,
+                                      messagesOnly
+                                          ? (isRead
+                                              ? Icons.chat_bubble_outline
+                                              : Icons.mark_chat_unread_outlined)
+                                          : (isRead
+                                              ? Icons.notifications_none_outlined
+                                              : Icons.notifications_active),
                                       color: isRead
                                           ? const Color(0xFF95A5A6)
                                           : const Color(0xFF3498DB),
@@ -3891,7 +3943,9 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
         app.currentUser?['first_name'] ??
         app.currentUser?['email'] ??
         'Finance User';
-    final unread = app.unreadNotifications;
+    final unreadMessages = _unreadNotificationCount(app, messagesOnly: true);
+    final unreadNotifications =
+        _unreadNotificationCount(app, messagesOnly: false);
 
     return Container(
       height: 70,
@@ -3946,28 +4000,55 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  width: _adminLikeIconDiameter,
-                  height: _adminLikeIconDiameter,
-                  child: IconButton(
-                    tooltip: 'Messages',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    splashColor: Colors.transparent,
-                    highlightColor: Colors.transparent,
-                    hoverColor: Colors.transparent,
-                    onPressed: () async {
-                      await app.fetchNotifications();
-                      if (!mounted) return;
-                      _showNotificationsSheet(app);
-                    },
-                    icon: Image.asset(
-                      'assets/images/new icons for manager/messages.png',
-                      width: 52,
-                      height: 52,
-                      fit: BoxFit.contain,
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    SizedBox(
+                      width: _adminLikeIconDiameter,
+                      height: _adminLikeIconDiameter,
+                      child: IconButton(
+                        tooltip: 'Messages',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                        hoverColor: Colors.transparent,
+                        onPressed: () async {
+                          await app.fetchNotifications();
+                          if (!mounted) return;
+                          _showNotificationsSheet(app, messagesOnly: true);
+                        },
+                        icon: Image.asset(
+                          'assets/images/new icons for manager/messages.png',
+                          width: 52,
+                          height: 52,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (unreadMessages > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          width: 18,
+                          height: 18,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFC10D00),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            unreadMessages > 9 ? '9+' : unreadMessages.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 0),
                 Stack(
@@ -3986,7 +4067,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                         onPressed: () async {
                           await app.fetchNotifications();
                           if (!mounted) return;
-                          _showNotificationsSheet(app);
+                          _showNotificationsSheet(app, messagesOnly: false);
                         },
                         icon: Image.asset(
                           'assets/images/new icons for manager/notifications.png',
@@ -3996,7 +4077,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                         ),
                       ),
                     ),
-                    if (unread > 0)
+                    if (unreadNotifications > 0)
                       Positioned(
                         right: -2,
                         top: -2,
@@ -4009,7 +4090,9 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            unread > 9 ? '9+' : unread.toString(),
+                            unreadNotifications > 9
+                                ? '9+'
+                                : unreadNotifications.toString(),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 9,

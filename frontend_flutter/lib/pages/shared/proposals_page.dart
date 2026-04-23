@@ -1,4 +1,5 @@
 import 'dart:ui' show FontFeature;
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -535,18 +536,438 @@ class _ProposalsPageState extends State<ProposalsPage>
           _buildHeaderIconButton(
             chrome: chrome,
             assetPath: 'assets/images/new icons for manager/messages.png',
-            onTap: () {},
+            onTap: () async {
+              await app.fetchNotifications();
+              if (!mounted) return;
+              _showNotificationsSheet(app, messagesOnly: true);
+            },
+            badge: _unreadNotificationCount(app, messagesOnly: true) > 0
+                ? _unreadNotificationCount(app, messagesOnly: true)
+                : null,
           ),
           const SizedBox(width: 8),
           _buildHeaderIconButton(
             chrome: chrome,
             assetPath: 'assets/images/new icons for manager/notifications.png',
-            onTap: () {},
-            badge: 2,
+            onTap: () async {
+              await app.fetchNotifications();
+              if (!mounted) return;
+              _showNotificationsSheet(app, messagesOnly: false);
+            },
+            badge: _unreadNotificationCount(app, messagesOnly: false) > 0
+                ? _unreadNotificationCount(app, messagesOnly: false)
+                : null,
           ),
         ],
       ),
     );
+  }
+
+  static bool _notificationIsCommentMessage(Map<String, dynamic> n) {
+    final t =
+        (n['notification_type'] ?? n['type'] ?? '').toString().toLowerCase();
+    return t.contains('comment') || t == 'mentioned' || t.contains('mention');
+  }
+
+  static Map<String, dynamic> _asNotificationMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      try {
+        return raw.cast<String, dynamic>();
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }
+    return <String, dynamic>{};
+  }
+
+  int _unreadNotificationCount(AppState app, {required bool messagesOnly}) {
+    var n = 0;
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      final isComment = _notificationIsCommentMessage(item);
+      if (messagesOnly != isComment) continue;
+      if (item['is_read'] != true) n++;
+    }
+    return n;
+  }
+
+  List<Map<String, dynamic>> _notificationsFiltered(
+    AppState app, {
+    required bool messagesOnly,
+  }) {
+    final out = <Map<String, dynamic>>[];
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      if (messagesOnly != _notificationIsCommentMessage(item)) continue;
+      out.add(item);
+    }
+    return out;
+  }
+
+  void _showNotificationsSheet(AppState app, {bool messagesOnly = false}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              final notifications =
+                  _notificationsFiltered(app, messagesOnly: messagesOnly);
+              final unreadCount =
+                  _unreadNotificationCount(app, messagesOnly: messagesOnly);
+
+              Future<void> markAllInSheet() async {
+                for (final n in List<Map<String, dynamic>>.from(notifications)) {
+                  if (n['is_read'] == true) continue;
+                  final idRaw = n['id'];
+                  final id = idRaw is int
+                      ? idRaw
+                      : int.tryParse(idRaw?.toString() ?? '');
+                  if (id != null) await app.markNotificationRead(id);
+                }
+                await app.fetchNotifications();
+                if (context.mounted) setModalState(() {});
+              }
+
+              Future<void> deleteAllInSheet() async {
+                for (final n in List<Map<String, dynamic>>.from(notifications)) {
+                  final idRaw = n['id'];
+                  final id = idRaw is int
+                      ? idRaw
+                      : int.tryParse(idRaw?.toString() ?? '');
+                  if (id != null) await app.deleteNotification(id);
+                }
+                await app.fetchNotifications();
+                if (context.mounted) setModalState(() {});
+              }
+
+              return Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.7,
+                ),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 16),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF2C3E50),
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(10),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            messagesOnly ? 'Messages' : 'Notifications',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              if (unreadCount > 0)
+                                TextButton(
+                                  onPressed: () async {
+                                    await markAllInSheet();
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  child: const Text(
+                                    'Mark all read',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              TextButton(
+                                onPressed: notifications.isEmpty
+                                    ? null
+                                    : () async {
+                                        await deleteAllInSheet();
+                                      },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red.shade200,
+                                ),
+                                child: const Text(
+                                  'Delete all',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              IconButton(
+                                icon:
+                                    const Icon(Icons.close, color: Colors.white),
+                                onPressed: () => Navigator.of(context).pop(),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (notifications.isEmpty)
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            messagesOnly
+                                ? 'No comment messages yet.'
+                                : 'No notifications yet.',
+                            style: const TextStyle(
+                              color: Color(0xFF4A4A4A),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 16),
+                          itemCount: notifications.length,
+                          separatorBuilder: (_, __) =>
+                              const Divider(height: 16),
+                          itemBuilder: (context, index) {
+                            final notification = notifications[index];
+                            final title =
+                                notification['title']?.toString().trim();
+                            final message =
+                                notification['message']?.toString().trim() ??
+                                    '';
+                            final proposalTitle = notification['proposal_title']
+                                ?.toString()
+                                .trim();
+                            final isRead = notification['is_read'] == true;
+                            final timeLabel = _formatNotificationTimestamp(
+                                notification['created_at']);
+                            final dynamic notificationIdRaw = notification['id'];
+                            final int? notificationId = notificationIdRaw is int
+                                ? notificationIdRaw
+                                : int.tryParse(
+                                    notificationIdRaw?.toString() ?? '',
+                                  );
+
+                            return ListTile(
+                              onTap: () async {
+                                Navigator.of(bottomSheetContext).pop();
+                                await _handleNotificationTap(
+                                  app,
+                                  notification,
+                                  notificationId: notificationId,
+                                  isAlreadyRead: isRead,
+                                );
+                              },
+                              leading: Icon(
+                                messagesOnly
+                                    ? (isRead
+                                        ? Icons.chat_bubble_outline
+                                        : Icons.mark_chat_unread_outlined)
+                                    : (isRead
+                                        ? Icons.notifications_none_outlined
+                                        : Icons.notifications_active),
+                                color: isRead
+                                    ? const Color(0xFF95A5A6)
+                                    : const Color(0xFF3498DB),
+                              ),
+                              title: Text(
+                                title?.isNotEmpty == true
+                                    ? title!
+                                    : 'Notification',
+                                style: TextStyle(
+                                  color: const Color(0xFF2C3E50),
+                                  fontWeight: isRead
+                                      ? FontWeight.w600
+                                      : FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (message.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        message,
+                                        style: const TextStyle(
+                                          color: Color(0xFF4A4A4A),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  if (proposalTitle != null &&
+                                      proposalTitle.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        proposalTitle,
+                                        style: const TextStyle(
+                                          color: Color(0xFF7F8C8D),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ),
+                                  if (timeLabel.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        timeLabel,
+                                        style: const TextStyle(
+                                          color: Color(0xFF95A5A6),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              isThreeLine: true,
+                              trailing: notificationId != null
+                                  ? Wrap(
+                                      spacing: 4,
+                                      children: [
+                                        if (!isRead)
+                                          TextButton(
+                                            onPressed: () async {
+                                              await app.markNotificationRead(
+                                                  notificationId);
+                                              setModalState(() {});
+                                            },
+                                            child: const Text('Mark read'),
+                                          ),
+                                        IconButton(
+                                          tooltip: 'Delete',
+                                          onPressed: () async {
+                                            await app.deleteNotification(
+                                                notificationId);
+                                            setModalState(() {});
+                                          },
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            size: 18,
+                                            color: Colors.redAccent,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : null,
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleNotificationTap(
+    AppState app,
+    Map<String, dynamic> notification, {
+    int? notificationId,
+    bool isAlreadyRead = false,
+  }) async {
+    final metadata = _parseNotificationMetadata(notification['metadata']);
+    String? proposalId = _asIdString(
+      metadata['proposal_id'] ?? notification['proposal_id'],
+    );
+    proposalId ??= _asIdString(metadata['resource_id']);
+    final proposalTitle =
+        notification['proposal_title']?.toString().trim().isNotEmpty == true
+            ? notification['proposal_title'].toString().trim()
+            : notification['title']?.toString().trim();
+
+    if (notificationId != null && !isAlreadyRead) {
+      try {
+        await app.markNotificationRead(notificationId);
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    if (proposalId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This notification is missing proposal details.'),
+        ),
+      );
+      return;
+    }
+
+    final commentId = metadata['comment_id'] is int
+        ? metadata['comment_id'] as int
+        : int.tryParse(metadata['comment_id']?.toString() ?? '');
+    final sectionIndex = metadata['section_index'] is int
+        ? metadata['section_index'] as int
+        : int.tryParse(metadata['section_index']?.toString() ?? '');
+
+    Navigator.of(context).pushNamed(
+      '/compose',
+      arguments: {
+        'proposalId': proposalId,
+        if (proposalTitle != null && proposalTitle.isNotEmpty)
+          'proposalTitle': proposalTitle,
+        'forceCommentsPanelOpen': true,
+        if (commentId != null) 'initialCommentId': commentId,
+        if (sectionIndex != null) 'initialSectionIndex': sectionIndex,
+      },
+    );
+  }
+
+  Map<String, dynamic> _parseNotificationMetadata(dynamic raw) {
+    if (raw == null) return <String, dynamic>{};
+    if (raw is Map<String, dynamic>) return Map<String, dynamic>.from(raw);
+    if (raw is Map) {
+      try {
+        return raw.cast<String, dynamic>();
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }
+    if (raw is String && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          return decoded.cast<String, dynamic>();
+        }
+      } catch (_) {}
+    }
+    return <String, dynamic>{};
+  }
+
+  String? _asIdString(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    if (text.isEmpty || text.toLowerCase() == 'null') return null;
+    return text;
+  }
+
+  String _formatNotificationTimestamp(dynamic raw) {
+    if (raw == null) return '';
+    final value = raw.toString().trim();
+    if (value.isEmpty) return '';
+    final dt = DateTime.tryParse(value);
+    if (dt == null) return value;
+    final local = dt.toLocal();
+    final diff = DateTime.now().difference(local);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${local.day}/${local.month}/${local.year}';
   }
 
   Widget _buildOverviewAndListPanel({

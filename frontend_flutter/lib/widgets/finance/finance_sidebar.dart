@@ -15,6 +15,7 @@ class FinanceSidebar extends StatelessWidget {
     this.showAudit = false,
     this.pendingBadge,
     this.managerChrome,
+    this.showCollapseToggle = false,
   });
 
   final bool isCollapsed;
@@ -25,6 +26,7 @@ class FinanceSidebar extends StatelessWidget {
   final bool showAudit;
   final int? pendingBadge;
   final ManagerChromeTheme? managerChrome;
+  final bool showCollapseToggle;
 
   static const double collapsedWidth = 76.0;
   static const double expandedWidth = 220.0;
@@ -34,6 +36,7 @@ class FinanceSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = managerChrome;
+    final effectiveCollapsed = showCollapseToggle ? isCollapsed : false;
     final items = <_FinanceNavItem>[
       const _FinanceNavItem(
         label: 'Dashboard',
@@ -52,7 +55,8 @@ class FinanceSidebar extends StatelessWidget {
       if (showAudit)
         const _FinanceNavItem(
           label: 'Audit',
-          assetPath: 'assets/images/finance_manager_new_icons/Audit_sidebar.png',
+          assetPath:
+              'assets/images/finance_manager_new_icons/Audit_sidebar.png',
         ),
       const _FinanceNavItem(
         label: 'Analytics',
@@ -62,7 +66,7 @@ class FinanceSidebar extends StatelessWidget {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: isCollapsed ? collapsedWidth : expandedWidth,
+      width: effectiveCollapsed ? collapsedWidth : expandedWidth,
       decoration: BoxDecoration(
         color: c?.sidebarBackground ?? _base,
         border: Border(
@@ -75,16 +79,16 @@ class FinanceSidebar extends StatelessWidget {
       child: SafeArea(
         child: Column(
           children: [
-            _buildHeader(isCollapsed, c),
+            _buildHeader(effectiveCollapsed, c),
             Expanded(
               child: Column(
                 children: [
                   Expanded(
                     child: SingleChildScrollView(
                       padding: EdgeInsets.only(
-                        top: isCollapsed ? 8 : 6,
-                        left: isCollapsed ? 0 : 4,
-                        right: isCollapsed ? 0 : 4,
+                        top: effectiveCollapsed ? 8 : 6,
+                        left: effectiveCollapsed ? 0 : 4,
+                        right: effectiveCollapsed ? 0 : 4,
                       ),
                       child: Column(
                         children: [
@@ -94,31 +98,32 @@ class FinanceSidebar extends StatelessWidget {
                               assetPath: item.assetPath,
                               badge: item.badge,
                               isActive: currentPage == item.label,
-                              isCollapsed: isCollapsed,
+                              isCollapsed: effectiveCollapsed,
                               onTap: () => onSelect(item.label),
                               accent: _accent,
                               managerChrome: c,
                             ),
-                          SizedBox(height: isCollapsed ? 18 : 40),
+                          SizedBox(height: effectiveCollapsed ? 18 : 40),
                         ],
                       ),
                     ),
                   ),
-                  SizedBox(height: isCollapsed ? 8 : 10),
+                  SizedBox(height: effectiveCollapsed ? 8 : 10),
                   _FinanceSidebarNavItem(
                     label: 'Account Profile',
                     assetPath: 'assets/images/User_Profile.png',
                     badge: null,
                     isActive: currentPage == 'Account Profile',
-                    isCollapsed: isCollapsed,
+                    isCollapsed: effectiveCollapsed,
                     onTap: () => onSelect('Account Profile'),
                     accent: _accent,
                     managerChrome: c,
                     isBottomItem: true,
                   ),
-                  if (!isCollapsed)
+                  if (!effectiveCollapsed)
                     const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                       child: Divider(
                         height: 1,
                         thickness: 1,
@@ -130,13 +135,13 @@ class FinanceSidebar extends StatelessWidget {
                     assetPath: 'assets/images/Logout_KhonoBuzz.png',
                     badge: null,
                     isActive: false,
-                    isCollapsed: isCollapsed,
+                    isCollapsed: effectiveCollapsed,
                     onTap: () => onSelect(bottomLabel),
                     accent: _accent,
                     managerChrome: c,
                     isBottomItem: true,
                   ),
-                  SizedBox(height: isCollapsed ? 8 : 10),
+                  SizedBox(height: effectiveCollapsed ? 8 : 10),
                 ],
               ),
             ),
@@ -146,47 +151,104 @@ class FinanceSidebar extends StatelessWidget {
     );
   }
 
-  Color _iconFg(ManagerChromeTheme? c) => c == null ? Colors.white : c.textPrimary;
+  Color _subtleFill(ManagerChromeTheme? c) {
+    if (c == null) return Colors.white.withValues(alpha: 0.14);
+    return c.isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : Colors.black.withValues(alpha: 0.06);
+  }
+
+  Color _iconFg(ManagerChromeTheme? c) =>
+      c == null ? Colors.white : c.textPrimary;
 
   Widget _buildHeader(bool effectiveCollapsed, ManagerChromeTheme? c) {
     if (effectiveCollapsed) {
-      return const SizedBox(height: 12);
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        child: InkWell(
+          onTap: showCollapseToggle ? onToggle : null,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            height: 36,
+            decoration: BoxDecoration(
+              color: _subtleFill(c),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: showCollapseToggle
+                ? Icon(
+                    Icons.keyboard_arrow_right,
+                    color: _iconFg(c),
+                    size: 20,
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      );
     }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-      child: Column(
+      child: Stack(
         children: [
-          const SizedBox(height: 2),
-          Image.asset(
-            'assets/images/new icons for manager/khonology_logo.png',
-            height: 22,
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Welcome to',
-            style: TextStyle(
-              color: c?.textSecondary ?? Colors.white.withValues(alpha: 0.7),
-              fontSize: 10.5,
-              fontWeight: FontWeight.w500,
+          if (showCollapseToggle)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: InkWell(
+                onTap: onToggle,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: _subtleFill(c),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.keyboard_arrow_left,
+                    color: _iconFg(c),
+                    size: 18,
+                  ),
+                ),
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Proposal & SOW Builder',
-            style: TextStyle(
-              color: _iconFg(c),
-              fontSize: 12.8,
-              fontWeight: FontWeight.w700,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Container(
-            height: 1,
-            color: c?.divider ?? Colors.white.withValues(alpha: 0.14),
+          Column(
+            children: [
+              const SizedBox(height: 2),
+              Image.asset(
+                'assets/images/new icons for manager/khonology_logo.png',
+                height: 22,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Welcome to',
+                style: TextStyle(
+                  color:
+                      c?.textSecondary ?? Colors.white.withValues(alpha: 0.7),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Proposal & SOW Builder',
+                style: TextStyle(
+                  color: _iconFg(c),
+                  fontSize: 12.8,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Container(
+                height: 1,
+                color: c?.divider ?? Colors.white.withValues(alpha: 0.14),
+              ),
+            ],
           ),
         ],
       ),

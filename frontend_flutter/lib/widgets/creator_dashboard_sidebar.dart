@@ -10,12 +10,14 @@ class CreatorDashboardSidebar extends StatelessWidget {
     required this.currentLabel,
     required this.onSelect,
     required this.onToggle,
+    this.showCollapseToggle = false,
   });
 
   final bool isCollapsed;
   final String currentLabel;
   final ValueChanged<String> onSelect;
   final VoidCallback onToggle;
+  final bool showCollapseToggle;
 
   static const double collapsedWidth = 76.0;
   static const double expandedWidth = 220.0;
@@ -60,9 +62,10 @@ class CreatorDashboardSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveCollapsed = showCollapseToggle ? isCollapsed : false;
     return AnimatedContainer(
       duration: AppColors.animationDuration,
-      width: isCollapsed ? collapsedWidth : expandedWidth,
+      width: effectiveCollapsed ? collapsedWidth : expandedWidth,
       decoration: const BoxDecoration(
         color: AppColors.backgroundColor,
         border: Border(
@@ -73,8 +76,9 @@ class CreatorDashboardSidebar extends StatelessWidget {
         child: Column(
           children: [
             _SidebarHeader(
-              isCollapsed: isCollapsed,
+              isCollapsed: effectiveCollapsed,
               onToggle: onToggle,
+              showCollapseToggle: showCollapseToggle,
             ),
             Expanded(
               child: Column(
@@ -82,9 +86,9 @@ class CreatorDashboardSidebar extends StatelessWidget {
                   Expanded(
                     child: SingleChildScrollView(
                       padding: EdgeInsets.only(
-                        top: isCollapsed ? 8 : 6,
-                        left: isCollapsed ? 0 : 4,
-                        right: isCollapsed ? 0 : 4,
+                        top: effectiveCollapsed ? 8 : 6,
+                        left: effectiveCollapsed ? 0 : 4,
+                        right: effectiveCollapsed ? 0 : 4,
                       ),
                       child: Column(
                         children: [
@@ -92,28 +96,29 @@ class CreatorDashboardSidebar extends StatelessWidget {
                             _SidebarRow(
                               label: item.label,
                               assetPath: item.assetPath,
-                              isCollapsed: isCollapsed,
+                              isCollapsed: effectiveCollapsed,
                               isSelected: currentLabel == item.label,
                               onTap: () => onSelect(item.label),
                             ),
-                          SizedBox(height: isCollapsed ? 18 : 40),
+                          SizedBox(height: effectiveCollapsed ? 18 : 40),
                         ],
                       ),
                     ),
                   ),
-                  SizedBox(height: isCollapsed ? 8 : 10),
+                  SizedBox(height: effectiveCollapsed ? 8 : 10),
                   _SidebarRow(
                     label: 'Account Profile',
                     assetPath:
                         'assets/images/Creator_Dashboard/User Profile_White Badge_Blue.png',
-                    isCollapsed: isCollapsed,
+                    isCollapsed: effectiveCollapsed,
                     isSelected: currentLabel == 'Account Profile',
                     isBottomItem: true,
                     onTap: () => onSelect('Account Profile'),
                   ),
-                  if (!isCollapsed)
+                  if (!effectiveCollapsed)
                     const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                       child: Divider(
                         height: 1,
                         thickness: 1,
@@ -123,12 +128,12 @@ class CreatorDashboardSidebar extends StatelessWidget {
                   _SidebarRow(
                     label: 'Logout',
                     assetPath: 'assets/images/Logout_KhonoBuzz.png',
-                    isCollapsed: isCollapsed,
+                    isCollapsed: effectiveCollapsed,
                     isSelected: false,
                     isBottomItem: true,
                     onTap: () => onSelect('Logout'),
                   ),
-                  SizedBox(height: isCollapsed ? 8 : 10),
+                  SizedBox(height: effectiveCollapsed ? 8 : 10),
                 ],
               ),
             ),
@@ -143,51 +148,101 @@ class _SidebarHeader extends StatelessWidget {
   const _SidebarHeader({
     required this.isCollapsed,
     required this.onToggle,
+    required this.showCollapseToggle,
   });
 
   final bool isCollapsed;
   final VoidCallback onToggle;
+  final bool showCollapseToggle;
 
   @override
   Widget build(BuildContext context) {
     if (isCollapsed) {
-      return const SizedBox(height: 12);
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        child: InkWell(
+          onTap: showCollapseToggle ? onToggle : null,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.hoverColor,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: showCollapseToggle
+                ? const Icon(
+                    Icons.keyboard_arrow_right,
+                    color: AppColors.textPrimary,
+                    size: 20,
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      );
     }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-      child: Column(
+      child: Stack(
         children: [
-          const SizedBox(height: 2),
-          Image.asset(
-            'assets/images/new icons for manager/khonology_logo.png',
-            height: 22,
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Welcome to',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 10.5,
-              fontWeight: FontWeight.w500,
+          if (showCollapseToggle)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: InkWell(
+                onTap: onToggle,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: AppColors.hoverColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.keyboard_arrow_left,
+                    color: AppColors.textPrimary,
+                    size: 18,
+                  ),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          const Text(
-            'Proposal & SOW Builder',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 12.8,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            height: 1,
-            color: AppColors.borderColor,
+          Column(
+            children: [
+              const SizedBox(height: 2),
+              Image.asset(
+                'assets/images/new icons for manager/khonology_logo.png',
+                height: 22,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Welcome to',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                'Proposal & SOW Builder',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 12.8,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                height: 1,
+                color: AppColors.borderColor,
+              ),
+            ],
           ),
         ],
       ),
