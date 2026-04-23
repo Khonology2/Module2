@@ -11,7 +11,9 @@ import '../../api.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
 import '../../services/asset_service.dart';
+import '../../theme/manager_theme_controller.dart';
 import '../../theme/premium_theme.dart';
+import '../../widgets/manager_page_background.dart';
 import '../../widgets/custom_scrollbar.dart';
 import '../../widgets/admin/admin_sidebar.dart';
 // ignore: avoid_web_libraries_in_flutter
@@ -348,6 +350,7 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
 
     try {
       AuthService.restoreSessionFromStorage();
+      const requestTimeout = Duration(seconds: 25);
 
       var token = AuthService.token;
       if (token == null) {
@@ -371,28 +374,26 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
       }
 
       // 1) Fetch proposals pending admin/CEO approval from dedicated endpoint
-      final pendingResponse = await http.get(
-        Uri.parse('${ApiService.baseUrl}/api/proposals/pending_approval'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw Exception('Request timed out');
-        },
-      );
-
       final List<Map<String, dynamic>> pendingFromApi = [];
-      if (pendingResponse.statusCode == 200) {
-        final data = json.decode(pendingResponse.body);
-        final List<dynamic> items = data['proposals'] as List? ?? [];
-        for (final raw in items) {
-          if (raw is Map) {
-            pendingFromApi.add(Map<String, dynamic>.from(raw));
+      try {
+        final pendingResponse = await http.get(
+          Uri.parse('${ApiService.baseUrl}/api/proposals/pending_approval'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        ).timeout(requestTimeout);
+        if (pendingResponse.statusCode == 200) {
+          final data = json.decode(pendingResponse.body);
+          final List<dynamic> items = data['proposals'] as List? ?? [];
+          for (final raw in items) {
+            if (raw is Map) {
+              pendingFromApi.add(Map<String, dynamic>.from(raw));
+            }
           }
         }
+      } catch (_) {
+        // Continue with fallback endpoints instead of failing the whole page.
       }
 
       // 2) Fetch general proposals for additional context (e.g. history)
@@ -405,12 +406,7 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
           },
-        ).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            throw Exception('Request timed out');
-          },
-        );
+        ).timeout(requestTimeout);
 
         if (allResponse.statusCode == 200) {
           final decoded = json.decode(allResponse.body);
@@ -423,12 +419,12 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
       }
 
       if (proposals.isEmpty) {
-        proposals = await ApiService.getProposals(token).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            throw Exception('Request timed out');
-          },
-        );
+        try {
+          proposals = await ApiService.getProposals(token).timeout(requestTimeout);
+        } catch (_) {
+          // Keep page usable with whatever data we already have (possibly only pending).
+          proposals = [];
+        }
       }
 
       // 3) Combine and categorise proposals into All / Pending / Approved / Rejected
@@ -571,87 +567,68 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final chrome = context.watch<ManagerThemeController>().chrome;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/Global BG.jpg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.black.withValues(alpha: 0.65),
-                  Colors.black.withValues(alpha: 0.35),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Material(
-                  child: AdminSidebar(
-                    isCollapsed: app.isAdminSidebarCollapsed,
-                    currentPage: _currentPage,
-                    onToggle: _toggleSidebar,
-                    onSelect: (label) {
-                      setState(() => _currentPage = label);
-                      _navigateToPage(label);
-                    },
-                  ),
+      body: ManagerPageBackground(
+        child: SafeArea(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Material(
+                child: AdminSidebar(
+                  isCollapsed: app.isAdminSidebarCollapsed,
+                  currentPage: _currentPage,
+                  managerChrome: chrome,
+                  onToggle: _toggleSidebar,
+                  onSelect: (label) {
+                    setState(() => _currentPage = label);
+                    _navigateToPage(label);
+                  },
                 ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildHeader(app),
-                        const SizedBox(height: 24),
-                        Expanded(
-                          child: _adminFrostedBlock(
-                            radius: 32,
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildApprovalsToolbar(),
-                                const SizedBox(height: 16),
-                                _buildStatusTabs(),
-                                const SizedBox(height: 16),
-                                Expanded(
-                                  child: CustomScrollbar(
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeader(app),
+                      const SizedBox(height: 24),
+                      Expanded(
+                        child: _adminFrostedBlock(
+                          radius: 32,
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildApprovalsToolbar(),
+                              const SizedBox(height: 16),
+                              _buildStatusTabs(),
+                              const SizedBox(height: 16),
+                              Expanded(
+                                child: CustomScrollbar(
+                                  controller: _scrollController,
+                                  child: SingleChildScrollView(
                                     controller: _scrollController,
-                                    child: SingleChildScrollView(
-                                      controller: _scrollController,
-                                      physics:
-                                          const AlwaysScrollableScrollPhysics(),
-                                      child: _buildApprovalsTable(),
-                                    ),
+                                    physics:
+                                        const AlwaysScrollableScrollPhysics(),
+                                    child: _buildApprovalsTable(),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -2342,7 +2319,14 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
       case 'History':
         Navigator.pushReplacementNamed(context, '/admin_history');
         break;
+      case 'Content Library':
+        Navigator.pushReplacementNamed(context, '/content_library');
+        break;
+      case 'Account Profile':
+        Navigator.pushReplacementNamed(context, '/manager_account_profile');
+        break;
       case 'Sign Out':
+      case 'Logout':
         AuthService.logout();
         Navigator.pushNamedAndRemoveUntil(
             context, '/login', (Route<dynamic> route) => false);

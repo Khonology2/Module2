@@ -1,5 +1,4 @@
 // ignore_for_file: unused_field, unused_element, unused_local_variable, deprecated_member_use
-
 import 'dart:convert';
 import 'dart:ui';
 
@@ -15,7 +14,7 @@ import '../../theme/premium_theme.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/manager_theme_controller.dart';
 import '../shared/proposal_insights_modal.dart';
-import '../../widgets/app_side_nav.dart';
+import '../../widgets/creator_dashboard_sidebar.dart';
 import '../../widgets/manager_page_background.dart';
 import '../../utils/manager_session_actions.dart';
 
@@ -403,7 +402,7 @@ class _DashboardPageState extends State<DashboardPage>
     final unread = _unreadNotificationCount(app, messagesOnly: false);
     return _buildIconButton(
       chrome: chrome,
-      assetPath: 'assets/images/new icons for manager/notifications.png',
+      assetPath: 'assets/images/Creator_Dashboard/Notification_blue.png',
       badge: unread > 0 ? unread : null,
       onTap: () async {
         await app.fetchNotifications();
@@ -791,25 +790,11 @@ class _DashboardPageState extends State<DashboardPage>
         child: Row(
           children: [
             // Sidebar
-            Consumer<AppState>(
-              builder: (context, app, child) {
-                final role = (app.currentUser?['role'] ?? '')
-                    .toString()
-                    .toLowerCase()
-                    .trim();
-                final isAdmin =
-                    role == 'admin' || role == 'ceo' || role == 'approver';
-                return AppSideNav(
-                  isCollapsed: app.isSidebarCollapsed,
-                  currentLabel: app.currentNavLabel,
-                  isAdmin: isAdmin,
-                  onToggle: app.toggleSidebar,
-                  onSelect: (label) {
-                    app.setCurrentNavLabel(label);
-                    _navigateToPage(context, label);
-                  },
-                );
-              },
+            CreatorDashboardSidebar(
+              isCollapsed: _isSidebarCollapsed,
+              currentLabel: _currentPage,
+              onToggle: _toggleSidebar,
+              onSelect: (label) => _navigateToPage(context, label),
             ),
 
             // Main Content Area
@@ -912,7 +897,7 @@ class _DashboardPageState extends State<DashboardPage>
           // Right: messages (comments & mentions), notifications (everything else), profile
           _buildIconButton(
             chrome: chrome,
-            assetPath: 'assets/images/new icons for manager/messages.png',
+            assetPath: 'assets/images/Creator_Dashboard/Email_blue.png',
             onTap: () async {
               await app.fetchNotifications();
               if (!mounted) return;
@@ -925,50 +910,6 @@ class _DashboardPageState extends State<DashboardPage>
           const SizedBox(width: 8),
           // Notifications icon (preserves existing functionality)
           _buildNotificationButton(app, chrome),
-          const SizedBox(width: 12),
-          // Profile avatar
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: const Color(0xFFC10D00).withOpacity(0.5),
-                width: 2,
-              ),
-            ),
-            child: ClipOval(
-              child: Image.asset(
-                'assets/images/User_Profile.png',
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: chrome.textSecondary, size: 28),
-            onSelected: (value) {
-              if (value == 'logout') {
-                app.logout();
-                AuthService.logout();
-                Navigator.pushNamed(context, '/login');
-              }
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem<String>(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout),
-                    SizedBox(width: 8),
-                    Text('Logout'),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -1037,20 +978,19 @@ class _DashboardPageState extends State<DashboardPage>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: chrome.isDark
-                    ? null
-                    : Border.all(color: chrome.divider, width: 1),
-              ),
+            SizedBox(
+              width: 44.87,
+              height: 44.87,
               child: Image.asset(
-                'assets/images/new icons for manager/messages.png',
+                'assets/images/Creator_Dashboard/Notification_blue.png',
+                width: 44.87,
+                height: 44.87,
                 fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.notifications_none,
+                  size: 24,
+                  color: Colors.black87,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -1069,46 +1009,54 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   Widget _buildFixedSidebar(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmall =
-        screenWidth < 1200; // Increased breakpoint for better 100% zoom support
-    final effectiveCollapsed = isSmall ? true : _isSidebarCollapsed;
+    final effectiveCollapsed = _isSidebarCollapsed;
 
-    return AnimatedContainer(
-      duration: AppColors.animationDuration,
-      width: effectiveCollapsed
-          ? AppColors.collapsedWidth
-          : AppColors.expandedWidth,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.backgroundColor
-                .withValues(alpha: AppColors.backgroundOpacity),
-            border: Border(
-              right: BorderSide(
-                color: AppColors.borderColor,
-                width: 1,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Keep sidebar visual sizing fixed while resizing screen.
+        const isCompact = false;
+        const isUltraCompact = false;
+        final headerHeight = AppColors.headerHeight;
+        final toggleHeight = AppColors.itemHeight;
+        const navTopGap = 8.0;
+        const midGap = 20.0;
+        const dividerGap = 12.0;
+        const navTitleSize = 14.0;
+        const navArrowSize = 20.0;
+        final headerPadding = AppSpacing.sidebarHeaderPadding;
+
+        return AnimatedContainer(
+          duration: AppColors.animationDuration,
+          width: effectiveCollapsed
+              ? AppColors.collapsedWidth
+              : AppColors.expandedWidth,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.backgroundColor
+                    .withValues(alpha: AppColors.backgroundOpacity),
+                border: Border(
+                  right: BorderSide(
+                    color: AppColors.borderColor,
+                    width: 1,
+                  ),
+                ),
               ),
-            ),
-          ),
-          child: Column(
-            children: [
+              child: Column(
+                children: [
               // Header Section
               SizedBox(
-                height: AppColors.headerHeight,
+                height: headerHeight,
                 child: Padding(
-                  padding: AppSpacing.sidebarHeaderPadding,
+                  padding: headerPadding,
                   child: InkWell(
                     onTap: () {
-                      if (!isSmall) {
-                        setState(
-                            () => _isSidebarCollapsed = !_isSidebarCollapsed);
-                      }
+                      setState(() => _isSidebarCollapsed = !_isSidebarCollapsed);
                     },
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      height: AppColors.itemHeight,
+                      height: toggleHeight,
                       decoration: BoxDecoration(
                         color: AppColors.hoverColor,
                         borderRadius: BorderRadius.circular(10),
@@ -1124,7 +1072,7 @@ class _DashboardPageState extends State<DashboardPage>
                                 'Navigation',
                                 style: TextStyle(
                                   color: AppColors.textPrimary,
-                                  fontSize: 14,
+                                  fontSize: navTitleSize,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -1134,7 +1082,7 @@ class _DashboardPageState extends State<DashboardPage>
                                 ? Icons.keyboard_arrow_right
                                 : Icons.keyboard_arrow_left,
                             color: AppColors.textPrimary,
-                            size: 20,
+                            size: navArrowSize,
                           ),
                         ],
                       ),
@@ -1148,12 +1096,14 @@ class _DashboardPageState extends State<DashboardPage>
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                      const SizedBox(height: 8),
+                      SizedBox(height: navTopGap),
                       _buildSidebarNavItem(
                         label: 'Dashboard',
                         assetPath: 'assets/images/Dahboard.png',
                         isSelected: _currentPage == 'Dashboard',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () => _navigateToPage(context, 'Dashboard'),
                       ),
                       _buildSidebarNavItem(
@@ -1161,6 +1111,8 @@ class _DashboardPageState extends State<DashboardPage>
                         assetPath: 'assets/images/My_Proposals.png',
                         isSelected: _currentPage == 'My Proposals',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () => _navigateToPage(context, 'My Proposals'),
                       ),
                       _buildSidebarNavItem(
@@ -1168,6 +1120,8 @@ class _DashboardPageState extends State<DashboardPage>
                         assetPath: 'assets/images/content_library.png',
                         isSelected: _currentPage == 'Templates',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () => _navigateToPage(context, 'Templates'),
                       ),
                       _buildSidebarNavItem(
@@ -1175,6 +1129,8 @@ class _DashboardPageState extends State<DashboardPage>
                         assetPath: 'assets/images/content_library.png',
                         isSelected: _currentPage == 'Content Library',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () =>
                             _navigateToPage(context, 'Content Library'),
                       ),
@@ -1183,6 +1139,8 @@ class _DashboardPageState extends State<DashboardPage>
                         assetPath: 'assets/images/collaborations.png',
                         isSelected: _currentPage == 'Client Management',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () =>
                             _navigateToPage(context, 'Client Management'),
                       ),
@@ -1192,6 +1150,8 @@ class _DashboardPageState extends State<DashboardPage>
                             'assets/images/Time Allocation_Approval_Blue.png',
                         isSelected: _currentPage == 'Approved Proposals',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () =>
                             _navigateToPage(context, 'Approved Proposals'),
                       ),
@@ -1200,37 +1160,52 @@ class _DashboardPageState extends State<DashboardPage>
                         assetPath: 'assets/images/analytics.png',
                         isSelected: _currentPage == 'Analytics (My Pipeline)',
                         isCollapsed: effectiveCollapsed,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
                         onTap: () =>
                             _navigateToPage(context, 'Analytics (My Pipeline)'),
                       ),
-                      const SizedBox(height: 20),
-
-                      // Divider
-                      if (!effectiveCollapsed)
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16),
-                          height: 1,
-                          color: AppColors.borderColor,
-                        ),
-                      const SizedBox(height: 12),
-
-                      // Logout
-                      _buildSidebarNavItem(
-                        label: 'Logout',
-                        assetPath: 'assets/images/Logout_KhonoBuzz.png',
-                        isSelected: false,
-                        isCollapsed: effectiveCollapsed,
-                        onTap: () => _handleLogout(context),
-                      ),
-                      const SizedBox(height: 20),
+                      // This trailing gap ensures visible separation from bottom actions
+                      // even when content fits without scrolling.
+                      const SizedBox(height: 32),
                     ],
                   ),
                 ),
               ),
+
+              // Bottom fixed actions
+              if (!effectiveCollapsed)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  height: 1,
+                  color: AppColors.borderColor,
+                ),
+              SizedBox(height: dividerGap),
+              _buildSidebarNavItem(
+                label: 'Account Profile',
+                assetPath: 'assets/images/User_Profile.png',
+                isSelected: _currentPage == 'Account Profile',
+                isCollapsed: effectiveCollapsed,
+                isCompact: isCompact,
+                isUltraCompact: isUltraCompact,
+                onTap: () => _navigateToPage(context, 'Account Profile'),
+              ),
+              _buildSidebarNavItem(
+                label: 'Logout',
+                assetPath: 'assets/images/Logout_KhonoBuzz.png',
+                isSelected: false,
+                isCollapsed: effectiveCollapsed,
+                isCompact: isCompact,
+                isUltraCompact: isUltraCompact,
+                onTap: () => _handleLogout(context),
+              ),
+              SizedBox(height: midGap),
             ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1240,6 +1215,8 @@ class _DashboardPageState extends State<DashboardPage>
     required bool isSelected,
     required bool isCollapsed,
     required VoidCallback onTap,
+    bool isCompact = false,
+    bool isUltraCompact = false,
     bool showProfileIndicator = false,
   }) {
     bool hovering = false;
@@ -1247,7 +1224,10 @@ class _DashboardPageState extends State<DashboardPage>
     return StatefulBuilder(
       builder: (context, setState) {
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          padding: EdgeInsets.symmetric(
+            horizontal: isUltraCompact ? 6 : 8,
+            vertical: isUltraCompact ? 1 : (isCompact ? 1.5 : 2),
+          ),
           child: MouseRegion(
             onEnter: (_) => setState(() => hovering = true),
             onExit: (_) => setState(() => hovering = false),
@@ -1256,15 +1236,28 @@ class _DashboardPageState extends State<DashboardPage>
               borderRadius: BorderRadius.circular(10),
               child: AnimatedContainer(
                 duration: AppColors.animationDuration,
-                height: AppColors.itemHeight,
+                height: isUltraCompact
+                    ? 38
+                    : (isCompact ? 42 : AppColors.itemHeight),
                 decoration: BoxDecoration(
                   color: _getItemColor(isSelected, hovering, isCollapsed),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: isCollapsed
                     ? _buildCollapsedItem(
-                        assetPath, isSelected, showProfileIndicator)
-                    : _buildExpandedItem(label, assetPath, isSelected),
+                        assetPath,
+                        isSelected,
+                        showProfileIndicator,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
+                      )
+                    : _buildExpandedItem(
+                        label,
+                        assetPath,
+                        isSelected,
+                        isCompact: isCompact,
+                        isUltraCompact: isUltraCompact,
+                      ),
               ),
             ),
           ),
@@ -1274,13 +1267,19 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   Widget _buildCollapsedItem(
-      String assetPath, bool isSelected, bool showProfileIndicator) {
+    String assetPath,
+    bool isSelected,
+    bool showProfileIndicator, {
+    bool isCompact = false,
+    bool isUltraCompact = false,
+  }) {
+    final iconSize = isUltraCompact ? 26.0 : (isCompact ? 30.0 : 40.0);
     return Center(
       child: Stack(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: iconSize,
+            height: iconSize,
             decoration: BoxDecoration(
               color: Colors.transparent,
               shape: BoxShape.circle,
@@ -1316,14 +1315,27 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
-  Widget _buildExpandedItem(String label, String assetPath, bool isSelected) {
+  Widget _buildExpandedItem(
+    String label,
+    String assetPath,
+    bool isSelected, {
+    bool isCompact = false,
+    bool isUltraCompact = false,
+  }) {
+    final iconSize = isUltraCompact ? 26.0 : (isCompact ? 30.0 : 40.0);
+    final fontSize = isUltraCompact ? 12.0 : (isCompact ? 13.0 : 14.0);
+    final itemPadding = isUltraCompact
+        ? const EdgeInsets.symmetric(horizontal: 8, vertical: 6)
+        : (isCompact
+            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 7)
+            : AppSpacing.sidebarItemPadding);
     return Padding(
-      padding: AppSpacing.sidebarItemPadding,
+      padding: itemPadding,
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: iconSize,
+            height: iconSize,
             decoration: BoxDecoration(
               color: Colors.transparent,
               shape: BoxShape.circle,
@@ -1339,11 +1351,13 @@ class _DashboardPageState extends State<DashboardPage>
           Expanded(
             child: Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: isSelected
                     ? AppColors.textPrimary
                     : AppColors.textSecondary,
-                fontSize: 14,
+                fontSize: fontSize,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
@@ -1474,6 +1488,9 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   void _navigateToPage(BuildContext context, String label) {
+    setState(() => _currentPage = label);
+    context.read<AppState>().setCurrentNavLabel(label);
+
     switch (label) {
       case 'Dashboard':
         // Already on dashboard
@@ -1537,20 +1554,13 @@ class _DashboardPageState extends State<DashboardPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (iconAsset != null) ...[
-                Container(
+                SizedBox(
                   width: 80,
                   height: 80,
-                  decoration: BoxDecoration(
-                    color: iconOnWhiteCircle
-                        ? Colors.white
-                        : const Color(0xFFC10D00).withOpacity(0.15),
-                    shape: BoxShape.circle,
-                    border: iconOnWhiteCircle && !chrome.isDark
-                        ? Border.all(color: chrome.divider, width: 1)
-                        : null,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Image.asset(iconAsset, fit: BoxFit.contain),
                   ),
-                  padding: const EdgeInsets.all(12),
-                  child: Image.asset(iconAsset, fit: BoxFit.contain),
                 ),
                 const SizedBox(width: 14),
               ],
@@ -1611,7 +1621,16 @@ class _DashboardPageState extends State<DashboardPage>
             ],
           ),
           const SizedBox(height: 16),
-          Container(height: 1, color: chrome.divider),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: double.infinity,
+              height: title == 'Recent Proposals' ? 0.61 : 1,
+              color: title == 'Recent Proposals'
+                  ? const Color(0xFFFFFFFF)
+                  : chrome.divider,
+            ),
+          ),
           const SizedBox(height: 14),
           child,
         ],
@@ -1626,7 +1645,8 @@ class _DashboardPageState extends State<DashboardPage>
         'title': 'Draft Proposals',
         'subtitle': 'Proposals in progress\nand not yet submitted.',
         'value': counts['Draft']?.toString() ?? '0',
-        'icon': 'assets/images/new icons for manager/Draft proposal.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Red.png',
       },
       {
         'title': 'Pending CEO Approval',
@@ -1634,19 +1654,21 @@ class _DashboardPageState extends State<DashboardPage>
         'value':
             (counts['Pending CEO Approval'] ?? counts['Pending Approval'] ?? 0)
                 .toString(),
-        'icon': 'assets/images/new icons for manager/Pending Ceo approval.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Concentration_Key Focus_White Badge_Red.png',
       },
       {
         'title': 'Sent to Client',
         'subtitle': 'Delivered to clients\nand awaiting their response.',
         'value': counts['Sent to Client']?.toString() ?? '0',
-        'icon': 'assets/images/new icons for manager/sent to client.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Send_Paper Plane_White Badge_Red.png',
       },
       {
         'title': 'Signed',
         'subtitle': 'Finalized and\napproved by clients.',
         'value': counts['Signed']?.toString() ?? '0',
-        'icon': 'assets/images/new icons for manager/signed.png',
+        'icon': 'assets/images/Creator_Dashboard/Approved_White Badge_Red.png',
       },
     ];
 
@@ -1684,6 +1706,7 @@ class _DashboardPageState extends State<DashboardPage>
         padding: const EdgeInsets.all(16),
         decoration: chrome.floatingPanelDecoration(radius: 10),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             // Text info
             Expanded(
@@ -1722,19 +1745,17 @@ class _DashboardPageState extends State<DashboardPage>
             ),
             const SizedBox(width: 8),
             // Icon (~2× for visual prominence)
-            Container(
-              width: 104,
-              height: 104,
-              decoration: BoxDecoration(
-                color: const Color(0xFFC10D00).withOpacity(0.15),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFFC10D00).withOpacity(0.3),
-                  width: 1,
+            Padding(
+              padding: const EdgeInsets.only(right: 2, top: 20),
+              child: SizedBox(
+                width: 52,
+                height: 52,
+                child: Image.asset(
+                  iconAsset,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.bottomRight,
                 ),
               ),
-              padding: const EdgeInsets.all(16),
-              child: Image.asset(iconAsset, fit: BoxFit.contain),
             ),
           ],
         ),
@@ -1746,17 +1767,54 @@ class _DashboardPageState extends State<DashboardPage>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildWorkflowStep('1', 'Compose', context, chrome),
-        _buildWorkflowStep('2', 'Govern', context, chrome),
-        _buildWorkflowStep('3', 'AI Risk Gate', context, chrome),
-        _buildWorkflowStep('4', 'Preview', context, chrome),
-        _buildWorkflowStep('5', 'Internal Sign-off', context, chrome),
+        _buildWorkflowStep(
+          'assets/images/Creator_Dashboard/1.png',
+          'Compose',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+        ),
+        _buildWorkflowStep(
+          'assets/images/Creator_Dashboard/2.png',
+          'Govern',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+        ),
+        _buildWorkflowStep(
+          'assets/images/Creator_Dashboard/3.png',
+          'AI Risk Gate',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+        ),
+        _buildWorkflowStep(
+          'assets/images/Creator_Dashboard/4.png',
+          'Preview',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+        ),
+        _buildWorkflowStep(
+          'assets/images/Creator_Dashboard/5.png',
+          'Internal Sign-off',
+          context,
+          chrome,
+          applyFigmaLabelSpecs: true,
+          figmaLabelWidth: 102.03,
+        ),
       ],
     );
   }
 
-  Widget _buildWorkflowStep(String number, String label, BuildContext context,
-      ManagerChromeTheme chrome) {
+  Widget _buildWorkflowStep(
+    String iconAssetPath,
+    String label,
+    BuildContext context,
+    ManagerChromeTheme chrome, {
+    bool applyFigmaLabelSpecs = false,
+    double figmaLabelWidth = 79.29,
+  }) {
     return Expanded(
       child: InkWell(
         onTap: () {
@@ -1767,34 +1825,53 @@ class _DashboardPageState extends State<DashboardPage>
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Column(
             children: [
-              Container(
-                width: 96,
-                height: 96,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFC10D00),
-                  shape: BoxShape.circle,
-                ),
+              SizedBox(
+                width: 51.92,
+                height: 51.92,
                 child: Center(
-                  child: Text(
-                    number,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 34,
+                  child: Image.asset(
+                    iconAssetPath,
+                    width: 51.92,
+                    height: 51.92,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.broken_image,
+                      color: Colors.white70,
+                      size: 28,
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: chrome.textPrimary,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              applyFigmaLabelSpecs
+                  ? SizedBox(
+                      width: figmaLabelWidth,
+                      height: 18.44,
+                      child: Center(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9.22,
+                            height: 9.38 / 9.22,
+                            letterSpacing: 0.0922,
+                            color: chrome.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  : Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: chrome.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
             ],
           ),
         ),
@@ -1972,7 +2049,8 @@ class _DashboardPageState extends State<DashboardPage>
     if (_riskItems.isEmpty) {
       return _buildDashboardSection(
         chrome: chrome,
-        iconAsset: 'assets/images/new icons for manager/risk_gate_tab.png',
+        iconAsset:
+            'assets/images/Creator_Dashboard/Innovation Brainstorm_White Badge_Red.png',
         title: 'AI-Powered Compound Risk Gate',
         subtitle:
             'AI analyses multiple small deviations and flags combined risks.',
@@ -1988,14 +2066,18 @@ class _DashboardPageState extends State<DashboardPage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 112,
-                height: 112,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFC10D00),
-                  shape: BoxShape.circle,
+              SizedBox(
+                width: 60,
+                height: 61,
+                child: Image.asset(
+                  'assets/images/Creator_Dashboard/Approved_White Badge_Red.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.check_circle,
+                    color: Colors.white,
+                    size: 56,
+                  ),
                 ),
-                child: const Icon(Icons.check, color: Colors.white, size: 56),
               ),
               const SizedBox(height: 14),
               Text(
@@ -2022,7 +2104,8 @@ class _DashboardPageState extends State<DashboardPage>
 
     return _buildDashboardSection(
       chrome: chrome,
-      iconAsset: 'assets/images/new icons for manager/risk_gate_tab.png',
+      iconAsset:
+          'assets/images/Creator_Dashboard/Innovation Brainstorm_White Badge_Red.png',
       title: 'AI-Powered Compound Risk Gate',
       subtitle:
           'AI analyses multiple small deviations and flags combined risks.',
@@ -2251,7 +2334,7 @@ class _DashboardPageState extends State<DashboardPage>
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         // Filtered Proposals List
         if (filteredProposals.isEmpty)
@@ -2343,12 +2426,6 @@ class _DashboardPageState extends State<DashboardPage>
       );
     }
 
-    final checkboxIdleBorder = selected
-        ? const Color(0xFFC10D00)
-        : (chrome.isDark
-            ? Colors.white.withOpacity(0.35)
-            : ManagerChromeTheme.textDark.withOpacity(0.35));
-
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -2368,20 +2445,27 @@ class _DashboardPageState extends State<DashboardPage>
               });
             },
             child: Container(
-              width: 22,
-              height: 22,
-              margin: const EdgeInsets.only(right: 14),
+              width: 34,
+              height: 34,
+              margin: const EdgeInsets.only(right: 12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: checkboxIdleBorder,
-                  width: 2,
-                ),
-                color: selected ? const Color(0xFFC10D00) : Colors.transparent,
+                border: selected
+                    ? Border.all(
+                        color: const Color(0xFF2D9CFF),
+                        width: 1.8,
+                      )
+                    : null,
               ),
-              child: selected
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : null,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.asset(
+                  'assets/images/Creator_Dashboard/Networking_Collaboration_Red Badge__White.png',
+                  width: 34,
+                  height: 34,
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
           ),
           Expanded(
@@ -2550,27 +2634,32 @@ class _DashboardPageState extends State<DashboardPage>
   Widget _buildSystemComponents(ManagerChromeTheme chrome) {
     final components = [
       {
-        'icon': 'assets/images/new icons for manager/Template_li`brary_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Project Management_White Badge_Red.png',
         'label': 'Template Library',
       },
       {
-        'icon': 'assets/images/new icons for manager/content_block_tab.png',
+        'icon': 'assets/images/Creator_Dashboard/Content_blocks_white_red.png',
         'label': 'Content Blocks',
       },
       {
-        'icon': 'assets/images/new icons for manager/client_management_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Team Meeting_White Badge_Red.png',
         'label': 'Client Management',
       },
       {
-        'icon': 'assets/images/new icons for manager/E-signature_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Tag_Channel Name_White Badge_Red.png',
         'label': 'E-Signature',
       },
       {
-        'icon': 'assets/images/new icons for manager/analytics_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/Business Growth_Development_White Badge_Red.png',
         'label': 'Analytics',
       },
       {
-        'icon': 'assets/images/new icons for manager/user_management_tab.png',
+        'icon':
+            'assets/images/Creator_Dashboard/HR_Team Management_White Badge_Red.png',
         'label': 'User Management',
       },
     ];
@@ -2604,15 +2693,13 @@ class _DashboardPageState extends State<DashboardPage>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
+                SizedBox(
                   width: 80,
                   height: 80,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFC10D00).withOpacity(0.12),
-                    shape: BoxShape.circle,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Image.asset(iconAsset, fit: BoxFit.contain),
                   ),
-                  padding: const EdgeInsets.all(14),
-                  child: Image.asset(iconAsset, fit: BoxFit.contain),
                 ),
                 const SizedBox(height: 10),
                 Text(
@@ -2871,7 +2958,7 @@ class _DashboardPageState extends State<DashboardPage>
                   _buildDashboardSection(
                     chrome: chrome,
                     iconAsset:
-                        'assets/images/new icons for manager/proposals.png',
+                        'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Blue.png',
                     iconOnWhiteCircle: true,
                     title: 'Recent Proposals',
                     subtitle: 'Latest proposals created or recently updated.',
@@ -2883,7 +2970,7 @@ class _DashboardPageState extends State<DashboardPage>
                   _buildDashboardSection(
                     chrome: chrome,
                     iconAsset:
-                        'assets/images/new icons for manager/available_tools.png',
+                        'assets/images/Creator_Dashboard/Group 418.png',
                     title: 'Available Tools',
                     subtitle:
                         'Additional description can be included if required.',
@@ -2901,7 +2988,7 @@ class _DashboardPageState extends State<DashboardPage>
                   _buildDashboardSection(
                     chrome: chrome,
                     iconAsset:
-                        'assets/images/new icons for manager/proposal_workflow.png',
+                        'assets/images/Creator_Dashboard/Task Management_White Badge_Red.png',
                     title: 'Proposal Workflow',
                     subtitle: 'Monitor proposal progress across all stages.',
                     child: _buildWorkflow(context, chrome),

@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:flutter/material.dart';
 import '../../config/app_constants.dart';
 
 class CinematicSequencePage extends StatefulWidget {
@@ -9,202 +9,183 @@ class CinematicSequencePage extends StatefulWidget {
   State<CinematicSequencePage> createState() => _CinematicSequencePageState();
 }
 
-class _CinematicSequencePageState extends State<CinematicSequencePage>
-    with TickerProviderStateMixin {
-  late final AnimationController _textController;
-  late final AnimationController _underlineController;
-  late final AnimationController _ctaController;
-  late final AnimationController _parallaxController;
-  late final AnimationController _frameController;
+class _CinematicSequencePageState extends State<CinematicSequencePage> {
+  bool _isLightMode = false;
 
-  // Background images for cinematic sequence (using Background-Dark.png)
-  final List<String> _backgroundImages = [
-    'assets/images/Background-Dark..png',
-  ];
-
-  int _currentFrameIndex = 0;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Frame transition controller (smooth cycling)
-    _frameController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000), // 2s per frame
-    );
-
-    // Text fade-in + scale animation
-    _textController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-
-    // Underline drawing animation
-    _underlineController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    );
-
-    // CTA button animation
-    _ctaController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
-
-    // Parallax floating shapes
-    _parallaxController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat();
-
-    // Precache all frames after first frame so that
-    // MediaQuery and other inherited widgets are available.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _precacheFrames();
-    });
-
-    // Start animation sequence
-    _startAnimationSequence();
-    _cycleBackgrounds();
-  }
-
-  Future<void> _precacheFrames() async {
-    for (final imagePath in _backgroundImages) {
-      await precacheImage(AssetImage(imagePath), context);
-    }
-  }
-
-  void _cycleBackgrounds() {
-    _frameController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        setState(() {
-          _currentFrameIndex =
-              (_currentFrameIndex + 1) % _backgroundImages.length;
-        });
-        _frameController.reset();
-        _frameController.forward();
-      }
-    });
-    _frameController.forward();
-  }
-
-  void _startAnimationSequence() async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    _textController.forward();
-
-    await Future.delayed(const Duration(milliseconds: 600));
-    _underlineController.forward();
-
-    await Future.delayed(const Duration(milliseconds: 800));
-    _ctaController.forward();
-  }
-
-  @override
-  void dispose() {
-    _frameController.dispose();
-    _textController.dispose();
-    _underlineController.dispose();
-    _ctaController.dispose();
-    _parallaxController.dispose();
-    super.dispose();
-  }
+  static const Color _white = Color(0xFFFFFFFF);
+  static const Color _lightText = Color(0xFF090812);
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final isMobile =
-        size.width < 1200; // Increased breakpoint for better desktop support
+    final bool isMobile = size.width < 900;
+    final double heroFrameWidth =
+        isMobile ? math.min(size.width - 40, 609.02) : 609.02;
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       body: Stack(
         children: [
-          // Background image with dark overlay
           Positioned.fill(
-            child: ColorFiltered(
-              colorFilter: ColorFilter.mode(
-                Colors.black.withValues(alpha: 0.4),
-                BlendMode.darken,
-              ),
-              child: _buildBackgroundLayers(),
-            ),
-          ),
-          // Main content with fixed header
-          Positioned.fill(
-            child: Column(
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                // FIXED HEADER SECTION (never scrolls)
-                const SizedBox(height: 48), // Top safe area/padding
-                Center(
-                  child: Image.asset(
-                    // LOGO - Fixed position
-                    'assets/images/2026.png',
-                    height: 160, // Fixed height
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Text(
-                        '✕ Khonology',
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 80,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      );
-                    },
-                  ),
+                Image.asset(
+                  _isLightMode
+                      ? 'assets/images/light_mode_bg.png'
+                      : 'assets/images/client_dashboard_bg.png',
+                  fit: BoxFit.cover,
                 ),
-                Expanded(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: size.height - (isMobile ? 80 : 120),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Animated headline
-                        _buildAnimatedHeadline(isMobile),
-
-                        SizedBox(height: isMobile ? 24 : 40),
-
-                        // Subheading
-                        _buildSubheading(isMobile),
-
-                        SizedBox(height: isMobile ? 40 : 56),
-
-                        // CTA buttons
-                        _buildCTAButtons(isMobile),
-                      ],
-                    ),
-                  ),
+                Container(
+                  color: _isLightMode
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.48),
                 ),
               ],
             ),
           ),
-
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: IgnorePointer(
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFF333333), width: 1),
+          SafeArea(
+            child: Center(
+              child: Transform.translate(
+                offset: Offset(0, isMobile ? -14 : -30),
+                child: SingleChildScrollView(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                  child: SizedBox(
+                    width: heroFrameWidth,
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          width: heroFrameWidth,
+                          height: isMobile ? 80 : 102,
+                          child: Image.asset(
+                            'assets/images/2026.png',
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                            errorBuilder: (_, __, ___) => Text(
+                              'KHONOLOGY',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: _isLightMode ? _lightText : _white,
+                                fontFamily: 'Poppins',
+                                fontSize: 38,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 0),
+                        _HeroPanel(
+                          isMobile: isMobile,
+                          isLightMode: _isLightMode,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                child: Text(
-                  AppConstants.fullVersion,
-                  style: const TextStyle(
-                    color: Color(0xFF9CA3AF),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 46,
+            child: Center(
+              child: Transform.translate(
+                // Red and white disc assets have slightly different internal padding.
+                // Nudge light-mode discs so both modes align visually.
+                offset: Offset(0, _isLightMode ? 6 : 0),
+                child: Opacity(
+                  opacity: _isLightMode ? 0.8 : 1.0,
+                  child: SizedBox(
+                    width: 127.85,
+                    height: 127.85,
+                    child: Transform.rotate(
+                      angle: -180 * (math.pi / 180),
+                      child: Image.asset(
+                        _isLightMode
+                            ? 'assets/images/Red_Discs.png'
+                            : 'assets/images/white_khono_loading.png',
+                        width: 127.85,
+                        height: 127.85,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            bottom: 16,
+            child: IgnorePointer(
+              child: SizedBox(
+                width: 113,
+                height: 23,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: _isLightMode
+                        ? Colors.transparent
+                        : Colors.black.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(
+                      color: _isLightMode
+                          ? const Color(0xFF3D3F40)
+                          : const Color(0xFF3D3F40),
+                      width: 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      AppConstants.fullVersion,
+                      style: TextStyle(
+                        color: _isLightMode
+                            ? const Color(0xFF3D3F40)
+                            : const Color(0xFF9CA3AF),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: SizedBox(
+              width: 84,
+              height: 25.2,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _isLightMode = !_isLightMode;
+                  });
+                },
+                icon: Icon(_isLightMode ? Icons.dark_mode : Icons.light_mode,
+                    size: 12),
+                label: Text(_isLightMode ? 'Dark' : 'Light'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor:
+                      _isLightMode ? _lightText : const Color(0xFFFFFFFF),
+                  side: BorderSide(
+                    color: _isLightMode ? _lightText : const Color(0xFFFFFFFF),
+                    width: 1,
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  textStyle: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -214,361 +195,106 @@ class _CinematicSequencePageState extends State<CinematicSequencePage>
       ),
     );
   }
+}
 
-  Widget _buildBackgroundLayers() {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Base background image
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 1200),
-          switchInCurve: Curves.easeInOut,
-          switchOutCurve: Curves.easeInOut,
-          child: Image.asset(
-            _backgroundImages[_currentFrameIndex],
-            key: ValueKey<int>(_currentFrameIndex),
-            fit: BoxFit.fill,
-            width: double.infinity,
-            height: double.infinity,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: const Color(0xFF000000),
-                child: const Center(
-                  child: Icon(Icons.error, color: Colors.white54, size: 48),
-                ),
-              );
-            },
+class _HeroPanel extends StatelessWidget {
+  final bool isMobile;
+  final bool isLightMode;
+  const _HeroPanel({required this.isMobile, required this.isLightMode});
+
+  static const Color _white = Color(0xFFFFFFFF);
+  static const Color _lightText = Color(0xFF090812);
+  static const Color _accentRed = Color(0xFFC10D00);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 18 : 24),
+      child: Column(
+        children: [
+          Text(
+            'Proposal & SOW Builder',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isLightMode ? _lightText : _white,
+              fontFamily: 'Poppins',
+              fontSize: isMobile ? 19 : 24.59,
+              fontWeight: FontWeight.w600,
+              height: 1.0,
+            ),
           ),
-        ),
-        // Pulsing light overlay (dark to light breathing)
-        AnimatedBuilder(
-          animation: _parallaxController,
-          builder: (context, child) {
-            // Darkness ranges from 0.6 (darker) to 0.2 (lighter)
-            final darkness =
-                0.4 - (math.sin(_parallaxController.value * 2 * math.pi) * 0.2);
-            return Container(
-              color: Colors.black.withValues(alpha: darkness.clamp(0.0, 1.0)),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFloatingShapes() {
-    return AnimatedBuilder(
-      animation: _parallaxController,
-      builder: (context, child) {
-        return Stack(
-          children: [
-            // Triangle 1 - Top Left
-            Positioned(
-              left: 120 +
-                  (math.sin(_parallaxController.value * 2 * math.pi) * 40),
-              top: 180 +
-                  (math.cos(_parallaxController.value * 2 * math.pi) * 30),
-              child: Transform.rotate(
-                angle: _parallaxController.value * 2 * math.pi,
-                child: CustomPaint(
-                  painter:
-                      TrianglePainter(color: Colors.white.withOpacity(0.04)),
-                  size: const Size(70, 70),
-                ),
-              ),
+          const SizedBox(height: 8),
+          Text(
+            'Craft refined requirement into polished execution proposal.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isLightMode ? _lightText : _white.withValues(alpha: 0.95),
+              fontFamily: 'Poppins',
+              fontSize: isMobile ? 13 : 17.5,
+              fontWeight: FontWeight.w500,
+              height: 1.05,
             ),
-
-            // Triangle 2 - Top Right
-            Positioned(
-              right: 140 +
-                  (math.sin(_parallaxController.value * 2 * math.pi + 1.5) *
-                      50),
-              top: 220 +
-                  (math.cos(_parallaxController.value * 2 * math.pi + 1.5) *
-                      35),
-              child: Transform.rotate(
-                angle: -_parallaxController.value * 2 * math.pi * 0.8,
-                child: CustomPaint(
-                  painter:
-                      TrianglePainter(color: Colors.white.withOpacity(0.05)),
-                  size: const Size(90, 90),
-                ),
-              ),
-            ),
-
-            // Triangle 3 - Bottom Left
-            Positioned(
-              left: 200 +
-                  (math.sin(_parallaxController.value * 2 * math.pi + 3) * 35),
-              bottom: 150 +
-                  (math.cos(_parallaxController.value * 2 * math.pi + 3) * 25),
-              child: Transform.rotate(
-                angle: _parallaxController.value * 2 * math.pi * 0.6,
-                child: CustomPaint(
-                  painter:
-                      TrianglePainter(color: Colors.white.withOpacity(0.03)),
-                  size: const Size(60, 60),
-                ),
-              ),
-            ),
-
-            // Triangle 4 - Center Right
-            Positioned(
-              right: 180 +
-                  (math.sin(_parallaxController.value * 2 * math.pi + 4) * 45),
-              top: 400 +
-                  (math.cos(_parallaxController.value * 2 * math.pi + 4) * 40),
-              child: Transform.rotate(
-                angle: -_parallaxController.value * 2 * math.pi * 0.7,
-                child: CustomPaint(
-                  painter:
-                      TrianglePainter(color: Colors.white.withOpacity(0.04)),
-                  size: const Size(80, 80),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildAnimatedHeadline(bool isMobile) {
-    return FadeTransition(
-      opacity: _textController,
-      child: ScaleTransition(
-        scale: Tween<double>(begin: 0.95, end: 1.0).animate(
-          CurvedAnimation(parent: _textController, curve: Curves.easeOut),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildHeadlineText('BUILD.', isMobile),
-            _buildHeadlineText('AUTOMATE.', isMobile),
-            _buildHeadlineText('DELIVER.', isMobile),
-            const SizedBox(height: 16),
-            // Animated red underline
-            AnimatedBuilder(
-              animation: _underlineController,
-              builder: (context, child) {
-                return CustomPaint(
-                  painter: RedLinePainter(
-                    progress: _underlineController.value,
-                    color: const Color(0xFFD72638),
-                  ),
-                  size: Size(isMobile ? 200 : 400, 4),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeadlineText(String text, bool isMobile) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontFamily: 'Poppins',
-        color: Colors.white,
-        fontSize: isMobile ? 32 : 60, // Reduced for better 100% zoom
-        fontWeight: FontWeight.w900,
-        height: 0.95,
-        letterSpacing: -2,
-      ),
-    );
-  }
-
-  Widget _buildSubheading(bool isMobile) {
-    return FadeTransition(
-      opacity: _textController,
-      child: Text(
-        'Smart Proposal & SOW Builder for Digital Teams',
-        style: TextStyle(
-          fontFamily: 'Poppins',
-          color: Colors.white.withValues(alpha: 0.95),
-          fontSize: isMobile ? 14 : 18, // Reduced for better 100% zoom
-          fontWeight: FontWeight.w300,
-          height: 1.4,
-          letterSpacing: 0.3,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCTAButtons(bool isMobile) {
-    return FadeTransition(
-      opacity: _ctaController,
-      child: ScaleTransition(
-        scale: Tween<double>(begin: 0.95, end: 1.0).animate(
-          CurvedAnimation(parent: _ctaController, curve: Curves.easeOut),
-        ),
-        child: Wrap(
-          spacing: isMobile ? 16 : 32,
-          runSpacing: 16,
-          children: [
-            // Get Started button with gradient
-            AnimatedBuilder(
-              animation: _parallaxController,
-              builder: (context, child) {
-                final glowIntensity = 0.6 +
-                    (math.sin(_parallaxController.value * 2 * math.pi) * 0.3);
-                return Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(50),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFE9293A), // #E9293A
-                        Color(0xFF780A01), // #780A01
-                      ],
+          ),
+          SizedBox(height: isMobile ? 24 : 32.58),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              SizedBox(
+                width: 201.3,
+                height: 32.58,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pushNamed(context, '/login'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accentRed,
+                    foregroundColor: _white,
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(34.11),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color:
-                            const Color(0xFFE9293A).withOpacity(glowIntensity),
-                        blurRadius: 24,
-                        spreadRadius: 4,
-                      ),
-                    ],
-                  ),
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pushNamed(context, '/login'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 32 : 48,
-                        vertical: isMobile ? 16 : 20,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                      elevation: 0,
+                    textStyle: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      letterSpacing: 0.3,
                     ),
-                    child: Text(
-                      'GET STARTED',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize:
-                            isMobile ? 14 : 16, // Reduced for better 100% zoom
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
-                      ),
+                    elevation: 0,
+                  ),
+                  child: const Text('GET STARTED'),
+                ),
+              ),
+              SizedBox(
+                width: 201.3,
+                height: 32.58,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pushNamed(context, '/learn-more'),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: const Color(0x00C10D00),
+                    foregroundColor: isLightMode ? _lightText : _white,
+                    side: BorderSide(
+                      color: isLightMode ? _lightText : const Color(0xFFFFFFFF),
+                      width: 1.23,
+                    ),
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(34.11),
+                    ),
+                    textStyle: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                      letterSpacing: 0.4,
                     ),
                   ),
-                );
-              },
-            ),
-
-            // Learn More button with grey/silver gradient
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(50),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFFFFFFFF), // #FFFFFF
-                    Color(0xFFB0B6BB), // #B0B6BB
-                  ],
+                  child: const Text('LEARN MORE'),
                 ),
               ),
-              child: ElevatedButton(
-                onPressed: () {
-                  // TODO: Navigate to learn more page
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  foregroundColor: Colors.black,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 32 : 48,
-                    vertical: isMobile ? 16 : 20,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(50),
-                  ),
-                  elevation: 0,
-                ),
-                child: Text(
-                  'LEARN MORE',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize:
-                        isMobile ? 14 : 16, // Reduced for better 100% zoom
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
-}
-
-// Custom painter for the red underline
-class RedLinePainter extends CustomPainter {
-  final double progress;
-  final Color color;
-
-  RedLinePainter({required this.progress, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 4
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final path = Path()
-      ..moveTo(0, size.height / 2)
-      ..lineTo(size.width, size.height / 2);
-
-    final pathMetrics = path.computeMetrics().first;
-    final extractPath = pathMetrics.extractPath(
-      0,
-      pathMetrics.length * progress,
-    );
-
-    canvas.drawPath(extractPath, paint);
-  }
-
-  @override
-  bool shouldRepaint(RedLinePainter oldDelegate) {
-    return oldDelegate.progress != progress;
-  }
-}
-
-// Custom painter for triangles
-class TrianglePainter extends CustomPainter {
-  final Color color;
-
-  TrianglePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final path = Path()
-      ..moveTo(size.width / 2, 0)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(TrianglePainter oldDelegate) => false;
 }

@@ -4,12 +4,15 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
 import 'package:fl_chart/fl_chart.dart';
+import 'package:provider/provider.dart';
 import 'package:web/web.dart' as web;
 import 'dart:async';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'client_proposal_viewer.dart';
 import '../../api.dart';
 import '../../theme/premium_theme.dart';
+import '../../theme/manager_theme_controller.dart';
+import '../../widgets/app_side_nav.dart';
 
 class ClientDashboardHome extends StatefulWidget {
   final String? initialToken;
@@ -32,17 +35,23 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   static Future<void>? _globalVerificationFuture;
 
   bool _isLoading = true;
+  DateTime? _loadingStartedAt;
   String? _error;
   String? _accessToken;
   String? _clientEmail;
   String? _deviceId;
   String? _clientSessionToken;
+
+  /// Incremented when the persisted client session token changes (e.g. after OTP).
+  /// Used to ignore in-flight proposal HTTP responses that used a superseded session.
+  int _clientSessionEpoch = 0;
   bool _verificationInProgress = false;
   bool _otpDialogOpen = false;
   Future<void>? _loadProposalsFuture;
   List<Map<String, dynamic>> _proposals = [];
   Map<String, dynamic>? _selectedDocument;
   int _selectedNavIndex = 0;
+  bool _isSidebarCollapsed = false;
   bool _overviewLoading = false;
   String? _overviewError;
   Map<String, dynamic>? _overview;
@@ -53,15 +62,80 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     'rejected': 0,
     'viewed': 0,
   };
-  bool _isSidebarCollapsed = false;
-  int? _hoverSidebarIndex;
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _proposalsScrollController = ScrollController();
 
   static const List<Map<String, dynamic>> _clientNavItems = [
-    {'index': 0, 'label': 'Dashboard', 'icon': Icons.dashboard_outlined},
-    {'index': 1, 'label': 'Proposals', 'icon': Icons.description_outlined},
-    {'index': 2, 'label': 'Documents', 'icon': Icons.folder_outlined},
-    {'index': 3, 'label': 'Profile', 'icon': Icons.person_outline},
+    {
+      'index': 0,
+      'label': 'Dashboard',
+      'asset':
+          'assets/images/Creator_Dashboard/Project Launch_Start_White Badge_Blue.png'
+    },
+    {
+      'index': 1,
+      'label': 'Proposals',
+      'asset':
+          'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Blue.png'
+    },
+    {
+      'index': 2,
+      'label': 'Documents',
+      'asset': 'assets/images/client_icons/Data Approval_White Badge_Blue.png'
+    },
   ];
+
+  static const List<Map<String, String>> _clientAppSideNavItems = [
+    {
+      'label': 'Dashboard',
+      'icon':
+          'assets/images/Creator_Dashboard/Project Launch_Start_White Badge_Blue.png',
+    },
+    {
+      'label': 'Proposals',
+      'icon':
+          'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Blue.png',
+    },
+    {
+      'label': 'Documents',
+      'icon': 'assets/images/client_icons/Data Approval_White Badge_Blue.png',
+    },
+  ];
+
+  String _clientNavLabelForIndex(int index) {
+    switch (index) {
+      case 0:
+        return 'Dashboard';
+      case 1:
+        return 'Proposals';
+      case 2:
+        return 'Documents';
+      case 3:
+        return 'Account Profile';
+      default:
+        return 'Dashboard';
+    }
+  }
+
+  void _handleClientSideNavSelect(String label, {required bool closeDrawer}) {
+    if (label == 'Logout') {
+      if (closeDrawer) Navigator.of(context).pop();
+      _logoutClient();
+      return;
+    }
+
+    if (label == 'Account Profile') {
+      if (closeDrawer) Navigator.of(context).pop();
+      setState(() => _selectedNavIndex = 3);
+      return;
+    }
+
+    int idx = 0;
+    if (label == 'Dashboard') idx = 0;
+    if (label == 'Proposals') idx = 1;
+    if (label == 'Documents') idx = 2;
+    _handleNavTap(idx, closeDrawer: closeDrawer);
+  }
 
   bool _isSow(Map<String, dynamic> p) {
     final t =
@@ -71,12 +145,24 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     return t.contains('sow');
   }
 
+  Future<void> _ensureMinLoadingTime(Duration minDuration) async {
+    final startedAt = _loadingStartedAt;
+    if (startedAt == null) return;
+
+    final elapsed = DateTime.now().difference(startedAt);
+    final remaining = minDuration - elapsed;
+    if (remaining.isNegative) return;
+
+    await Future.delayed(remaining);
+  }
+
   Widget _filterChip(String label, String value) {
     final selected = _dashboardDocFilter == value;
-    const chipHeight = 18.06;
+    final chrome = context.read<ManagerThemeController>().chrome;
+    const chipHeight = 26.0;
     const chipRadius = 20.14;
     const chipBorderWidth = 1.23;
-    const chipBorderColor = Color(0xFF6A6A6A);
+    const chipBorderColor = Color(0xFFC10D00);
 
     return InkWell(
       onTap: () {
@@ -88,27 +174,37 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       child: SizedBox(
         height: chipHeight,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: selected
                 ? const Color(0xFFC10D00)
-                : Colors.white.withValues(alpha: 0.08),
+                : chrome.isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.transparent,
             borderRadius: BorderRadius.circular(chipRadius),
             border: Border.all(
-                color: selected ? const Color(0xFFC10D00) : chipBorderColor,
+                color: selected
+                    ? const Color(0xFFC10D00)
+                    : (chrome.isDark
+                        ? const Color(0xFF6A6A6A)
+                        : chipBorderColor),
                 width: chipBorderWidth),
           ),
           child: Center(
             child: Text(
               label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                height: 1,
+                color: selected
+                    ? Colors.white
+                    : (chrome.isDark
+                        ? Colors.white.withValues(alpha: 0.75)
+                        : Colors.black),
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 7.5,
-                fontWeight: FontWeight.w700,
-                height: 1.0,
-              ),
             ),
           ),
         ),
@@ -202,6 +298,20 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     Navigator.pushReplacementNamed(context, '$route$suffix');
   }
 
+  void _logoutClient() {
+    setState(() {
+      _accessToken = null;
+      _clientSessionToken = null;
+      _selectedNavIndex = 0;
+    });
+    if (kIsWeb) {
+      try {
+        web.window.localStorage.removeItem('lukens_client_session_token');
+      } catch (_) {}
+    }
+    Navigator.pushReplacementNamed(context, '/login');
+  }
+
   String _sanitizeToken(String token) {
     var t = token.trim();
     try {
@@ -247,6 +357,9 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   void _persistClientSessionToken(String token) {
     final clean = token.trim();
     if (clean.isEmpty) return;
+    if ((_clientSessionToken ?? '').trim() != clean) {
+      _clientSessionEpoch++;
+    }
     _clientSessionToken = clean;
     if (!kIsWeb) return;
     try {
@@ -351,6 +464,13 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           sessionToken.trim().isNotEmpty) {
         _persistClientSessionToken(sessionToken);
         await _loadClientProposals();
+
+        if (!mounted) return;
+        if (widget.showSummary) {
+          setState(() => _selectedNavIndex = 0);
+        } else {
+          _navigateClient('/client/dashboard');
+        }
         return;
       }
 
@@ -365,6 +485,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       }
 
       await _showOtpDialog(token: token, challengeId: challengeId);
+
+      // If verification succeeded, a session token should now be available.
+      if (!mounted) return;
+      if ((_clientSessionToken ?? '').trim().isNotEmpty) {
+        if (widget.showSummary) {
+          setState(() => _selectedNavIndex = 0);
+        } else {
+          _navigateClient('/client/dashboard');
+          return;
+        }
+      }
 
       if (!mounted) return;
       setState(() {
@@ -457,59 +588,342 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                 }
               }
 
-              return AlertDialog(
-                title: const Text('Verify your device'),
-                content: SizedBox(
-                  width: 420,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Enter the code sent to your email'),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: controller,
-                        decoration: const InputDecoration(
-                          labelText: 'OTP code',
-                          border: OutlineInputBorder(),
-                        ),
-                        enabled: !submitting,
-                        keyboardType: TextInputType.number,
-                        onSubmitted: (_) => verify(),
-                      ),
-                      if (error != null) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          error!,
-                          style: TextStyle(color: Colors.red.shade300),
-                        ),
+              final w = MediaQuery.sizeOf(context).width;
+              final h = MediaQuery.sizeOf(context).height;
+              final logoHeight = (w * 0.10).clamp(56.0, 120.0);
+              final loaderHeight = (w * 0.08).clamp(40.0, 90.0);
+              final cardWidth = (w * 0.42).clamp(320.0, 520.0);
+              final chrome = context.read<ManagerThemeController>().chrome;
+              final bgAsset = chrome.backgroundAsset;
+              final loaderAsset = chrome.isDark
+                  ? 'assets/images/White_khono_loading.png.png'
+                  : 'assets/images/Red_Discs.png';
+              final overlayGradient = chrome.isDark
+                  ? LinearGradient(
+                      colors: [
+                        Colors.black.withValues(alpha: 0.65),
+                        Colors.black.withValues(alpha: 0.35),
                       ],
-                    ],
-                  ),
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    )
+                  : LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.50),
+                        Colors.white.withValues(alpha: 0.15),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    );
+              final cardColor = chrome.isDark
+                  ? Colors.black.withValues(alpha: 0.55)
+                  : Colors.black;
+              final titleColor = Colors.white;
+              final subtitleColor = Colors.white.withValues(alpha: 0.75);
+              final otpFieldFill = chrome.isDark
+                  ? chrome.fieldFill
+                  : Colors.white.withValues(alpha: 0.10);
+              final otpFieldBorder = chrome.isDark
+                  ? chrome.fieldBorder
+                  : Colors.white.withValues(alpha: 0.35);
+
+              return Dialog(
+                insetPadding: EdgeInsets.zero,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Positioned.fill(
+                      child: Image.asset(
+                        bgAsset,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: overlayGradient,
+                      ),
+                    ),
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 14,
+                        ),
+                        child: Stack(
+                          children: [
+                            Align(
+                              alignment: Alignment.topCenter,
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 18),
+                                child: Image.asset(
+                                  'assets/images/Landingscreen.png',
+                                  height: logoHeight,
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.high,
+                                ),
+                              ),
+                            ),
+                            Center(
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: cardWidth,
+                                  maxHeight: h * 0.72,
+                                ),
+                                child: Material(
+                                  color: cardColor,
+                                  borderRadius: BorderRadius.circular(18),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(18),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Text(
+                                          'Proposal & SOW Builder',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: titleColor,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Verify your device',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: titleColor,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 14),
+                                        Text(
+                                          'Enter the code sent to your email address:',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: subtitleColor,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 14),
+                                        TextField(
+                                          controller: controller,
+                                          enabled: !submitting,
+                                          keyboardType: TextInputType.number,
+                                          onSubmitted: (_) => verify(),
+                                          style: TextStyle(
+                                            color: titleColor,
+                                          ),
+                                          decoration: InputDecoration(
+                                            hintText: 'OTP code',
+                                            hintStyle: TextStyle(
+                                              color: subtitleColor.withValues(
+                                                  alpha: 0.7),
+                                            ),
+                                            filled: true,
+                                            fillColor: otpFieldFill,
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                              borderSide: BorderSide(
+                                                  color: otpFieldBorder),
+                                            ),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 14,
+                                            ),
+                                          ),
+                                        ),
+                                        if (error != null) ...[
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            error!,
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: error ==
+                                                      'A new code has been sent.'
+                                                  ? subtitleColor
+                                                  : Colors.red.shade300,
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 18),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                onPressed: submitting
+                                                    ? null
+                                                    : () => Navigator.of(
+                                                            dialogContext,
+                                                            rootNavigator: true)
+                                                        .pop(),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.grey
+                                                      .withValues(alpha: 0.65),
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            22),
+                                                  ),
+                                                ),
+                                                child: const Text('CANCEL'),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: OutlinedButton(
+                                                onPressed:
+                                                    submitting ? null : resend,
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor: Colors.white,
+                                                  side: BorderSide(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                            alpha: 0.55),
+                                                  ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            22),
+                                                  ),
+                                                ),
+                                                child: const Text('RESEND'),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                onPressed:
+                                                    submitting ? null : verify,
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      const Color(0xFFC10D00),
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            22),
+                                                  ),
+                                                ),
+                                                child: submitting
+                                                    ? const SizedBox(
+                                                        width: 18,
+                                                        height: 18,
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          color: Colors.white,
+                                                        ),
+                                                      )
+                                                    : const Text('VERIFY'),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.bottomLeft,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.only(left: 10, bottom: 10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.35),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.18),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'ver 2026.04.BE7_SIT',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: subtitleColor,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.bottomRight,
+                              child: Padding(
+                                padding: const EdgeInsets.only(
+                                  right: 10,
+                                  bottom: 10,
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () {
+                                      final ctrl = context
+                                          .read<ManagerThemeController>();
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                        ctrl.toggle();
+                                      });
+                                      setModalState(() {});
+                                    },
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: (chrome.isDark
+                                                ? Colors.black
+                                                : Colors.white)
+                                            .withValues(alpha: 0.35),
+                                        borderRadius: BorderRadius.circular(18),
+                                        border: Border.all(
+                                          color: (chrome.isDark
+                                                  ? Colors.white
+                                                  : Colors.black)
+                                              .withValues(alpha: 0.18),
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        chrome.isDark
+                                            ? Icons.light_mode_outlined
+                                            : Icons.dark_mode_outlined,
+                                        size: 16,
+                                        color: chrome.isDark
+                                            ? Colors.white
+                                            : Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: Image.asset(
+                                  loaderAsset,
+                                  height: loaderHeight,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: submitting
-                        ? null
-                        : () =>
-                            Navigator.of(context, rootNavigator: true).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: submitting ? null : resend,
-                    child: const Text('Resend'),
-                  ),
-                  ElevatedButton(
-                    onPressed: submitting ? null : verify,
-                    child: submitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Verify'),
-                  ),
-                ],
               );
             },
           );
@@ -524,9 +938,25 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   List<Map<String, dynamic>> _filteredDocuments() {
     final idx = _selectedNavIndex;
     final docs = List<Map<String, dynamic>>.from(_proposals);
+
+    // Apply search filtering if search text is present
+    final searchText = _searchController.text.toLowerCase().trim();
+    List<Map<String, dynamic>> filteredDocs = docs;
+    if (searchText.isNotEmpty) {
+      filteredDocs = docs.where((d) {
+        final title = (d['title'] ?? '').toString().toLowerCase();
+        final client =
+            (d['client_name'] ?? d['client'] ?? '').toString().toLowerCase();
+        final id = d['id']?.toString() ?? '';
+        return title.contains(searchText) ||
+            client.contains(searchText) ||
+            id.contains(searchText);
+      }).toList();
+    }
+
     if (idx == 0) {
-      if (_dashboardDocFilter == 'all') return docs;
-      return docs.where((d) {
+      if (_dashboardDocFilter == 'all') return filteredDocs;
+      return filteredDocs.where((d) {
         final status = (d['status'] ?? '').toString().toLowerCase();
         switch (_dashboardDocFilter) {
           case 'draft':
@@ -548,12 +978,12 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       }).toList();
     }
     if (idx == 1) {
-      return docs.where(_isAwaitingSignature).toList();
+      return filteredDocs.where(_isAwaitingSignature).toList();
     }
     if (idx == 2) {
-      return docs.where(_isSignedDocument).toList();
+      return filteredDocs.where(_isSignedDocument).toList();
     }
-    return docs;
+    return filteredDocs;
   }
 
   String _documentLabel(Map<String, dynamic> doc) {
@@ -821,353 +1251,300 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   void _handleNavTap(int index, {bool closeDrawer = false}) {
+    if (closeDrawer) Navigator.of(context).pop();
+
+    // In the summary (single-page) client portal, switch tabs without route
+    // navigation to avoid reload spinners.
+    if (widget.showSummary) {
+      setState(() {
+        _selectedNavIndex = index;
+      });
+      return;
+    }
+
+    // In standalone pages (e.g. /client/proposals), navigate to the other route.
     if (index == 0) {
-      if (closeDrawer) Navigator.of(context).pop();
-      if (!widget.showSummary) {
-        _navigateClient('/client/dashboard');
-      }
+      _navigateClient('/client/dashboard');
       return;
     }
+
     if (index == 1) {
-      if (closeDrawer) Navigator.of(context).pop();
-      if (widget.showSummary) {
-        _navigateClient('/client/proposals');
-      }
+      _navigateClient('/client/proposals');
       return;
     }
+
+    if (index == 2) {
+      _navigateClient('/client/documents');
+      return;
+    }
+
     setState(() {
       _selectedNavIndex = index;
     });
-    if (closeDrawer) Navigator.of(context).pop();
   }
 
-  Widget _buildSidebar() {
-    const Color activeColor = Color(0xFFC10D00);
-    const Color sidebarBg = Color(0xFF2A2A2A);
-    const Color hoverFill = Color(0xFF3A3A3A);
-    const Color iconCircleIdle = Color(0xFF4A4A4A);
+  Widget _buildSidebar({bool inDrawer = false}) {
+    final chrome = context.watch<ManagerThemeController>().chrome;
+    final theme = Theme.of(context);
+    final isDark = chrome.isDark;
+    final unselectedColor = isDark
+        ? Colors.white
+        : theme.colorScheme.onSurface.withValues(alpha: 0.84);
+    final subItemUnselectedColor = isDark
+        ? Colors.white.withValues(alpha: 0.9)
+        : theme.colorScheme.onSurface.withValues(alpha: 0.78);
+    final welcomeTextColor = isDark
+        ? Colors.white
+        : theme.colorScheme.onSurface.withValues(alpha: 0.82);
     const Color leftAccent = Color(0xFF1565C0);
+    const Color activeColor = Color(0xFFC10D00);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: _isSidebarCollapsed ? 80 : 300,
-      decoration: BoxDecoration(
-        color: sidebarBg,
-        border: Border(
-          left: const BorderSide(color: leftAccent, width: 3),
-          right: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+    Widget buildSidebarIcon({
+      required String assetPath,
+      required double chipSize,
+      required double iconSize,
+      required bool selected,
+    }) {
+      return SizedBox(
+        width: chipSize,
+        height: chipSize,
+        child: Image.asset(
+          assetPath,
+          width: iconSize,
+          height: iconSize,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => Icon(
+            Icons.image_not_supported_outlined,
+            size: iconSize,
+            color: chrome.textPrimary,
+          ),
         ),
-      ),
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_isSidebarCollapsed)
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-                child: InkWell(
-                  onTap: () => setState(() => _isSidebarCollapsed = false),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: hoverFill,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.keyboard_arrow_right,
-                      color: Colors.white,
-                      size: 24,
+      );
+    }
+
+    Widget buildNavRow({
+      required int index,
+      required String label,
+      required String assetPath,
+      required double chipSize,
+      required double iconSize,
+      required double navVerticalPadding,
+      required double navFontSize,
+      Color? labelColor,
+      VoidCallback? onTap,
+    }) {
+      final selected = _selectedNavIndex == index;
+      final badgeCount =
+          label == 'Proposals' ? _proposalsRequiringActionCount() : 0;
+
+      return Padding(
+        padding:
+            EdgeInsets.symmetric(horizontal: 14, vertical: navVerticalPadding),
+        child: InkWell(
+          onTap: onTap ?? () => _handleNavTap(index, closeDrawer: inDrawer),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected ? activeColor : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                buildSidebarIcon(
+                  assetPath: assetPath,
+                  chipSize: chipSize,
+                  iconSize: iconSize,
+                  selected: selected,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected
+                          ? Colors.white
+                          : (labelColor ?? unselectedColor),
+                      fontSize: navFontSize,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      fontFamily: 'Poppins',
                     ),
                   ),
                 ),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 30, 16, 20),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: InkWell(
-                        onTap: () => setState(() => _isSidebarCollapsed = true),
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: hoverFill,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.keyboard_arrow_left,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
+                if (!selected && badgeCount > 0)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: chrome.isDark
+                          ? Colors.white.withValues(alpha: 0.18)
+                          : Colors.black.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
                     ),
-                    Column(
-                      children: [
-                        const SizedBox(height: 4),
-                        Image.asset(
-                          'assets/images/new icons for manager/khonology_logo.png',
-                          height: 36,
-                          fit: BoxFit.contain,
-                        ),
-                        const SizedBox(height: 20),
-                        const Text(
-                          'Welcome to',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w400,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Proposal & SOW Builder',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 22),
-                        const Divider(color: Color(0x33FFFFFF), height: 1),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Column(
-                  children: [
-                    for (final item in _clientNavItems)
-                      _buildSidebarNavItem(
-                        index: item['index'] as int,
-                        label: item['label'] as String,
-                        icon: item['icon'] as IconData,
-                        isCollapsed: _isSidebarCollapsed,
-                        activeColor: activeColor,
-                        hoverFill: hoverFill,
-                        iconCircleIdle: iconCircleIdle,
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            if (!_isSidebarCollapsed)
-              Container(
-                margin:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                height: 1,
-                color: Colors.white.withValues(alpha: 0.14),
-              ),
-            Padding(
-              padding: EdgeInsets.only(
-                left: _isSidebarCollapsed ? 6 : 16,
-                right: _isSidebarCollapsed ? 6 : 16,
-                bottom: 18,
-              ),
-              child: _isSidebarCollapsed
-                  ? Tooltip(
-                      message: _clientEmail ?? '',
-                      child: const Icon(
-                        Icons.alternate_email_rounded,
-                        color: Colors.white70,
-                        size: 18,
-                      ),
-                    )
-                  : Text(
-                      _clientEmail ?? '',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    child: Text(
+                      badgeCount > 99 ? '99+' : badgeCount.toString(),
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontSize: 12,
+                        color: chrome.textPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
+                  ),
+              ],
             ),
-          ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: 285,
+      decoration: BoxDecoration(
+        color: chrome.sidebarBackground,
+        border: Border(
+          left: const BorderSide(color: leftAccent, width: 3),
+          right: BorderSide(color: chrome.sidebarRightBorder, width: 1),
         ),
       ),
-    );
-  }
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxHeight < 760;
+            final isVeryCompact = constraints.maxHeight < 660;
+            final isUltraCompact = constraints.maxHeight < 580;
 
-  Widget _buildSidebarNavItem({
-    required int index,
-    required String label,
-    required IconData icon,
-    required bool isCollapsed,
-    required Color activeColor,
-    required Color hoverFill,
-    required Color iconCircleIdle,
-  }) {
-    final bool selected = _selectedNavIndex == index;
-    final bool isHovering = _hoverSidebarIndex == index;
-    final int badgeCount =
-        label == 'Proposals' ? _proposalsRequiringActionCount() : 0;
+            final double sidebarChipSize = isUltraCompact
+                ? 38
+                : (isVeryCompact ? 42 : (isCompact ? 44.87 : 46));
+            final double sidebarIconSize = isUltraCompact
+                ? 38
+                : (isVeryCompact ? 42 : (isCompact ? 44.87 : 46));
+            final double navVerticalPadding =
+                isUltraCompact ? 1.5 : (isVeryCompact ? 2 : 3);
+            final double navFontSize =
+                isUltraCompact ? 11.0 : (isVeryCompact ? 12.0 : 13.0);
+            final double sectionGap =
+                isUltraCompact ? 2 : (isVeryCompact ? 4 : 6);
+            final double bottomGap =
+                isUltraCompact ? 6 : (isVeryCompact ? 8 : 10);
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hoverSidebarIndex = index),
-      onExit: (_) => setState(() => _hoverSidebarIndex = null),
-      child: Padding(
-        padding: isCollapsed
-            ? const EdgeInsets.symmetric(vertical: 5)
-            : const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        child: Tooltip(
-          message: isCollapsed ? label : '',
-          child: InkWell(
-            onTap: () => _handleNavTap(index),
-            borderRadius: BorderRadius.circular(10),
-            child: isCollapsed
-                ? Center(
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? activeColor
-                            : isHovering
-                                ? hoverFill
-                                : iconCircleIdle,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, color: Colors.white, size: 24),
-                    ),
-                  )
-                : Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? activeColor
-                          : isHovering
-                              ? hoverFill
-                              : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
+            return Column(
+              children: [
+                SizedBox(height: isUltraCompact ? 4 : 8),
+                Image.asset(
+                  'assets/icons/khono.png',
+                  width: isUltraCompact ? 150 : (isVeryCompact ? 190 : 228),
+                  height: isUltraCompact ? 28 : (isVeryCompact ? 35 : 44),
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/images/new icons for manager/khonology_logo.png',
+                    width: isUltraCompact ? 150 : (isVeryCompact ? 190 : 228),
+                    height: isUltraCompact ? 28 : (isVeryCompact ? 35 : 44),
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                SizedBox(height: isUltraCompact ? 4 : 6),
+                Text(
+                  'Welcome to',
+                  style: TextStyle(
+                    color: welcomeTextColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize:
+                        isUltraCompact ? 11.0 : (isVeryCompact ? 12.0 : 12.5),
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Proposal & SOW Builder',
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: welcomeTextColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize:
+                        isUltraCompact ? 11.0 : (isVeryCompact ? 12.0 : 12.5),
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                SizedBox(height: sectionGap),
+                Divider(color: chrome.divider, height: 1),
+                SizedBox(height: sectionGap),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
                       children: [
-                        Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? Colors.white.withValues(alpha: 0.22)
-                                : iconCircleIdle,
-                            shape: BoxShape.circle,
+                        for (final item in _clientNavItems)
+                          buildNavRow(
+                            index: item['index'] as int,
+                            label: item['label'] as String,
+                            assetPath: item['asset'] as String,
+                            chipSize: sidebarChipSize,
+                            iconSize: sidebarIconSize,
+                            navVerticalPadding: navVerticalPadding,
+                            navFontSize: navFontSize,
                           ),
-                          child: Icon(icon, color: Colors.white, size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            label,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight:
-                                  selected ? FontWeight.w600 : FontWeight.w500,
-                              height: 1.2,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: bottomGap),
+                Divider(color: chrome.divider, height: 1),
+                buildNavRow(
+                  index: 3,
+                  label: 'Account Profile',
+                  assetPath: 'assets/images/User_Profile.png',
+                  chipSize: sidebarChipSize,
+                  iconSize: sidebarIconSize,
+                  navVerticalPadding: navVerticalPadding,
+                  navFontSize: navFontSize,
+                  labelColor: subItemUnselectedColor,
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 14, vertical: navVerticalPadding),
+                  child: InkWell(
+                    onTap: _logoutClient,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          buildSidebarIcon(
+                            assetPath: 'assets/images/Logout_KhonoBuzz.png',
+                            chipSize: sidebarChipSize,
+                            iconSize: sidebarIconSize,
+                            selected: false,
                           ),
-                        ),
-                        if (badgeCount > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
+                          const SizedBox(width: 12),
+                          Expanded(
                             child: Text(
-                              badgeCount > 99 ? '99+' : badgeCount.toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
+                              'Logout',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: subItemUnselectedColor,
+                                fontSize: navFontSize,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Poppins',
                               ),
                             ),
                           ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSidebarDrawer() {
-    return Drawer(
-      backgroundColor: const Color(0xFF2A2A2A),
-      child: SafeArea(
-        child: Builder(
-          builder: (context) {
-            return Container(
-              color: const Color(0xFF2A2A2A),
-              child: SingleChildScrollView(
-                  child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 14),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 8, 10),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Client Portal',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.close, color: Colors.white70),
-                          tooltip: 'Close',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildDrawerNavItem(
-                      context, 0, Icons.dashboard_outlined, 'Dashboard'),
-                  _buildDrawerNavItem(
-                      context, 1, Icons.description_outlined, 'Proposals'),
-                  _buildDrawerNavItem(
-                      context, 2, Icons.folder_outlined, 'Documents'),
-                  _buildDrawerNavItem(
-                      context, 3, Icons.person_outline, 'Profile'),
-                  const Spacer(),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-                    child: Text(
-                      _clientEmail ?? '',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 12),
-                    ),
-                  ),
-                ],
-              )),
+                ),
+                SizedBox(height: bottomGap),
+              ],
             );
           },
         ),
@@ -1175,85 +1552,32 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     );
   }
 
-  Widget _buildDrawerNavItem(
-      BuildContext context, int index, IconData icon, String label,
-      {VoidCallback? onTap, double itemHeight = 37.77, double? itemWidth}) {
-    final selected = _selectedNavIndex == index;
-    final badgeCount =
-        label == 'Proposals' ? _proposalsRequiringActionCount() : 0;
-    return InkWell(
-      onTap: () {
-        _handleNavTap(index, closeDrawer: true);
-        onTap?.call();
-      },
-      child: Container(
-        width: itemWidth,
-        height: itemHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: selected
-              ? Colors.white.withValues(alpha: 0.12)
-              : Colors.transparent,
-          border: selected
-              ? Border(
-                  left: BorderSide(color: PremiumTheme.primaryRed, width: 3),
-                )
-              : null,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 26,
-              height: 26,
-              decoration: const BoxDecoration(
-                color: Color(0xFFE5E7EB),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: const Color(0xFF1F2937), size: 14),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: selected ? Colors.white : Colors.white70,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                ),
-              ),
-            ),
-            if (badgeCount > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: PremiumTheme.primaryRed,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  badgeCount > 99 ? '99+' : badgeCount.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-          ],
+  Widget _buildSidebarDrawer() {
+    final chrome = context.read<ManagerThemeController>().chrome;
+    return Drawer(
+      backgroundColor: chrome.sidebarBackground,
+      child: SafeArea(
+        child: AppSideNav(
+          isCollapsed: _isSidebarCollapsed,
+          currentLabel: _clientNavLabelForIndex(_selectedNavIndex),
+          onSelect: (label) =>
+              _handleClientSideNavSelect(label, closeDrawer: true),
+          onToggle: () =>
+              setState(() => _isSidebarCollapsed = !_isSidebarCollapsed),
+          isAdmin: false,
+          items: _clientAppSideNavItems,
+          collapsedWidthOverride: 76,
+          expandedWidthOverride: 220,
         ),
       ),
     );
   }
 
   Widget _buildTopHeader({required bool useDrawer}) {
+    final chrome = context.read<ManagerThemeController>().chrome;
+    final isDocumentsTab = _selectedNavIndex == 2;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0B1220).withValues(alpha: 0.55),
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-      ),
       child: Row(
         children: [
           if (useDrawer)
@@ -1262,36 +1586,50 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                 final scaffold = Scaffold.maybeOf(context);
                 scaffold?.openDrawer();
               },
-              icon: const Icon(Icons.menu, color: Colors.white70),
+              icon: Icon(Icons.menu, color: chrome.textSecondary),
               tooltip: 'Menu',
             ),
           if (useDrawer) const SizedBox(width: 6),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                const Text(
-                  'Client Portal',
+                Text(
+                  isDocumentsTab
+                      ? 'Client Portal Signed Documents'
+                      : 'Client Portal',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: chrome.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(width: 8),
                 Text(
-                  'Welcome back, ${_clientEmail ?? 'Client'}',
+                  'Hello, ${_getClientDisplayName()}',
                   style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontSize: 12),
+                    color: chrome.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_none, color: Colors.white70),
-            tooltip: 'Notifications',
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHeaderIconButton(
+                assetPath: 'assets/images/new icons for manager/messages.png',
+                onTap: () {},
+              ),
+              const SizedBox(width: 8),
+              _buildHeaderIconButton(
+                assetPath:
+                    'assets/images/new icons for manager/notifications.png',
+                onTap: () {},
+                badge: 2,
+              ),
+            ],
           ),
         ],
       ),
@@ -1299,38 +1637,36 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildSummaryTiles() {
+    final chrome = context.read<ManagerThemeController>().chrome;
     final allDocs = List<Map<String, dynamic>>.from(_proposals);
-    final activeCount = allDocs.where((d) {
+    final activeCount = allDocs.length;
+    final pendingSignatureCount = allDocs.where((d) {
       final s = (d['status'] ?? '').toString().toLowerCase();
       if (s.contains('signed')) return false;
       return s.contains('sent') ||
           s.contains('released') ||
-          s.contains('review');
+          s.contains('review') ||
+          s.contains('signature');
     }).length;
-    final signedSowCount = allDocs.where((d) {
-      if (!_isSow(d)) return false;
+    final signedCount = allDocs.where((d) {
       final s = (d['status'] ?? '').toString().toLowerCase();
-      return s.contains('signed');
+      return s.contains('signed') || s.contains('approved');
     }).length;
-    final pendingApprovalsCount = _statusCounts['pending'] ?? 0;
+    final pendingApprovalsCount = pendingSignatureCount;
 
-    const tileDescription =
-        'Additional description information can be included if required.';
-
-    const tileWidth = 306.62;
     const tileHeight = 102.64;
 
     Widget tile({
       required String label,
       required String value,
-      required IconData icon,
+      required String subtitle,
+      required String iconAssetPath,
     }) {
       return Container(
-        width: tileWidth,
         height: tileHeight,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.14),
+          color: chrome.floatingFill,
           borderRadius: BorderRadius.circular(5.32),
           boxShadow: [
             BoxShadow(
@@ -1356,19 +1692,19 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                         label,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: chrome.textPrimary,
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        tileDescription,
+                        subtitle,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.55),
+                          color: chrome.textSecondary,
                           fontSize: 10,
                           height: 1.25,
                           fontWeight: FontWeight.w400,
@@ -1378,8 +1714,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   ),
                   Text(
                     value,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: chrome.textPrimary,
                       fontSize: 28,
                       height: 1.0,
                       fontWeight: FontWeight.w800,
@@ -1389,21 +1725,13 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               ),
             ),
             const SizedBox(width: 12),
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    offset: const Offset(0, 1),
-                    blurRadius: 2,
-                  ),
-                ],
+            SizedBox(
+              width: 68,
+              height: 68,
+              child: Image.asset(
+                iconAssetPath,
+                fit: BoxFit.contain,
               ),
-              child: Icon(icon, color: PremiumTheme.primaryRed, size: 22),
             ),
           ],
         ),
@@ -1414,33 +1742,53 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       tile(
         label: 'Active Proposals',
         value: activeCount.toString(),
-        icon: Icons.adjust,
+        subtitle: 'All proposals',
+        iconAssetPath:
+            'assets/images/client_icons/Goal_Target_White Badge_Red.png',
       ),
       tile(
-        label: "Signed SOW'S",
-        value: signedSowCount.toString(),
-        icon: Icons.check,
+        label: 'Signed',
+        value: signedCount.toString(),
+        subtitle: 'Signature provided',
+        iconAssetPath: 'assets/images/Admin_new_icons/Client_Approved.png',
       ),
       tile(
         label: 'Pending Approvals',
         value: pendingApprovalsCount.toString(),
-        icon: Icons.remove_red_eye_outlined,
+        subtitle: 'Awaiting review',
+        iconAssetPath: 'assets/images/Admin_new_icons/Pending_CEO_Approval.png',
       ),
     ];
 
-    // Figma: three blocks side-by-side, 306.62 × 102.64 each; scroll horizontally if needed.
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          children[0],
-          const SizedBox(width: 12),
-          children[1],
-          const SizedBox(width: 12),
-          children[2],
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 840;
+        if (wide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: children[0]),
+              const SizedBox(width: 12),
+              Expanded(child: children[1]),
+              const SizedBox(width: 12),
+              Expanded(child: children[2]),
+            ],
+          );
+        }
+
+        final maxWidth = constraints.maxWidth;
+        final tileWidth = maxWidth >= 560 ? (maxWidth - 12) / 2 : maxWidth;
+
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            SizedBox(width: tileWidth, child: children[0]),
+            SizedBox(width: tileWidth, child: children[1]),
+            SizedBox(width: tileWidth, child: children[2]),
+          ],
+        );
+      },
     );
   }
 
@@ -1470,28 +1818,106 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     );
   }
 
-  Widget _buildRecentDocuments() {
+  Widget _buildRecentDocuments({double? width, double? height}) {
+    final chrome = context.read<ManagerThemeController>().chrome;
     final docs = _filteredDocuments();
     final isDocumentsTab = _selectedNavIndex == 2;
     final isProposalsTab = _selectedNavIndex == 1;
+    const managerBadgeAsset =
+        'assets/images/Project Management_Red Badge_White.png';
+    const recentDocumentsIconAsset =
+        'assets/images/Admin_new_icons/Recent_Proposals.png';
+    const notificationBellAsset =
+        'assets/images/new icons for manager/notifications.png';
     final listTitle = isDocumentsTab
-        ? 'Signed Documents'
+        ? 'Client Portal Signed Documents'
         : isProposalsTab
             ? 'Awaiting Signature'
             : 'Recent Documents';
-    const recentDocsWidth = 466.59;
-    const recentDocsHeight = 308.28;
+    const recentDocsWidth = 580.0;
+    const recentDocsHeight = 370.0;
+    final panelWidth = width ?? recentDocsWidth;
+    final panelHeight = height ?? recentDocsHeight;
+
+    Widget _buildBellCountBadge(int count) {
+      const size = 44.0;
+      const badgeBg = Color(0xFFC10D00);
+      return SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: ClipOval(
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: Image.asset(
+                    notificationBellAsset,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+            if (count > 0)
+              Positioned(
+                right: -4,
+                top: -4,
+                child: Container(
+                  constraints:
+                      const BoxConstraints(minWidth: 20, minHeight: 20),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: badgeBg,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: chrome.isDark ? Colors.white : Colors.white,
+                        width: 2),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    count > 99 ? '99+' : '$count',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
 
     return Align(
       alignment: Alignment.topLeft,
       child: SizedBox(
-        width: recentDocsWidth,
-        height: recentDocsHeight,
+        width: panelWidth,
+        height: panelHeight,
         child: Container(
           clipBehavior: Clip.antiAlias,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.14),
+            color: chrome.floatingFill,
             borderRadius: BorderRadius.circular(5.32),
             boxShadow: [
               BoxShadow(
@@ -1507,31 +1933,26 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
             children: [
               Row(
                 children: [
+                  SizedBox(
+                    width: 62,
+                    height: 62,
+                    child: Image.asset(
+                      recentDocumentsIconAsset,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       listTitle,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: chrome.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                  if (_selectedNavIndex == 0)
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _dashboardDocFilter = 'all';
-                        });
-                      },
-                      child: const Text('View All'),
-                    ),
-                  Text(
-                    '${docs.length}',
-                    style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.70),
-                        fontSize: 12),
-                  ),
+                  _buildBellCountBadge(docs.length),
                 ],
               ),
               const SizedBox(height: 12),
@@ -1540,8 +1961,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _filterChip('View All', 'all'),
-                      const SizedBox(width: 10),
                       _filterChip('Released', 'released'),
                       const SizedBox(width: 10),
                       _filterChip('Signed', 'signed'),
@@ -1558,205 +1977,229 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                       : isProposalsTab
                           ? 'No proposals are currently awaiting signature.'
                           : 'No documents available for this link.',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.70)),
+                  style: TextStyle(color: chrome.textSecondary),
                 )
               else
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: docs.length > 6 ? 6 : docs.length,
-                  separatorBuilder: (_, __) => Divider(
-                    height: 14,
-                    color: Colors.white.withValues(alpha: 0.08),
-                  ),
-                  itemBuilder: (context, index) {
-                    final doc = docs[index];
-                    final selected = _selectedDocument?['id']?.toString() ==
-                        doc['id']?.toString();
-                    final status = (doc['status'] ?? '').toString();
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: docs.length > 6 ? 6 : docs.length,
+                    separatorBuilder: (_, __) => Divider(
+                      height: 14,
+                      color: chrome.divider,
+                    ),
+                    itemBuilder: (context, index) {
+                      final doc = docs[index];
+                      final status = (doc['status'] ?? '').toString();
 
-                    Widget _statusChip(String rawStatus) {
-                      final normalizedLabel = _normalizeStatus(rawStatus);
-                      final lower = normalizedLabel.toLowerCase().trim();
-                      Color bg = Colors.white.withValues(alpha: 0.10);
-                      Color fg = Colors.white;
-                      String label = normalizedLabel.isEmpty
-                          ? (rawStatus.isEmpty ? 'Unknown' : rawStatus)
-                          : normalizedLabel;
-                      double chipWidth = 87.89;
+                      Widget _statusChip(String rawStatus) {
+                        final normalizedLabel = _normalizeStatus(rawStatus);
+                        final lower = normalizedLabel.toLowerCase().trim();
+                        Color bg = chrome.isDark
+                            ? Colors.white.withValues(alpha: 0.10)
+                            : Colors.black.withValues(alpha: 0.10);
+                        Color fg = chrome.textPrimary;
+                        String label = normalizedLabel.isEmpty
+                            ? (rawStatus.isEmpty ? 'Unknown' : rawStatus)
+                            : normalizedLabel;
+                        double chipWidth = 87.89;
 
-                      if (lower.contains('signed')) {
-                        bg = const Color(0xFF6CA510);
-                        fg = Colors.white;
-                        chipWidth = 87.89;
-                      } else if (lower.contains('pending') ||
-                          lower.contains('released') ||
-                          lower.contains('sent for signature') ||
-                          lower.contains('in review')) {
-                        bg = const Color(0xFFEA990C);
-                        fg = Colors.white;
-                        chipWidth = 88.51;
-                        if (lower.contains('pending')) {
-                          label = 'Request Sent';
+                        if (lower.contains('signed')) {
+                          bg = const Color(0xFF6CA510);
+                          fg = Colors.white;
+                          chipWidth = 87.89;
+                        } else if (lower.contains('pending') ||
+                            lower.contains('released') ||
+                            lower.contains('sent for signature') ||
+                            lower.contains('in review')) {
+                          bg = const Color(0xFFEA990C);
+                          fg = Colors.white;
+                          chipWidth = 88.51;
+                          if (lower.contains('pending')) {
+                            label = 'Request Sent';
+                          }
+                        } else if (lower.contains('rejected') ||
+                            lower.contains('declined')) {
+                          bg = const Color(0xFFE74C3C);
+                          fg = Colors.white;
+                          chipWidth = 88.51;
                         }
-                      } else if (lower.contains('rejected') ||
-                          lower.contains('declined')) {
-                        bg = const Color(0xFFE74C3C);
-                        fg = Colors.white;
-                        chipWidth = 88.51;
+
+                        return SizedBox(
+                          width: chipWidth,
+                          height: 23.36,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: bg,
+                              borderRadius: BorderRadius.circular(26.06),
+                            ),
+                            child: Center(
+                              child: Text(
+                                label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: fg,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
                       }
 
-                      return SizedBox(
-                        width: chipWidth,
-                        height: 23.36,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                              color: bg,
-                              borderRadius: BorderRadius.circular(26.06)),
-                          child: Center(
-                            child: Text(
-                              label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                      final Widget _draftChip = _statusChip('Draft');
+
+                      Widget _viewChip(VoidCallback onPressed) {
+                        return SizedBox(
+                          width: 48.56,
+                          height: 23.36,
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                              backgroundColor: const Color(0xFF7F7F7F),
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(48.56, 23.36),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(26.06),
+                              ),
+                            ),
+                            onPressed: onPressed,
+                            child: const Text(
+                              'VIEW',
                               style: TextStyle(
-                                color: fg,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
                                 height: 1.0,
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }
+                        );
+                      }
 
-                    Widget _viewChip(VoidCallback onPressed) {
-                      return SizedBox(
-                        width: 48.56,
-                        height: 23.36,
-                        child: TextButton(
-                          style: TextButton.styleFrom(
-                            backgroundColor: const Color(0xFF7F7F7F),
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(48.56, 23.36),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(26.06),
+                      Widget _documentLeadingBadge() {
+                        return SizedBox(
+                          width: 33,
+                          height: 33,
+                          child: Image.asset(
+                            isProposalsTab
+                                ? recentDocumentsIconAsset
+                                : managerBadgeAsset,
+                            width: 33,
+                            height: 33,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Icon(
+                              Icons.check_box_outline_blank,
+                              color: chrome.textSecondary,
+                              size: 18,
                             ),
                           ),
-                          onPressed: onPressed,
-                          child: const Text(
-                            'VIEW',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              height: 1.0,
-                            ),
-                          ),
-                        ),
-                      );
-                    }
+                        );
+                      }
 
-                    return InkWell(
-                      onTap: () {
-                        setState(() {
-                          _selectedDocument = doc;
-                        });
-                      },
-                      child: Row(
-                        children: [
-                          Icon(
-                            selected
-                                ? Icons.check_box
-                                : Icons.check_box_outline_blank,
-                            color: selected
-                                ? Colors.lightBlueAccent
-                                : Colors.white70,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Builder(
-                              builder: (context) {
-                                final lead =
-                                    '${_documentLabel(doc)} #${doc['id']}';
-                                final rawTitle =
-                                    (doc['title'] ?? 'Untitled').toString();
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedDocument = doc;
+                          });
+                        },
+                        child: Row(
+                          children: [
+                            _documentLeadingBadge(),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Builder(
+                                builder: (context) {
+                                  final lead =
+                                      '${_documentLabel(doc)} #${doc['id']}';
+                                  final rawTitle =
+                                      (doc['title'] ?? 'Untitled').toString();
 
-                                // Figma text treatment: lead is bold small-caps, project part is italic.
-                                return SizedBox(
-                                  height: 18.44,
-                                  child: RichText(
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    text: TextSpan(
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontFamily: 'Poppins',
-                                        fontSize: 9.22,
-                                        height: 1.0174,
-                                        letterSpacing: 0.0922,
+                                  // Figma text treatment: lead is bold small-caps, project part is italic.
+                                  return SizedBox(
+                                    height: 22,
+                                    child: RichText(
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      text: TextSpan(
+                                        style: TextStyle(
+                                          color: chrome.textPrimary,
+                                          fontFamily: 'Poppins',
+                                          fontSize: 11.5,
+                                          height: 1.05,
+                                          letterSpacing: 0.11,
+                                        ),
+                                        children: [
+                                          TextSpan(
+                                            text: '$lead ',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontFeatures: [
+                                                ui.FontFeature.enable('smcp')
+                                              ],
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text: '- $rawTitle',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                              fontStyle: FontStyle.italic,
+                                              fontFeatures: [
+                                                ui.FontFeature.enable('smcp')
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      children: [
-                                        TextSpan(
-                                          text: '$lead ',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontFeatures: [
-                                              ui.FontFeature.enable('smcp')
-                                            ],
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: '- $rawTitle',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            fontStyle: FontStyle.italic,
-                                            fontFeatures: [
-                                              ui.FontFeature.enable('smcp')
-                                            ],
-                                          ),
-                                        ),
-                                      ],
                                     ),
+                                  );
+                                },
+                              ),
+                            ),
+                            if (isDocumentsTab)
+                              TextButton(
+                                onPressed: () => _downloadPdfForDocument(doc),
+                                style: TextButton.styleFrom(
+                                  backgroundColor: const Color(0xFFC10D00),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
                                   ),
-                                );
-                              },
-                            ),
-                          ),
-                          if (isDocumentsTab)
-                            TextButton(
-                              onPressed: () => _downloadPdfForDocument(doc),
-                              child: const Text('Download'),
-                            )
-                          else if (isProposalsTab)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _statusChip(status),
-                                const SizedBox(width: 7.84),
-                                _viewChip(() {
-                                  setState(() {
-                                    _selectedDocument = doc;
-                                  });
-                                  _openSigningUrl(doc);
-                                }),
-                              ],
-                            )
-                          else
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _statusChip(status),
-                                const SizedBox(width: 7.84),
-                                _viewChip(() => _openProposal(doc)),
-                              ],
-                            ),
-                        ],
-                      ),
-                    );
-                  },
+                                ),
+                                child: const Text('Download'),
+                              )
+                            else if (doc['status'] == 'Draft')
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _draftChip,
+                                  const SizedBox(width: 7.84),
+                                  _viewChip(() {
+                                    setState(() {
+                                      _selectedDocument = doc;
+                                    });
+                                    _openProposal(doc);
+                                  }),
+                                ],
+                              )
+                            else
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _statusChip(status),
+                                  const SizedBox(width: 7.84),
+                                  _viewChip(() => _openProposal(doc)),
+                                ],
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ),
             ],
           ),
@@ -1766,25 +2209,21 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildRightPanel() {
+    final chrome = context.read<ManagerThemeController>().chrome;
     final doc = _selectedDocument;
-    final title = doc?['title']?.toString() ?? 'Select a document';
-    final status = doc?['status']?.toString() ?? '';
-    final hasSigning =
-        (doc?['signing_url']?.toString() ?? '').trim().isNotEmpty;
-    final statusLower = status.toLowerCase().trim();
-    final isSignedStatus =
-        statusLower.contains('client signed') || statusLower.contains('signed');
 
     Widget panelCard({
       required String title,
       required Widget child,
       double? fixedHeight,
     }) {
+      final showTitle = title.trim().isNotEmpty;
       final card = Container(
+        width: double.infinity,
         clipBehavior: Clip.antiAlias,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.14),
+          color: chrome.floatingFill,
           borderRadius: BorderRadius.circular(5.32),
           boxShadow: [
             BoxShadow(
@@ -1798,119 +2237,80 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+            if (showTitle) ...[
+              Text(
+                title,
+                style: TextStyle(
+                  color: chrome.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             child,
           ],
         ),
       );
 
       if (fixedHeight != null) {
-        return SizedBox(height: fixedHeight, child: card);
+        return SizedBox(
+            height: fixedHeight, width: double.infinity, child: card);
       }
       return card;
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (doc != null) ...[
-          panelCard(
-            title: 'View Document',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.w600),
+        panelCard(
+          title: '',
+          fixedHeight: 184,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: Image.asset(
+                  'assets/images/client_icons/HR_Team Management_White Badge_Red.png',
+                  fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  status.isEmpty ? '' : status,
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.70),
-                      fontSize: 12),
-                ),
-                if (isSignedStatus) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.check_circle,
-                          size: 16, color: Color(0xFF2ECC71)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'This document has been signed. No further action is required.',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.75),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Row(
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: isSignedStatus
-                            ? null
-                            : () {
-                                if (hasSigning) {
-                                  _openSigningUrl(doc);
-                                } else {
-                                  _showFallbackSignModal(doc);
-                                }
-                              },
-                        child: const Text('View'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: isSignedStatus
-                            ? null
-                            : () => _openProposalComments(doc),
-                        child: const Text('Request Changes'),
+                    Text(
+                      'Project Chat',
+                      style: TextStyle(
+                        color: chrome.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-        panelCard(
-          title: 'Project Chat',
-          fixedHeight: 145.17,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Open a document to view and post comments.',
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.70), fontSize: 12),
               ),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed:
-                      doc == null ? null : () => _openProposalComments(doc),
-                  icon: const Icon(Icons.forum_outlined, size: 18),
-                  label: const Text('Open Comments'),
+              ElevatedButton(
+                onPressed:
+                    doc == null ? null : () => _openProposalComments(doc),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFC10D00),
+                  disabledBackgroundColor: const Color(0xFFC10D00),
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: const Text(
+                  'OPEN COMMENTS',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -1918,22 +2318,56 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         ),
         const SizedBox(height: 12),
         panelCard(
-          title: 'Documents & Downloads',
-          fixedHeight: 145.17,
-          child: Column(
+          title: '',
+          fixedHeight: 184,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: doc == null
-                          ? null
-                          : () => _downloadPdfForDocument(doc),
-                      icon: const Icon(Icons.download_outlined, size: 18),
-                      label: const Text('Download PDF'),
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: Image.asset(
+                  'assets/images/client_icons/Download_Arrow_White Badge_Red.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Download Document',
+                      maxLines: 2,
+                      style: TextStyle(
+                        color: chrome.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        height: 1.15,
+                      ),
                     ),
+                  ],
+                ),
+              ),
+              ElevatedButton(
+                onPressed:
+                    doc == null ? null : () => _downloadPdfForDocument(doc),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFC10D00),
+                  disabledBackgroundColor: const Color(0xFFC10D00),
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ],
+                ),
+                child: const Text(
+                  'DOWNLOAD PDF',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
@@ -1943,6 +2377,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildComingSoon(String title) {
+    final chrome = context.read<ManagerThemeController>().chrome;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -1959,7 +2394,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               color: Colors.white.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.hourglass_top, color: Colors.white70),
+            child: Icon(Icons.hourglass_top, color: chrome.textSecondary),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1968,8 +2403,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: chrome.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1978,11 +2413,601 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                 Text(
                   'Coming soon. This section is part of the client portal experience but is not enabled in this build.',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.75),
+                    color: chrome.textSecondary,
                     fontSize: 12,
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProposalsHeaderBar() {
+    final chrome = context.read<ManagerThemeController>().chrome;
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Title
+          Text(
+            'Client Portal Proposals',
+            style: TextStyle(
+              color: chrome.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Greeting
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: RichText(
+              text: TextSpan(
+                text: 'Hello, ',
+                style: TextStyle(
+                  color: chrome.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                ),
+                children: [
+                  TextSpan(
+                    text: _getClientDisplayName(),
+                    style: TextStyle(
+                      color: chrome.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          // Message icon
+          _buildHeaderIconButton(
+            assetPath: 'assets/images/new icons for manager/messages.png',
+            onTap: () {},
+          ),
+          const SizedBox(width: 8),
+          // Notification bell with badge
+          _buildHeaderIconButton(
+            assetPath: 'assets/images/new icons for manager/notifications.png',
+            onTap: () {},
+            badge: 2,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderIconButton({
+    required String assetPath,
+    required VoidCallback onTap,
+    int? badge,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            width: 44.87,
+            height: 44.87,
+            child: Image.asset(assetPath, fit: BoxFit.contain),
+          ),
+        ),
+        if (badge != null && badge > 0)
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: const BoxDecoration(
+                color: Color(0xFFC10D00),
+                borderRadius: BorderRadius.all(Radius.circular(10)),
+              ),
+              child: Text(
+                badge > 99 ? '99+' : badge.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _getClientDisplayName() {
+    if (_clientEmail != null && _clientEmail!.isNotEmpty) {
+      final namePart = _clientEmail!.split('@')[0];
+      // Convert email username to title case (e.g., "john.doe" -> "John Doe")
+      final parts = namePart.split('.');
+      return parts
+          .map((p) =>
+              p.isNotEmpty ? '${p[0].toUpperCase()}${p.substring(1)}' : '')
+          .join(' ');
+    }
+    return 'Client';
+  }
+
+  Widget _buildChatSupportButton() {
+    return FloatingActionButton(
+      onPressed: () {
+        // Open chat support
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Chat support coming soon!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      },
+      backgroundColor: const Color(0xFFC10D00),
+      mini: true,
+      child: const Icon(
+        Icons.support_agent,
+        color: Colors.white,
+        size: 24,
+      ),
+    );
+  }
+
+  Widget _buildProposalsContentCard() {
+    final chrome = context.read<ManagerThemeController>().chrome;
+    final docs = _filteredDocuments();
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: chrome.floatingFill,
+        borderRadius: BorderRadius.circular(5.32),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 3.55,
+            offset: const Offset(0, 3.55),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header with handshake icon, title, subtitle, and search
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: _buildProposalsSectionHeader(),
+          ),
+          // Divider
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Divider(
+              color: chrome.divider,
+              height: 1,
+              thickness: 1,
+            ),
+          ),
+          // List
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 400),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+              child: _buildProposalsList(docs),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProposalsContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header bar with title, greeting, and notification icons
+        _buildProposalsHeaderBar(),
+        const SizedBox(height: 20),
+        // Main content card
+        _buildProposalsContentCard(),
+        const SizedBox(height: 12),
+        // Version label outside the card
+        Container(
+          width: 115,
+          height: 18,
+          decoration: BoxDecoration(
+            color: const Color(0xFF3D3D3D),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          alignment: Alignment.center,
+          child: const Text(
+            'ver 2026.04.BE7_SIT',
+            style: TextStyle(
+              fontSize: 9,
+              color: Colors.white70,
+              height: 1,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProposalsSectionHeader() {
+    final chrome = context.read<ManagerThemeController>().chrome;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Proposal icon (matching manager design)
+        Image.asset(
+          'assets/images/new icons for manager/Draft proposal.png',
+          width: 56,
+          height: 56,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Icon(
+              Icons.handshake_outlined,
+              color: chrome.textPrimary,
+              size: 32,
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        // Title and subtitle
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Proposals Awaiting Signature',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  letterSpacing: 0.2,
+                  color: chrome.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'The following proposal documents are waiting on your attention and action.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: chrome.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 18),
+        // Search bar with red magnifying glass
+        _buildSearchBar(),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar() {
+    final chrome = context.read<ManagerThemeController>().chrome;
+    return SizedBox(
+      width: 245,
+      height: 43,
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 22),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: chrome.isDark
+                      ? const Color(0xFF3D3D3D)
+                      : Colors.white.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 36, right: 12),
+                  child: Center(
+                    child: TextField(
+                      controller: _searchController,
+                      style: TextStyle(
+                        color: chrome.isDark ? Colors.white : Colors.black,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Search Proposals...',
+                        hintStyle: TextStyle(
+                          color: chrome.isDark
+                              ? const Color(0xFF9CA3AF)
+                              : Colors.black.withValues(alpha: 0.45),
+                          fontSize: 14,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
+                        isDense: true,
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Red magnifying glass icon
+          Container(
+            width: 43,
+            height: 43,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/new icons for manager/Search_Seek_Red Badge_White.png',
+                width: 43,
+                height: 43,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProposalsList(List<Map<String, dynamic>> docs) {
+    final chrome = context.read<ManagerThemeController>().chrome;
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFC10D00)),
+          ),
+        ),
+      );
+    }
+
+    if (docs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.description_outlined,
+                size: 64,
+                color: chrome.isDark
+                    ? Colors.white.withValues(alpha: 0.5)
+                    : Colors.black.withValues(alpha: 0.45)),
+            const SizedBox(height: 16),
+            Text(
+              'No proposals are currently awaiting signature.',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: chrome.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scrollbar(
+      controller: _proposalsScrollController,
+      thumbVisibility: true,
+      trackVisibility: true,
+      thickness: 6,
+      radius: const Radius.circular(3),
+      child: ListView.builder(
+        controller: _proposalsScrollController,
+        itemCount: docs.length,
+        itemBuilder: (context, index) {
+          final doc = docs[index];
+          return _buildProposalListItem(doc);
+        },
+      ),
+    );
+  }
+
+  Widget _buildProposalListItem(Map<String, dynamic> doc) {
+    final chrome = context.read<ManagerThemeController>().chrome;
+    final status = (doc['status'] ?? '').toString();
+    final title = (doc['title'] ?? 'Untitled Proposal').toString();
+    final clientName =
+        (doc['client_name'] ?? _clientEmail ?? 'Unknown Client').toString();
+    final proposalId = doc['id']?.toString() ?? '';
+
+    // Status colors and labels matching manager design
+    Color statusBgColor;
+    Color statusColor = Colors.white;
+    String statusLabel;
+
+    final lowerStatus = status.toLowerCase();
+    if (lowerStatus.contains('sent for approval') ||
+        lowerStatus.contains('approval requested')) {
+      statusBgColor = const Color(0xFF6CA510); // Green
+      statusLabel = 'Sent for Approval';
+    } else if (lowerStatus.contains('awaiting signature') ||
+        lowerStatus.contains('sent to client')) {
+      statusBgColor = const Color(0xFF6095CC); // Blue
+      statusLabel = 'Awaiting Signature';
+    } else if (lowerStatus.contains('released') ||
+        lowerStatus.contains('sent')) {
+      statusBgColor = const Color(0xFFEA990C); // Orange
+      statusLabel = 'Released';
+    } else if (lowerStatus.contains('draft')) {
+      statusBgColor = const Color(0xFF5C389D); // Purple
+      statusLabel = 'Drafted';
+    } else if (lowerStatus.contains('signed') ||
+        lowerStatus.contains('approved')) {
+      statusBgColor = const Color(0xFF6CA510); // Green
+      statusLabel = 'Signed';
+    } else if (lowerStatus.contains('declined') ||
+        lowerStatus.contains('rejected')) {
+      statusBgColor = const Color(0xFFE74C3C); // Red
+      statusLabel = 'Declined';
+    } else {
+      statusBgColor = const Color(0xFF4B5563); // Gray
+      statusLabel = status.isEmpty ? 'Unknown' : status;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Document Icon
+          Image.asset(
+            'assets/images/new icons for manager/Project Management_Red Badge_White.png',
+            width: 40,
+            height: 40,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFC10D00).withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child:
+                  const Icon(Icons.description, color: Colors.white, size: 20),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Title and Description
+          Expanded(
+            flex: 3,
+            child: RichText(
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              text: TextSpan(
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                  height: 9.38 / 11,
+                  letterSpacing: 0.11,
+                  color: chrome.textPrimary,
+                ),
+                children: [
+                  TextSpan(
+                    text: title,
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      height: 9.38 / 13,
+                      letterSpacing: 0.13,
+                      color: chrome.textPrimary,
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' - $clientName',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                      height: 9.38 / 13,
+                      letterSpacing: 0.13,
+                      color: chrome.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Last Modified
+          SizedBox(
+            width: 160,
+            child: Text(
+              'Last Modified: ${_formatDate(doc['updated_at'] ?? doc['updatedAt'])}',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w500,
+                fontSize: 10.5,
+                height: 9.38 / 10.5,
+                letterSpacing: 0.105,
+                color: chrome.textSecondary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.left,
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Status badge
+          SizedBox(
+            width: 130,
+            height: 26,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusBgColor,
+                borderRadius: BorderRadius.circular(26),
+              ),
+              child: Center(
+                child: Text(
+                  statusLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // VIEW button
+          SizedBox(
+            width: 80,
+            height: 32,
+            child: OutlinedButton(
+              onPressed: () {
+                setState(() {
+                  _selectedDocument = doc;
+                });
+                _openSigningUrl(doc);
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: const Color(0xFF4B5563),
+                side: BorderSide.none,
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: const Text(
+                'VIEW',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -1995,95 +3020,44 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Dashboard',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildTopCornerAssetIcon('assets/images/Group 391 (2).png'),
-                  const SizedBox(width: 8),
-                  _buildTopCornerAssetIcon('assets/images/Group 398 (1).png'),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _buildSummaryTiles(),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const rightPanelWidth = 466.59;
-              final stackLowerCards = constraints.maxWidth < 980;
-              if (stackLowerCards) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildRecentDocuments(),
-                    const SizedBox(height: 14),
-                    SizedBox(width: rightPanelWidth, child: _buildRightPanel()),
-                  ],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildRecentDocuments(),
-                  const SizedBox(width: 16),
-                  SizedBox(width: rightPanelWidth, child: _buildRightPanel()),
-                ],
-              );
-            },
+          _buildRecentDocuments(
+            width: double.infinity,
+            height: 380,
           ),
         ],
       );
     }
 
     if (!widget.showSummary && _selectedNavIndex == 1) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Proposals',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Review and sign documents awaiting your signature',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.70),
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _buildRecentDocuments(),
-        ],
-      );
+      return _buildProposalsContent();
     }
 
     if (_selectedNavIndex == 0 ||
         _selectedNavIndex == 1 ||
         _selectedNavIndex == 2) {
+      if (_selectedNavIndex == 2) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final maxWidth = constraints.maxWidth;
+            final targetWidth = (maxWidth).clamp(620.0, maxWidth);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildRecentDocuments(
+                  width: targetWidth,
+                  height: 420,
+                ),
+              ],
+            );
+          },
+        );
+      }
+      if (_selectedNavIndex == 1) {
+        return _buildProposalsContent();
+      }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (widget.showSummary) ...[
-            _buildSummaryTiles(),
-            const SizedBox(height: 16),
-          ],
           _buildRecentDocuments(),
         ],
       );
@@ -2095,8 +3069,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSummaryTiles(),
-        const SizedBox(height: 16),
         _buildComingSoon(titles[_selectedNavIndex] ?? 'Coming Soon'),
       ],
     );
@@ -2193,9 +3165,11 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
+      _loadingStartedAt = DateTime.now();
       _error = null;
     });
 
+    final epochAtSend = _clientSessionEpoch;
     try {
       final uri = Uri.parse('$baseUrl/api/client/proposals').replace(
         queryParameters: {
@@ -2222,6 +3196,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
       print(
           '[ClientPortal] proposals status=${response.statusCode} device_id=${_deviceId ?? ""} session_token_present=${(_clientSessionToken ?? "").isNotEmpty}');
+
+      if (!mounted) return;
+      if (epochAtSend != _clientSessionEpoch) {
+        // OTP (or another tab) rotated the session while this request was in flight.
+        if ((_clientSessionToken ?? '').trim().isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _loadClientProposals();
+          });
+        }
+        return;
+      }
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
@@ -2302,8 +3287,11 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           if (!mounted) return;
           setState(() {
             _isLoading = true;
+            _loadingStartedAt = DateTime.now();
             _error = null;
           });
+
+          await _ensureMinLoadingTime(const Duration(milliseconds: 1200));
           await _ensureDeviceVerifiedAndRetry(token: token);
 
           // Verification may have completed in another widget instance.
@@ -2361,6 +3349,15 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       }
     } catch (e) {
       if (!mounted) return;
+      // Ignore errors from superseded session fetches (e.g. OTP completed in parallel).
+      if (epochAtSend != _clientSessionEpoch) {
+        if ((_clientSessionToken ?? '').trim().isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _loadClientProposals();
+          });
+        }
+        return;
+      }
       setState(() {
         _error = e is TimeoutException
             ? 'This link timed out. Please retry or ask the sender to resend it.'
@@ -3212,48 +4209,392 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    _proposalsScrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_isLoading) {
+      final w = MediaQuery.sizeOf(context).width;
+      final logoHeight = (w * 0.10).clamp(56.0, 120.0);
+      final loaderHeight = (w * 0.08).clamp(40.0, 90.0);
+      final chrome = context.read<ManagerThemeController>().chrome;
+      final bgAsset = chrome.backgroundAsset;
+      final loaderAsset = chrome.isDark
+          ? 'assets/images/White_khono_loading.png.png'
+          : 'assets/images/Red_Discs.png';
+      final overlayGradient = chrome.isDark
+          ? LinearGradient(
+              colors: [
+                Colors.black.withValues(alpha: 0.65),
+                Colors.black.withValues(alpha: 0.35),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            )
+          : LinearGradient(
+              colors: [
+                Colors.white.withValues(alpha: 0.50),
+                Colors.white.withValues(alpha: 0.15),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            );
       return Scaffold(
         backgroundColor: Colors.transparent,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Loading your proposals...'),
-            ],
-          ),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                bgAsset,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: overlayGradient,
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
+                child: Stack(
+                  children: [
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 18),
+                        child: Image.asset(
+                          'assets/images/Landingscreen.png',
+                          height: logoHeight,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Text(
+                        'Loading your proposals ...',
+                        style: TextStyle(
+                          color: chrome.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 10, bottom: 10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: const Text(
+                            'ver 2026.04.BE7_SIT',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          right: 10,
+                          bottom: 10,
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              final ctrl =
+                                  context.read<ManagerThemeController>();
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                ctrl.toggle();
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(18),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: (chrome.isDark
+                                        ? Colors.black
+                                        : Colors.white)
+                                    .withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: (chrome.isDark
+                                          ? Colors.white
+                                          : Colors.black)
+                                      .withValues(alpha: 0.18),
+                                ),
+                              ),
+                              child: Icon(
+                                chrome.isDark
+                                    ? Icons.light_mode_outlined
+                                    : Icons.dark_mode_outlined,
+                                size: 16,
+                                color:
+                                    chrome.isDark ? Colors.white : Colors.black,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Image.asset(
+                          loaderAsset,
+                          height: loaderHeight,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
 
     if (_error != null) {
+      final w = MediaQuery.sizeOf(context).width;
+      final loaderHeight = (w * 0.08).clamp(40.0, 90.0);
+      final chrome = context.read<ManagerThemeController>().chrome;
+      final bgAsset = chrome.backgroundAsset;
+      final loaderAsset = chrome.isDark
+          ? 'assets/images/White_khono_loading.png.png'
+          : 'assets/images/Red_Discs.png';
+      final overlayGradient = chrome.isDark
+          ? LinearGradient(
+              colors: [
+                Colors.black.withValues(alpha: 0.65),
+                Colors.black.withValues(alpha: 0.35),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            )
+          : LinearGradient(
+              colors: [
+                Colors.white.withValues(alpha: 0.50),
+                Colors.white.withValues(alpha: 0.15),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            );
+
+      final errorText = _error ?? '';
+      final lower = errorText.toLowerCase();
+      final headline = lower.contains('timed') || lower.contains('expired')
+          ? 'Link Timed Out!'
+          : 'Device Verification Required';
+      final subtitle = lower.contains('timed') || lower.contains('expired')
+          ? 'Please retry, alternatively contact the sender for a refreshed link.'
+          : 'Please retry, alternatively contact the sender for a refreshed link.';
+
       return Scaffold(
         backgroundColor: Colors.transparent,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-              const SizedBox(height: 16),
-              Text(
-                _error!,
-                style: const TextStyle(fontSize: 18, color: Colors.red),
-                textAlign: TextAlign.center,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                bgAsset,
+                fit: BoxFit.cover,
               ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () => _loadClientProposals(),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: overlayGradient,
               ),
-            ],
-          ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
+                child: Stack(
+                  children: [
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 640),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              'assets/images/client_icons/Warning Error_White Badge_Red.png',
+                              width: 88,
+                              height: 88,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.warning_amber_rounded,
+                                size: 88,
+                                color: Color(0xFFC10D00),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              headline,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color:
+                                    chrome.isDark ? Colors.white : Colors.black,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              subtitle,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: chrome.textSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 22),
+                            SizedBox(
+                              width: 160,
+                              height: 40,
+                              child: ElevatedButton(
+                                onPressed: () => _loadClientProposals(),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFC10D00),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'RETRY',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 10, bottom: 10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.18),
+                            ),
+                          ),
+                          child: const Text(
+                            'ver 2026.04.BE7_SIT',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          right: 10,
+                          bottom: 10,
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              final ctrl =
+                                  context.read<ManagerThemeController>();
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                ctrl.toggle();
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(18),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: (chrome.isDark
+                                        ? Colors.black
+                                        : Colors.white)
+                                    .withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: (chrome.isDark
+                                          ? Colors.white
+                                          : Colors.black)
+                                      .withValues(alpha: 0.18),
+                                ),
+                              ),
+                              child: Icon(
+                                chrome.isDark
+                                    ? Icons.light_mode_outlined
+                                    : Icons.dark_mode_outlined,
+                                size: 16,
+                                color:
+                                    chrome.isDark ? Colors.white : Colors.black,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Image.asset(
+                          loaderAsset,
+                          height: loaderHeight,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
+
+    final chrome = context.watch<ManagerThemeController>().chrome;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -3262,76 +4603,120 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         final scaffold = Scaffold(
           backgroundColor: Colors.transparent,
           drawer: useDrawer ? _buildSidebarDrawer() : null,
+          floatingActionButton: FloatingActionButton(
+            heroTag: 'client_dashboard_theme_toggle',
+            backgroundColor: ManagerChromeTheme.accentRed,
+            onPressed: () {
+              final ctrl = context.read<ManagerThemeController>();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                ctrl.toggle();
+              });
+            },
+            child: Icon(
+              chrome.isDark ? Icons.wb_sunny_rounded : Icons.dark_mode_rounded,
+              color: Colors.white,
+            ),
+          ),
           body: Stack(
             fit: StackFit.expand,
             children: [
               Positioned.fill(
                 child: Image.asset(
-                  'assets/images/client_dashboard_bg.png',
+                  chrome.backgroundAsset,
                   fit: BoxFit.cover,
                 ),
               ),
               Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.black.withValues(alpha: 0.65),
-                      Colors.black.withValues(alpha: 0.35),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
+                  gradient: chrome.isDark
+                      ? LinearGradient(
+                          colors: [
+                            Colors.black.withValues(alpha: 0.65),
+                            Colors.black.withValues(alpha: 0.35),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : LinearGradient(
+                          colors: [
+                            Colors.white.withValues(alpha: 0.50),
+                            Colors.white.withValues(alpha: 0.15),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
                 ),
               ),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (!useDrawer) _buildSidebar(),
+                  if (!useDrawer)
+                    AppSideNav(
+                      isCollapsed: _isSidebarCollapsed,
+                      currentLabel: _clientNavLabelForIndex(_selectedNavIndex),
+                      onSelect: (label) =>
+                          _handleClientSideNavSelect(label, closeDrawer: false),
+                      onToggle: () => setState(
+                        () => _isSidebarCollapsed = !_isSidebarCollapsed,
+                      ),
+                      isAdmin: false,
+                      items: _clientAppSideNavItems,
+                      collapsedWidthOverride: 76,
+                      expandedWidthOverride: 220,
+                    ),
                   Expanded(
                     child: SafeArea(
                       left: false,
                       child: Column(
                         children: [
-                          _buildTopHeader(useDrawer: useDrawer),
+                          // Hide top header on proposals page (has its own header)
+                          if (!(_selectedNavIndex == 1))
+                            _buildTopHeader(useDrawer: useDrawer),
                           Expanded(
                             child: SingleChildScrollView(
                               padding: const EdgeInsets.all(18),
-                              child: LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final narrow = constraints.maxWidth < 980;
-                                  final leftContent = _buildMainLeftContent();
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (_selectedNavIndex == 0) ...[
+                                    _buildSummaryTiles(),
+                                    const SizedBox(height: 14),
+                                  ],
+                                  LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final narrow = constraints.maxWidth < 980;
+                                      final leftContent =
+                                          _buildMainLeftContent();
 
-                                  if (narrow) {
-                                    return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        leftContent,
-                                        const SizedBox(height: 16),
-                                        if ((_selectedNavIndex == 1 ||
-                                                _selectedNavIndex == 2) &&
-                                            widget.showSummary)
-                                          _buildRightPanel(),
-                                      ],
-                                    );
-                                  }
+                                      if (narrow) {
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            leftContent,
+                                            const SizedBox(height: 16),
+                                            if (_selectedNavIndex == 0)
+                                              _buildRightPanel(),
+                                          ],
+                                        );
+                                      }
 
-                                  return Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(child: leftContent),
-                                      const SizedBox(width: 16),
-                                      if ((_selectedNavIndex == 1 ||
-                                              _selectedNavIndex == 2) &&
-                                          widget.showSummary)
-                                        SizedBox(
-                                          width: 380,
-                                          child: _buildRightPanel(),
-                                        ),
-                                    ],
-                                  );
-                                },
+                                      return Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(child: leftContent),
+                                          const SizedBox(width: 16),
+                                          if (_selectedNavIndex == 0)
+                                            SizedBox(
+                                              width: 420,
+                                              child: _buildRightPanel(),
+                                            ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -3351,11 +4736,12 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   }
 
   Widget _buildHeader() {
+    final chrome = context.read<ManagerThemeController>().chrome;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      decoration: const BoxDecoration(
-        color: Color(0xFF2C3E50),
-        boxShadow: [
+      decoration: BoxDecoration(
+        color: chrome.sidebarBackground,
+        boxShadow: const [
           BoxShadow(
             color: Colors.black12,
             blurRadius: 4,
@@ -3365,33 +4751,33 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.dashboard, color: Colors.white, size: 28),
+          Icon(Icons.dashboard, color: chrome.textPrimary, size: 28),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                const Text(
+                Text(
                   'Client Portal',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: chrome.textPrimary,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(width: 8),
                 Text(
-                  'Welcome back, ${_clientEmail ?? 'Client'}',
-                  style: const TextStyle(
-                    color: Colors.white70,
+                  'Hello, ${_getClientDisplayName()}',
+                  style: TextStyle(
+                    color: chrome.textSecondary,
                     fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
+            icon: Icon(Icons.refresh, color: chrome.textPrimary),
             onPressed: _loadClientProposals,
             tooltip: 'Refresh',
           ),

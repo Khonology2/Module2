@@ -10,11 +10,15 @@ import 'dart:convert';
 import 'dart:html' as html;
 
 import '../../api.dart';
+import '../../config/app_constants.dart';
 import '../../services/auth_service.dart';
+import '../../theme/manager_theme_controller.dart';
 import '../../theme/premium_theme.dart';
 import '../../widgets/custom_scrollbar.dart';
 import '../../widgets/finance/finance_sidebar.dart';
 import '../../widgets/footer.dart';
+import '../../widgets/glass_date_picker.dart';
+import '../../widgets/manager_page_background.dart';
 import '../creator/blank_document_editor_page.dart';
 import 'finance_client_management_page.dart';
 
@@ -38,7 +42,16 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   String _statusFilter = 'all';
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _proposalsListScrollController = ScrollController();
   String _currentTab = 'dashboard'; // dashboard, proposals, clients
+
+  static const String _managerIconDir = 'assets/images/new icons for manager';
+  static const String _proposalsOverviewIcon =
+      '$_managerIconDir/Draft proposal.png';
+  static const String _searchIcon =
+      '$_managerIconDir/Search_Seek_Red Badge_White.png';
+  static const String _rowDocIcon =
+      '$_managerIconDir/Project Management_Red Badge_White.png';
 
   int _selectedYear = DateTime.now().year;
   Future<Map<String, dynamic>>? _financeSummaryFuture;
@@ -63,6 +76,91 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   int _aiUsageRefreshTick = 0;
   Timer? _aiUsageRefreshTimer;
   Future<Map<String, dynamic>?>? _aiUsageFuture;
+
+  static const String _financeIconDir =
+      'assets/images/finance_manager_new_icons';
+  static const String _kpiPipelineIcon =
+      '$_financeIconDir/Total_Pipeline_Value.png';
+  static const String _kpiExpectedIcon =
+      '$_financeIconDir/Expected_Revenue.png';
+  static const String _kpiSignedIcon = '$_financeIconDir/Signe_Revenue.png';
+  static const String _kpiWinRateIcon = '$_financeIconDir/Win_Rate.png';
+  static const String _kpiAvgDealIcon = '$_financeIconDir/Av_Deal_Size.png';
+  static const String _pipelineChartIcon =
+      '$_financeIconDir/Proposal_Pipeline.png';
+  static const String _forecastChartIcon =
+      '$_financeIconDir/Revenue_forecast_chart.png';
+  static const String _signedGrowthIcon = '$_financeIconDir/Signe_Revenue.png';
+  static const String _aiUsageIcon = '$_financeIconDir/AI_Usage.png';
+  static const String _byEndpointIcon = '$_financeIconDir/By_Endpoint.png';
+  static const String _includeDataIcon = '$_financeIconDir/include_data.png';
+  static const String _topClientsIcon = '$_financeIconDir/Top_clients.png';
+  static const String _recentSignedIcon =
+      '$_financeIconDir/Recent_signed_deals.png';
+  static const String _agingReportIcon =
+      '$_financeIconDir/Pipeline_aging_report.png';
+  static const String _financialAlertsIcon =
+      '$_financeIconDir/Financial_Alerts.png';
+  static const String _requiresAttentionIcon =
+      '$_financeIconDir/Requires_Attention.png';
+  static const String _topClientsInTabIcon =
+      '$_financeIconDir/Top clients by rev_intab.png';
+  static const String _recentSignedInTabIcon =
+      '$_financeIconDir/Recent_signed_deals_intab.png';
+  static const double _adminLikeIconDiameter = 80.0;
+  static const double _adminLikeIconPadding = 14.0;
+
+  BoxDecoration _panelDecoration() => BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF3F3F3F).withValues(alpha: 0.58),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      );
+
+  Widget _panelIcon(String path, {double size = _adminLikeIconDiameter}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border:
+            Border.all(color: Colors.white.withValues(alpha: 0.22), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.28),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(
+          size == _adminLikeIconDiameter ? _adminLikeIconPadding : 6),
+      child: Image.asset(
+        path,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) =>
+            const Icon(Icons.broken_image, color: Colors.red, size: 18),
+      ),
+    );
+  }
+
+  Widget _buildInTabIcon(String path) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: 0.12),
+      ),
+      padding: const EdgeInsets.all(2),
+      child: Image.asset(
+        path,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) =>
+            const Icon(Icons.broken_image, color: Colors.red, size: 14),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -156,6 +254,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     _aiUsageRefreshTimer?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
+    _proposalsListScrollController.dispose();
     _auditUserController.dispose();
     _auditEntityTypeController.dispose();
     _auditActionTypeController.dispose();
@@ -350,28 +449,16 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   Widget _buildKpiCard({
     required String label,
     required String value,
-    required IconData icon,
-    required Color color,
+    required String iconPath,
+    required String subtitle,
   }) {
     return Container(
-      height: 74,
+      height: 112,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        color: PremiumTheme.darkBg2.withOpacity(0.9),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
-      ),
+      decoration: _panelDecoration(),
       child: Row(
         children: [
-          Container(
-            height: 34,
-            width: 34,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.16),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
+          _panelIcon(iconPath),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -381,7 +468,14 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                 Text(
                   label,
                   style:
-                      PremiumTheme.labelMedium.copyWith(color: Colors.white60),
+                      PremiumTheme.labelMedium.copyWith(color: Colors.white70),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: PremiumTheme.bodySmall.copyWith(color: Colors.white54),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -432,32 +526,33 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
           _buildKpiCard(
             label: 'Total Pipeline Value',
             value: loading ? '--' : _formatCurrency(pipeline),
-            icon: Icons.stacked_line_chart,
-            color: PremiumTheme.info,
+            iconPath: _kpiPipelineIcon,
+            subtitle:
+                '${_getFilteredProposals(context.read<AppState>(), ignoreStatusFilter: true).length} Proposals',
           ),
           _buildKpiCard(
             label: 'Expected Revenue',
             value: loading ? '--' : _formatCurrency(expected),
-            icon: Icons.auto_graph,
-            color: PremiumTheme.teal,
+            iconPath: _kpiExpectedIcon,
+            subtitle: 'Awaiting Finance Action',
           ),
           _buildKpiCard(
             label: 'Signed Revenue',
             value: loading ? '--' : _formatCurrency(signed),
-            icon: Icons.verified,
-            color: const Color(0xFF34A853),
+            iconPath: _kpiSignedIcon,
+            subtitle: 'Closed-to-Lost upto 100%',
           ),
           _buildKpiCard(
             label: 'Win Rate',
             value: loading ? '--' : '${(winRate * 100).toStringAsFixed(1)}%',
-            icon: Icons.trending_up,
-            color: PremiumTheme.purple,
+            iconPath: _kpiWinRateIcon,
+            subtitle: '3 of 5 Completed',
           ),
           _buildKpiCard(
             label: 'Average Deal Size',
             value: loading ? '--' : _formatCurrency(avgDeal),
-            icon: Icons.payments,
-            color: Colors.orange,
+            iconPath: _kpiAvgDealIcon,
+            subtitle: '3 of 5 Completed',
           ),
         ];
 
@@ -496,84 +591,170 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     );
   }
 
-  Color _alertColor(String severity) {
-    final s = severity.toLowerCase();
-    if (s == 'warning') return Colors.orange;
-    if (s == 'critical') return Colors.redAccent;
-    return PremiumTheme.info;
-  }
-
   Widget _buildFinancialAlertsPanel() {
     final future = _alertsFuture ?? _fetchAlerts(year: _selectedYear);
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: future,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return SizedBox(
-            height: 220,
-            child: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.white.withOpacity(0.7)),
-              ),
-            ),
-          );
-        }
-
         final items = snapshot.data ?? [];
-        if (items.isEmpty) {
-          return SizedBox(
-            height: 80,
-            child: Center(
-              child: Text(
-                'No alerts',
-                style: PremiumTheme.bodyMedium.copyWith(color: Colors.white60),
+        final shown = items.take(4).toList();
+
+        Widget alertRow(Map<String, dynamic> item, {required bool checked}) {
+          final type =
+              (item['type'] ?? 'Alert Title').toString().replaceAll('_', ' ');
+          final details =
+              (item['client'] ?? item['message'] ?? item['detail'] ?? '')
+                  .toString()
+                  .trim();
+          final line = details.isEmpty ? type : '$type - $details';
+          return Row(
+            children: [
+              Icon(
+                checked ? Icons.check_box : Icons.check_box_outline_blank,
+                color: checked ? const Color(0xFFE11D48) : Colors.white70,
+                size: 14,
               ),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  line,
+                  style: PremiumTheme.bodySmall.copyWith(color: Colors.white70),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 10),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _currentTab = 'proposals';
+                    _statusFilter = 'pending_review';
+                  });
+                },
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.35),
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  shape: const StadiumBorder(),
+                ),
+                child: const Text(
+                  'VIEW',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
           );
         }
 
-        final shown = items.take(10).toList();
-        return Column(
-          children: [
-            for (int i = 0; i < shown.length; i++) ...[
+        final count = shown.length;
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: _panelDecoration(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    height: 10,
-                    width: 10,
-                    decoration: BoxDecoration(
-                      color: _alertColor(
-                          (shown[i]['severity'] ?? 'info').toString()),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
+                  _panelIcon(_financialAlertsIcon),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      (shown[i]['type'] ?? '').toString().replaceAll('_', ' '),
-                      style: PremiumTheme.bodyMedium.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Financial Alerts',
+                            style: PremiumTheme.titleMedium),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Items requiring financial attention.',
+                          style: PremiumTheme.bodyMedium
+                              .copyWith(color: Colors.white70),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    (shown[i]['client'] ?? '').toString(),
-                    style: PremiumTheme.labelMedium
-                        .copyWith(color: Colors.white60),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.95),
+                      shape: BoxShape.circle,
+                    ),
+                    padding: const EdgeInsets.all(7),
+                    child: Image.asset(
+                      'assets/images/new icons for manager/notifications.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '$count',
+                      style: PremiumTheme.titleMedium
+                          .copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _currentTab = 'proposals';
+                        _statusFilter = 'pending_review';
+                      });
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: const Color(0xFFC10D00),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: const Text(
+                      'VIEW ALL',
+                      style:
+                          TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ],
               ),
-              if (i != shown.length - 1)
-                Divider(color: Colors.white.withOpacity(0.06), height: 14),
+              const SizedBox(height: 10),
+              Divider(color: Colors.white.withValues(alpha: 0.35), height: 1),
+              const SizedBox(height: 10),
+              if (snapshot.connectionState == ConnectionState.waiting)
+                SizedBox(
+                  height: 110,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.white.withOpacity(0.7)),
+                    ),
+                  ),
+                )
+              else if (shown.isEmpty)
+                SizedBox(
+                  height: 70,
+                  child: Center(
+                    child: Text(
+                      'No alerts requiring attention.',
+                      style: PremiumTheme.bodyMedium
+                          .copyWith(color: Colors.white60),
+                    ),
+                  ),
+                )
+              else
+                Column(
+                  children: [
+                    for (int i = 0; i < shown.length; i++) ...[
+                      alertRow(shown[i], checked: i.isOdd),
+                      if (i != shown.length - 1) const SizedBox(height: 10),
+                    ],
+                  ],
+                ),
             ],
-          ],
+          ),
         );
       },
     );
@@ -582,19 +763,22 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   Widget _buildPanel({
     required String title,
     required String subtitle,
+    required String iconPath,
     required Widget child,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: PremiumTheme.darkBg2.withOpacity(0.9),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
-      ),
+      decoration: _panelDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: PremiumTheme.titleMedium),
+          Row(
+            children: [
+              _panelIcon(iconPath),
+              const SizedBox(width: 10),
+              Expanded(child: Text(title, style: PremiumTheme.titleMedium)),
+            ],
+          ),
           const SizedBox(height: 6),
           Text(
             subtitle,
@@ -817,16 +1001,19 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
         final left = _buildPanel(
           title: 'Proposal Pipeline',
           subtitle: 'Current proposals by status',
+          iconPath: _pipelineChartIcon,
           child: _buildPipelineChart(),
         );
         final mid = _buildPanel(
           title: 'Revenue Forecast Chart',
           subtitle: 'Forecasted revenue by month',
+          iconPath: _forecastChartIcon,
           child: _buildRevenueForecastChart(),
         );
         final right = _buildPanel(
           title: 'Signed Revenue Growth',
-          subtitle: 'Signed revenue trend',
+          subtitle: 'Projected vs Actual Revenue',
+          iconPath: _signedGrowthIcon,
           child: _buildSignedRevenueGrowthChart(),
         );
 
@@ -842,13 +1029,17 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
           );
         }
 
-        return Row(
+        return Column(
           children: [
-            Expanded(child: left),
-            const SizedBox(width: 12),
-            Expanded(child: mid),
-            const SizedBox(width: 12),
-            Expanded(child: right),
+            Row(
+              children: [
+                Expanded(child: left),
+                const SizedBox(width: 12),
+                Expanded(child: mid),
+              ],
+            ),
+            const SizedBox(height: 12),
+            right,
           ],
         );
       },
@@ -858,22 +1049,56 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   Widget _buildSimpleListPanel({
     required String title,
     required String subtitle,
+    required String iconPath,
+    String? actionLabel,
+    VoidCallback? onAction,
     required Widget child,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: PremiumTheme.darkBg2.withOpacity(0.9),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
-      ),
+      decoration: _panelDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: PremiumTheme.titleMedium),
-          const SizedBox(height: 6),
-          Text(subtitle,
-              style: PremiumTheme.bodyMedium.copyWith(color: Colors.white70)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: PremiumTheme.titleMedium),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: PremiumTheme.bodyMedium
+                          .copyWith(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              _panelIcon(iconPath),
+              if (actionLabel != null)
+                TextButton(
+                  onPressed: onAction,
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFFC10D00),
+                    foregroundColor: Colors.white,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  ),
+                  child: Text(
+                    actionLabel,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 12),
           child,
         ],
@@ -959,128 +1184,180 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
         final averageSpendReason =
             (usageSummary['average_spend_reason'] ?? '').toString();
 
-        Widget chip(String label, String value) {
+        Widget statTile(String label, String value) {
           return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
             ),
-            child: Text(
-              '$label: $value',
-              style: PremiumTheme.labelMedium.copyWith(color: Colors.white70),
-            ),
-          );
-        }
-
-        Widget listColumn(String title, List<Map<String, dynamic>> rows,
-            String leftKey, String rightKey) {
-          return Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.03),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withOpacity(0.06)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  title,
-                  style: PremiumTheme.titleMedium.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Text(
+                    label,
+                    style: PremiumTheme.labelMedium
+                        .copyWith(color: Colors.white70),
                   ),
                 ),
-                const SizedBox(height: 10),
-                if (rows.isEmpty)
-                  Text(
-                    'No data',
-                    style:
-                        PremiumTheme.bodyMedium.copyWith(color: Colors.white60),
-                  )
-                else
-                  ...rows.take(8).map(
-                        (row) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  (row[leftKey] ?? '-').toString(),
-                                  overflow: TextOverflow.ellipsis,
-                                  style: PremiumTheme.bodyMedium
-                                      .copyWith(color: Colors.white70),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                (row[rightKey] ?? '0').toString(),
-                                style: PremiumTheme.bodyMedium.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                Text(
+                  value,
+                  style: PremiumTheme.titleMedium.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ],
             ),
           );
         }
+
+        Widget includeDataCard({
+          required String title,
+          required String subtitle,
+          required Color borderColor,
+          required String actionIconPath,
+        }) {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: borderColor, width: 2),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: PremiumTheme.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: PremiumTheme.bodySmall.copyWith(
+                          color: Colors.white60,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Include Data',
+                        style: PremiumTheme.titleMedium.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 46,
+                  height: 46,
+                  child: Image.asset(
+                    actionIconPath,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final totalTokens =
+            NumberFormat.compact().format(n(usageSummary['total_tokens']));
+        final totalCost =
+            'R ${((usageSummary['estimated_cost_zar'] as num?) ?? 0).toStringAsFixed(2)}';
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                chip('Requests', n(totals['total_requests']).toString()),
-                chip('Success', n(totals['success_count']).toString()),
-                chip('Failed', n(totals['failed_count']).toString()),
-                chip('Blocked', n(totals['blocked_count']).toString()),
-                chip('Acceptance', '${acceptanceRate.toStringAsFixed(1)}%'),
-                chip(
-                    'Tokens',
-                    NumberFormat.compact()
-                        .format(n(usageSummary['total_tokens']))),
-                chip('Cost',
-                    'R ${((usageSummary['estimated_cost_zar'] as num?) ?? 0).toStringAsFixed(2)}'),
-                chip(
-                    'Average Spent', 'R ${averageSpendZar.toStringAsFixed(2)}'),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (averageSpendReason.isNotEmpty)
-              Text(
-                'Reason: $averageSpendReason',
-                style: PremiumTheme.bodyMedium.copyWith(color: Colors.white70),
-              ),
-            if (averageSpendReason.isNotEmpty) const SizedBox(height: 10),
             LayoutBuilder(
               builder: (context, constraints) {
-                final narrow = constraints.maxWidth < 980;
-                final left = listColumn(
-                    'By Endpoint', endpointSplit, 'endpoint', 'requests');
-                final right =
-                    listColumn('Top Users', topUsers, 'username', 'requests');
-                if (narrow) {
+                final columns = constraints.maxWidth < 960 ? 2 : 4;
+                final tiles = <Widget>[
+                  statTile('Requests', n(totals['total_requests']).toString()),
+                  statTile('Success', n(totals['success_count']).toString()),
+                  statTile('Failed', n(totals['failed_count']).toString()),
+                  statTile('Blocked', n(totals['blocked_count']).toString()),
+                  statTile(
+                      'Acceptance', '${acceptanceRate.toStringAsFixed(1)}%'),
+                  statTile('Tokens', totalTokens),
+                  statTile('Cost', totalCost),
+                  statTile(
+                    'Average spend',
+                    'R ${averageSpendZar.toStringAsFixed(2)}',
+                  ),
+                ];
+                return GridView.count(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: 2.6,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: tiles,
+                );
+              },
+            ),
+            if (averageSpendReason.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                averageSpendReason,
+                style: PremiumTheme.bodySmall.copyWith(color: Colors.white54),
+              ),
+            ],
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final endpointCount = endpointSplit.length.toString();
+                final usersCount = topUsers.length.toString();
+                final left = includeDataCard(
+                  title: 'By Endpoint',
+                  subtitle: 'Additional description information to include.',
+                  borderColor: const Color(0xFF2D9CDB),
+                  actionIconPath: _byEndpointIcon,
+                );
+                final right = includeDataCard(
+                  title: 'Top Users',
+                  subtitle: 'Additional description information to include.',
+                  borderColor: const Color(0xFFC10D00),
+                  actionIconPath: _includeDataIcon,
+                );
+                if (constraints.maxWidth < 980) {
                   return Column(
                     children: [
                       left,
                       const SizedBox(height: 10),
                       right,
+                      const SizedBox(height: 6),
+                      Text(
+                        'Endpoints: $endpointCount | Users: $usersCount',
+                        style: PremiumTheme.bodySmall
+                            .copyWith(color: Colors.white54),
+                      ),
                     ],
                   );
                 }
-                return Row(
+                return Column(
                   children: [
-                    Expanded(child: left),
-                    const SizedBox(width: 12),
-                    Expanded(child: right),
+                    Row(
+                      children: [
+                        Expanded(child: left),
+                        const SizedBox(width: 12),
+                        Expanded(child: right),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Endpoints: $endpointCount | Users: $usersCount',
+                      style: PremiumTheme.bodySmall
+                          .copyWith(color: Colors.white54),
+                    ),
                   ],
                 );
               },
@@ -1124,33 +1401,58 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             for (int i = 0; i < items.length; i++) ...[
               Row(
                 children: [
-                  SizedBox(
-                    width: 24,
-                    child: Text(
-                      '#${i + 1}',
-                      style: PremiumTheme.labelMedium
-                          .copyWith(color: Colors.white60),
-                    ),
-                  ),
+                  _buildInTabIcon(_topClientsInTabIcon),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      (items[i]['client'] ?? '').toString(),
-                      style:
-                          PremiumTheme.bodyMedium.copyWith(color: Colors.white),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          (items[i]['client'] ?? '').toString(),
+                          style: PremiumTheme.bodyMedium.copyWith(
+                            color: const Color(0xFFE11D48),
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _formatCurrency((items[i]['revenue'] is num)
+                              ? (items[i]['revenue'] as num).toDouble()
+                              : double.tryParse(
+                                      items[i]['revenue']?.toString() ?? '') ??
+                                  0.0),
+                          style: PremiumTheme.bodyMedium.copyWith(
+                            color: const Color(0xFFE11D48),
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    _formatCurrency((items[i]['revenue'] is num)
-                        ? (items[i]['revenue'] as num).toDouble()
-                        : double.tryParse(
-                                items[i]['revenue']?.toString() ?? '') ??
-                            0.0),
-                    style: PremiumTheme.bodyMedium.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () {
+                      setState(() => _currentTab = 'proposals');
+                    },
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.35),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: const Text(
+                      'VIEW',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
@@ -1198,6 +1500,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             for (int i = 0; i < items.length; i++) ...[
               Row(
                 children: [
+                  _buildInTabIcon(_recentSignedInTabIcon),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1205,7 +1509,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                         Text(
                           (items[i]['proposal'] ?? '').toString(),
                           style: PremiumTheme.bodyMedium.copyWith(
-                            color: Colors.white,
+                            color: const Color(0xFFE11D48),
                             fontWeight: FontWeight.w700,
                           ),
                           maxLines: 1,
@@ -1215,23 +1519,33 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                         Text(
                           (items[i]['client'] ?? '').toString(),
                           style: PremiumTheme.labelMedium
-                              .copyWith(color: Colors.white60),
+                              .copyWith(color: Colors.white70),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    _formatCurrency((items[i]['amount'] is num)
-                        ? (items[i]['amount'] as num).toDouble()
-                        : double.tryParse(
-                                items[i]['amount']?.toString() ?? '') ??
-                            0.0),
-                    style: PremiumTheme.bodyMedium.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () {
+                      setState(() => _currentTab = 'proposals');
+                    },
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.35),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: const Text(
+                      'VIEW',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
@@ -1742,38 +2056,81 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   }
 
   Widget _buildAuditPanel() {
+    final chrome = context.watch<ManagerThemeController>().chrome;
     final dateFmt = DateFormat('yyyy-MM-dd');
     final fromLabel = _auditFrom == null ? 'From' : dateFmt.format(_auditFrom!);
     final toLabel = _auditTo == null ? 'To' : dateFmt.format(_auditTo!);
+    final panelFill = chrome.isDark
+        ? Colors.white.withOpacity(0.04)
+        : Colors.white.withValues(alpha: 0.88);
+    final panelBorder = chrome.isDark
+        ? Colors.white.withOpacity(0.08)
+        : Colors.black.withValues(alpha: 0.10);
+    final fieldFill = chrome.isDark
+        ? Colors.white.withValues(alpha: 0.03)
+        : Colors.white.withValues(alpha: 0.96);
+    final fieldBorder = chrome.isDark
+        ? Colors.white24
+        : Colors.black.withValues(alpha: 0.18);
+    final labelColor = chrome.isDark ? Colors.white70 : chrome.textSecondary;
+    final valueColor = chrome.textPrimary;
+    final subtleText = chrome.isDark ? Colors.white70 : chrome.textSecondary;
+    final headingColor = chrome.textPrimary;
+    final tableHeadingColor = chrome.isDark
+        ? Colors.white.withValues(alpha: 0.92)
+        : chrome.textPrimary;
+    final tableRowColor =
+        chrome.isDark ? Colors.white70 : chrome.textPrimary.withValues(alpha: 0.92);
+    final buttonBorder = chrome.isDark
+        ? Colors.white.withValues(alpha: 0.16)
+        : Colors.black.withValues(alpha: 0.12);
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withOpacity(0.04),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: panelFill,
+        border: Border.all(color: panelBorder),
+        boxShadow: chrome.isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Text('Audit Logs', style: PremiumTheme.titleMedium),
+              Text(
+                'Audit Logs',
+                style: PremiumTheme.titleMedium.copyWith(color: headingColor),
+              ),
               const Spacer(),
               TextButton.icon(
                 onPressed: () => _exportAuditLogs('csv'),
-                icon:
-                    const Icon(Icons.download, color: Colors.white70, size: 18),
-                label:
-                    const Text('CSV', style: TextStyle(color: Colors.white70)),
+                style: TextButton.styleFrom(
+                  foregroundColor: subtleText,
+                  side: BorderSide(color: buttonBorder),
+                  backgroundColor: fieldFill,
+                ),
+                icon: Icon(Icons.download, color: subtleText, size: 18),
+                label: Text('CSV', style: TextStyle(color: subtleText)),
               ),
               const SizedBox(width: 8),
               TextButton.icon(
                 onPressed: () => _exportAuditLogs('pdf'),
-                icon: const Icon(Icons.picture_as_pdf,
-                    color: Colors.white70, size: 18),
-                label:
-                    const Text('PDF', style: TextStyle(color: Colors.white70)),
+                style: TextButton.styleFrom(
+                  foregroundColor: subtleText,
+                  side: BorderSide(color: buttonBorder),
+                  backgroundColor: fieldFill,
+                ),
+                icon: Icon(Icons.picture_as_pdf, color: subtleText, size: 18),
+                label: Text('PDF', style: TextStyle(color: subtleText)),
               ),
             ],
           ),
@@ -1783,8 +2140,13 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             runSpacing: 12,
             children: [
               OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: subtleText,
+                  backgroundColor: fieldFill,
+                  side: BorderSide(color: fieldBorder),
+                ),
                 onPressed: () async {
-                  final picked = await showDatePicker(
+                  final picked = await showGlassDatePicker(
                     context: context,
                     initialDate: _auditFrom ?? DateTime.now(),
                     firstDate: DateTime(2020),
@@ -1794,13 +2156,17 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   setState(() => _auditFrom = picked);
                   _loadAuditLogs();
                 },
-                icon: const Icon(Icons.date_range, color: Colors.white70),
-                label: Text(fromLabel,
-                    style: const TextStyle(color: Colors.white70)),
+                icon: Icon(Icons.date_range, color: subtleText),
+                label: Text(fromLabel, style: TextStyle(color: subtleText)),
               ),
               OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: subtleText,
+                  backgroundColor: fieldFill,
+                  side: BorderSide(color: fieldBorder),
+                ),
                 onPressed: () async {
-                  final picked = await showDatePicker(
+                  final picked = await showGlassDatePicker(
                     context: context,
                     initialDate: _auditTo ?? DateTime.now(),
                     firstDate: DateTime(2020),
@@ -1810,22 +2176,23 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   setState(() => _auditTo = picked);
                   _loadAuditLogs();
                 },
-                icon: const Icon(Icons.date_range, color: Colors.white70),
-                label: Text(toLabel,
-                    style: const TextStyle(color: Colors.white70)),
+                icon: Icon(Icons.date_range, color: subtleText),
+                label: Text(toLabel, style: TextStyle(color: subtleText)),
               ),
               SizedBox(
                 width: 220,
                 child: TextField(
                   controller: _auditUserController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: valueColor),
+                  decoration: InputDecoration(
                     labelText: 'User',
-                    labelStyle: TextStyle(color: Colors.white70),
+                    labelStyle: TextStyle(color: labelColor),
+                    filled: true,
+                    fillColor: fieldFill,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24),
+                      borderSide: BorderSide(color: fieldBorder),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(color: PremiumTheme.teal),
                     ),
                   ),
@@ -1836,14 +2203,16 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                 width: 220,
                 child: TextField(
                   controller: _auditEntityTypeController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: valueColor),
+                  decoration: InputDecoration(
                     labelText: 'Entity Type',
-                    labelStyle: TextStyle(color: Colors.white70),
+                    labelStyle: TextStyle(color: labelColor),
+                    filled: true,
+                    fillColor: fieldFill,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24),
+                      borderSide: BorderSide(color: fieldBorder),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(color: PremiumTheme.teal),
                     ),
                   ),
@@ -1854,14 +2223,16 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                 width: 220,
                 child: TextField(
                   controller: _auditActionTypeController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: valueColor),
+                  decoration: InputDecoration(
                     labelText: 'Action Type',
-                    labelStyle: TextStyle(color: Colors.white70),
+                    labelStyle: TextStyle(color: labelColor),
+                    filled: true,
+                    fillColor: fieldFill,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white24),
+                      borderSide: BorderSide(color: fieldBorder),
                     ),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(color: PremiumTheme.teal),
                     ),
                   ),
@@ -1882,14 +2253,21 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('Time')),
-                  DataColumn(label: Text('User')),
-                  DataColumn(label: Text('Entity')),
-                  DataColumn(label: Text('Action')),
-                  DataColumn(label: Text('Field')),
-                  DataColumn(label: Text('Old')),
-                  DataColumn(label: Text('New')),
+                headingRowColor: WidgetStatePropertyAll(
+                  chrome.isDark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.black.withValues(alpha: 0.04),
+                ),
+                dataRowColor: WidgetStatePropertyAll(fieldFill),
+                dividerThickness: 0.6,
+                columns: [
+                  DataColumn(label: Text('Time', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(label: Text('User', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(label: Text('Entity', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(label: Text('Action', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(label: Text('Field', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(label: Text('Old', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(label: Text('New', style: TextStyle(color: tableHeadingColor))),
                 ],
                 rows: _auditItems.map((r) {
                   final createdAt = (r['created_at'] ?? '').toString();
@@ -1904,7 +2282,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   Text cell(String v) => Text(
                         v,
                         style: PremiumTheme.bodySmall
-                            .copyWith(color: Colors.white70),
+                            .copyWith(color: tableRowColor),
                         overflow: TextOverflow.ellipsis,
                       );
 
@@ -1926,7 +2304,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   }
 
   Widget _buildNotificationButton(AppState app) {
-    final unread = app.unreadNotifications;
+    final unread = _unreadNotificationCount(app, messagesOnly: false);
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -1944,7 +2322,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             onPressed: () async {
               await app.fetchNotifications();
               if (!mounted) return;
-              _showNotificationsSheet(app);
+              _showNotificationsSheet(app, messagesOnly: false);
             },
           ),
         ),
@@ -1972,7 +2350,51 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     );
   }
 
-  void _showNotificationsSheet(AppState app) {
+  static bool _notificationIsCommentMessage(Map<String, dynamic> n) {
+    final t =
+        (n['notification_type'] ?? n['type'] ?? '').toString().toLowerCase();
+    return t.contains('comment') || t == 'mentioned' || t.contains('mention');
+  }
+
+  static Map<String, dynamic> _asNotificationMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      try {
+        return raw.cast<String, dynamic>();
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }
+    return <String, dynamic>{};
+  }
+
+  int _unreadNotificationCount(AppState app, {required bool messagesOnly}) {
+    var n = 0;
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      final isComment = _notificationIsCommentMessage(item);
+      if (messagesOnly != isComment) continue;
+      if (item['is_read'] != true) n++;
+    }
+    return n;
+  }
+
+  List<Map<String, dynamic>> _notificationsFiltered(
+    AppState app, {
+    required bool messagesOnly,
+  }) {
+    final out = <Map<String, dynamic>>[];
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      if (messagesOnly != _notificationIsCommentMessage(item)) continue;
+      out.add(item);
+    }
+    return out;
+  }
+
+  void _showNotificationsSheet(AppState app, {bool messagesOnly = false}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1985,8 +2407,10 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
           ),
           child: StatefulBuilder(
             builder: (context, setModalState) {
-              final notifications = app.notifications;
-              final unreadCount = app.unreadNotifications;
+              final notifications =
+                  _notificationsFiltered(app, messagesOnly: messagesOnly);
+              final unreadCount =
+                  _unreadNotificationCount(app, messagesOnly: messagesOnly);
 
               return Container(
                 constraints: BoxConstraints(
@@ -2015,8 +2439,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
-                                'Notifications',
+                              Text(
+                                messagesOnly ? 'Messages' : 'Notifications',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -2058,10 +2482,12 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                           horizontal: 16,
                         ),
                         child: notifications.isEmpty
-                            ? const Center(
+                            ? Center(
                                 child: Text(
-                                  'No notifications yet.',
-                                  style: TextStyle(
+                                  messagesOnly
+                                      ? 'No comment messages yet.'
+                                      : 'No notifications yet.',
+                                  style: const TextStyle(
                                     color: Color(0xFF4A4A4A),
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -2118,9 +2544,13 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                                       );
                                     },
                                     leading: Icon(
-                                      isRead
-                                          ? Icons.notifications_none_outlined
-                                          : Icons.notifications_active,
+                                      messagesOnly
+                                          ? (isRead
+                                              ? Icons.chat_bubble_outline
+                                              : Icons.mark_chat_unread_outlined)
+                                          : (isRead
+                                              ? Icons.notifications_none_outlined
+                                              : Icons.notifications_active),
                                       color: isRead
                                           ? const Color(0xFF95A5A6)
                                           : const Color(0xFF3498DB),
@@ -2299,8 +2729,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   DateTime _toSast(DateTime dt) {
     final utc = dt.isUtc
         ? dt
-        : DateTime.utc(dt.year, dt.month, dt.day, dt.hour, dt.minute,
-            dt.second, dt.millisecond, dt.microsecond);
+        : DateTime.utc(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second,
+            dt.millisecond, dt.microsecond);
     return utc.add(const Duration(hours: 2));
   }
 
@@ -2354,6 +2784,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final chrome = context.watch<ManagerThemeController>().chrome;
     final isSidebarCollapsed = app.isFinanceSidebarCollapsed;
     final dashboardProposals =
         _getFilteredProposals(app, ignoreStatusFilter: true);
@@ -2400,163 +2831,235 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     final isMobile = size.width < 900;
 
     return Scaffold(
-      body: Container(
-        color: Colors.transparent,
-        child: Column(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'finance_dashboard_theme_toggle',
+        backgroundColor: ManagerChromeTheme.accentRed,
+        onPressed: () => context.read<ManagerThemeController>().toggle(),
+        child: Icon(
+          chrome.isDark ? Icons.wb_sunny_rounded : Icons.dark_mode_rounded,
+          color: Colors.white,
+        ),
+      ),
+      body: ManagerPageBackground(
+        child: Row(
           children: [
-            _buildHeader(app, isMobile),
+            FinanceSidebar(
+              isCollapsed: isSidebarCollapsed,
+              currentPage: _currentTab == 'dashboard'
+                  ? 'Dashboard'
+                  : _currentTab == 'proposals'
+                      ? 'Proposals'
+                      : _currentTab == 'clients'
+                          ? 'Client Management'
+                          : _currentTab == 'audit'
+                              ? 'Audit'
+                              : 'Dashboard',
+              showAudit: _canAccessAudit(app),
+              pendingBadge: pendingBadge > 0 ? pendingBadge : null,
+              managerChrome: chrome,
+              onToggle: app.toggleFinanceSidebar,
+              onSelect: (label) {
+                if (label == 'Dashboard') {
+                  setState(() => _currentTab = 'dashboard');
+                  return;
+                }
+                if (label == 'Proposals') {
+                  setState(() => _currentTab = 'proposals');
+                  return;
+                }
+                if (label == 'Client Management') {
+                  setState(() => _currentTab = 'clients');
+                  return;
+                }
+                if (label == 'Audit') {
+                  setState(() => _currentTab = 'audit');
+                  _loadAuditLogs();
+                  return;
+                }
+                if (label == 'Analytics') {
+                  Navigator.pushNamed(context, '/analytics');
+                  return;
+                }
+                if (label == 'Account Profile') {
+                  Navigator.pushReplacementNamed(
+                      context, '/manager_account_profile');
+                  return;
+                }
+                if (label == 'Sign Out' || label == 'Logout') {
+                  app.logout();
+                  AuthService.logout();
+                  Navigator.pushNamed(context, '/login');
+                  return;
+                }
+              },
+            ),
             Expanded(
-              child: Row(
+              child: Column(
                 children: [
-                  FinanceSidebar(
-                    isCollapsed: isSidebarCollapsed,
-                    currentPage: _currentTab == 'dashboard'
-                        ? 'Dashboard'
-                        : _currentTab == 'proposals'
-                            ? 'Proposals'
-                            : _currentTab == 'clients'
-                                ? 'Client Management'
-                                : _currentTab == 'audit'
-                                    ? 'Audit'
-                                    : 'Dashboard',
-                    showAudit: _canAccessAudit(app),
-                    pendingBadge: pendingBadge > 0 ? pendingBadge : null,
-                    onToggle: app.toggleFinanceSidebar,
-                    onSelect: (label) {
-                      if (label == 'Dashboard') {
-                        setState(() => _currentTab = 'dashboard');
-                        return;
-                      }
-                      if (label == 'Proposals') {
-                        setState(() => _currentTab = 'proposals');
-                        return;
-                      }
-                      if (label == 'Client Management') {
-                        setState(() => _currentTab = 'clients');
-                        return;
-                      }
-                      if (label == 'Audit') {
-                        setState(() => _currentTab = 'audit');
-                        _loadAuditLogs();
-                        return;
-                      }
-                      if (label == 'Analytics') {
-                        Navigator.pushNamed(context, '/analytics');
-                        return;
-                      }
-                      if (label == 'Settings') {
-                        Navigator.pushNamed(context, '/settings');
-                        return;
-                      }
-                      if (label == 'Sign Out') {
-                        app.logout();
-                        AuthService.logout();
-                        Navigator.pushNamed(context, '/login');
-                        return;
-                      }
-                    },
-                  ),
+                  _buildHeader(app, isMobile, chrome),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
                       child: _currentTab == 'clients'
                           ? const FinanceClientManagementPage()
-                          : CustomScrollbar(
-                              controller: _scrollController,
-                              child: SingleChildScrollView(
-                                controller: _scrollController,
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    _buildBreadcrumb(),
-                                    const SizedBox(height: 16),
-                                    if (_currentTab == 'dashboard') ...[
-                                      _buildDashboardTitle(),
-                                      const SizedBox(height: 16),
-                                      _buildFinanceKpis(),
-                                      const SizedBox(height: 16),
-                                      _buildChartsRow(),
-                                      const SizedBox(height: 12),
-                                      _buildSimpleListPanel(
-                                        title: 'AI Usage',
-                                        subtitle:
-                                            'Live usage for AI Assistant + Risk Gate (last 30 days, auto-refresh)',
-                                        child: _buildAiUsageDashboardPanel(),
+                          : (_currentTab == 'proposals'
+                              ? SingleChildScrollView(
+                                  controller: _scrollController,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      _buildProposalsOverviewPanel(
+                                        chrome: chrome,
+                                        proposals: proposalsTabProposals,
                                       ),
-                                      const SizedBox(height: 12),
-                                      LayoutBuilder(
-                                        builder: (context, constraints) {
-                                          final isNarrow =
-                                              constraints.maxWidth < 1100;
-                                          final left = _buildSimpleListPanel(
-                                            title: 'Top Clients by Revenue',
-                                            subtitle: 'Highest revenue clients',
-                                            child: _buildTopClientsPanel(),
-                                          );
-                                          final mid = _buildSimpleListPanel(
-                                            title: 'Recent Signed Deals',
-                                            subtitle: 'Latest signed proposals',
-                                            child: _buildRecentSignedPanel(),
-                                          );
-                                          final right = _buildSimpleListPanel(
-                                            title: 'Pipeline Aging Report',
-                                            subtitle: 'Deals stuck > 30 days',
-                                            child: _buildAgingPanel(),
-                                          );
-
-                                          if (isNarrow) {
-                                            return Column(
-                                              children: [
-                                                left,
-                                                const SizedBox(height: 12),
-                                                mid,
-                                                const SizedBox(height: 12),
-                                                right,
-                                              ],
-                                            );
-                                          }
-
-                                          return Row(
-                                            children: [
-                                              Expanded(child: left),
-                                              const SizedBox(width: 12),
-                                              Expanded(child: mid),
-                                              const SizedBox(width: 12),
-                                              Expanded(child: right),
-                                            ],
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _buildSimpleListPanel(
-                                        title: 'Financial Alerts',
-                                        subtitle:
-                                            'Items that may need finance attention',
-                                        child: _buildFinancialAlertsPanel(),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _buildRequiresAttention(
-                                          requiresAttention),
-                                      const SizedBox(height: 24),
-                                      const Footer(),
-                                    ] else if (_currentTab == 'audit') ...[
-                                      _buildAuditPanel(),
-                                      const SizedBox(height: 24),
-                                      const Footer(),
-                                    ] else ...[
-                                      _buildFilters(),
-                                      const SizedBox(height: 16),
-                                      _buildTable(proposalsTabProposals),
                                       const SizedBox(height: 24),
                                       const Footer(),
                                     ],
-                                  ],
-                                ),
-                              ),
-                            ),
+                                  ),
+                                )
+                              : CustomScrollbar(
+                                  controller: _scrollController,
+                                  child: SingleChildScrollView(
+                                    controller: _scrollController,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        if (_currentTab == 'dashboard') ...[
+                                          _buildFinanceKpis(),
+                                          const SizedBox(height: 16),
+                                          _buildChartsRow(),
+                                          const SizedBox(height: 12),
+                                          LayoutBuilder(
+                                            builder: (context, constraints) {
+                                              final isNarrow =
+                                                  constraints.maxWidth < 1100;
+                                              const panelHeight = 330.0;
+                                              final left =
+                                                  _buildSimpleListPanel(
+                                                title: 'Top Clients by Revenue',
+                                                subtitle:
+                                                    'Highest revenue clients',
+                                                iconPath: _topClientsIcon,
+                                                child: _buildTopClientsPanel(),
+                                              );
+                                              final mid = _buildSimpleListPanel(
+                                                title: 'Recent Signed Deals',
+                                                subtitle:
+                                                    'Latest signed proposals',
+                                                iconPath: _recentSignedIcon,
+                                                child:
+                                                    _buildRecentSignedPanel(),
+                                              );
+                                              final right =
+                                                  _buildSimpleListPanel(
+                                                title: 'Pipeline Aging Report',
+                                                subtitle:
+                                                    'Deals stuck > 30 days',
+                                                iconPath: _agingReportIcon,
+                                                child: _buildAgingPanel(),
+                                              );
+
+                                              if (isNarrow) {
+                                                return Column(
+                                                  children: [
+                                                    SizedBox(
+                                                      height: panelHeight,
+                                                      child: left,
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    SizedBox(
+                                                      height: panelHeight,
+                                                      child: mid,
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    SizedBox(
+                                                      height: panelHeight,
+                                                      child: right,
+                                                    ),
+                                                  ],
+                                                );
+                                              }
+
+                                              return Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: SizedBox(
+                                                      height: panelHeight,
+                                                      child: left,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: SizedBox(
+                                                      height: panelHeight,
+                                                      child: mid,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: SizedBox(
+                                                      height: panelHeight,
+                                                      child: right,
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(height: 12),
+                                          _buildSimpleListPanel(
+                                            title: 'AI Usage',
+                                            subtitle:
+                                                'Live usage for AI Assistant + Risk Gate (last 30 days, auto-refresh)',
+                                            iconPath: _aiUsageIcon,
+                                            child:
+                                                _buildAiUsageDashboardPanel(),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          _buildFinancialAlertsPanel(),
+                                          const SizedBox(height: 12),
+                                          _buildRequiresAttention(
+                                              requiresAttention),
+                                          const SizedBox(height: 24),
+                                          const Footer(),
+                                        ] else ...[
+                                          _buildAuditPanel(),
+                                          const SizedBox(height: 24),
+                                          const Footer(),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                )),
                     ),
                   ),
+                  if (_currentTab == 'proposals')
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          width: 114.93836212158203,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            color: chrome.fieldFill,
+                            borderRadius: BorderRadius.circular(4.3),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            AppConstants.fullVersion,
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: chrome.textMuted,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -2564,6 +3067,417 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
         ),
       ),
     );
+  }
+
+  Widget _buildProposalsOverviewPanel({
+    required ManagerChromeTheme chrome,
+    required List<Map<String, dynamic>> proposals,
+  }) {
+    final filtered = proposals.where((p) {
+      final title = (p['title'] ?? '').toString().toLowerCase();
+      final client =
+          (p['client_name'] ?? p['client'] ?? '').toString().toLowerCase();
+      final q = _searchController.text.toLowerCase();
+      final matchesSearch = title.contains(q) || client.contains(q);
+
+      final effectiveStatusFilter =
+          _validStatusFilters.contains(_statusFilter) ? _statusFilter : 'all';
+      final matchesStatus = effectiveStatusFilter == 'all'
+          ? true
+          : _financePipelineBucket((p['status'] ?? '').toString()) ==
+              _financeBucketForFilter(effectiveStatusFilter);
+
+      return matchesSearch && matchesStatus;
+    }).toList();
+
+    final panelWidth = MediaQuery.of(context).size.width;
+    final targetWidth = panelWidth > 1100 ? 946.2045288461986 : double.infinity;
+
+    return Container(
+      width: targetWidth,
+      decoration: BoxDecoration(
+        color: const Color(0x24FFFFFF),
+        borderRadius: BorderRadius.circular(5.32),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x40000000),
+            blurRadius: 3.55,
+            offset: Offset(0, 3.55),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: _buildManagerLikeToolbar(chrome),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Divider(
+              color: chrome.divider,
+              height: 1,
+              thickness: 1,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: _buildManagerLikeProposalList(
+              chrome: chrome,
+              filtered: filtered,
+              all: proposals,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildManagerLikeToolbar(ManagerChromeTheme chrome) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Image.asset(
+          _proposalsOverviewIcon,
+          width: 86,
+          height: 86,
+          fit: BoxFit.contain,
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Proposals Overview',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18,
+                    letterSpacing: 0.2,
+                    color: chrome.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "Manage all your business proposals & SOW's",
+                  style: TextStyle(fontSize: 12, color: chrome.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 18),
+        SizedBox(
+          width: 245,
+          height: 43.060546875,
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 22),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3D3D3D),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 36, right: 12),
+                      child: Center(
+                        child: TextField(
+                          controller: _searchController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: const InputDecoration(
+                            hintText: 'Search Proposals or Clients...',
+                            hintStyle: TextStyle(
+                              color: Color(0xFF9CA3AF),
+                              fontSize: 14,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                width: 43,
+                height: 43,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    _searchIcon,
+                    width: 43,
+                    height: 43,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF4B5563),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _validStatusFilters.contains(_statusFilter)
+                  ? _statusFilter
+                  : 'all',
+              dropdownColor: const Color(0xFF4B5563),
+              icon: const Icon(
+                Icons.keyboard_arrow_down,
+                color: Colors.white,
+                size: 20,
+              ),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('All Statuses')),
+                DropdownMenuItem(
+                    value: 'pending_review', child: Text('Pending Review')),
+                DropdownMenuItem(
+                    value: 'in_pricing', child: Text('In Pricing')),
+                DropdownMenuItem(value: 'released', child: Text('Released')),
+                DropdownMenuItem(value: 'signed', child: Text('Signed')),
+              ],
+              onChanged: (v) => setState(() => _statusFilter = v ?? 'all'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildManagerLikeProposalList({
+    required ManagerChromeTheme chrome,
+    required List<Map<String, dynamic>> filtered,
+    required List<Map<String, dynamic>> all,
+  }) {
+    if (_isLoading) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(PremiumTheme.teal),
+          ),
+        ),
+      );
+    }
+
+    if (all.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 48.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.description_outlined,
+                  size: 64, color: chrome.textMuted),
+              const SizedBox(height: 16),
+              Text(
+                'No proposals yet',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: chrome.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Proposals will appear here once created.',
+                style: TextStyle(color: chrome.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 48.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off_outlined,
+                  size: 64, color: chrome.textMuted),
+              const SizedBox(height: 16),
+              Text(
+                'No proposals match your filters',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: chrome.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Try adjusting your search or status.',
+                style: TextStyle(color: chrome.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    const rowExtent = 64.0;
+    const visibleRows = 6;
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: rowExtent * visibleRows),
+      child: ListView.builder(
+        controller: _proposalsListScrollController,
+        itemExtent: rowExtent,
+        itemCount: filtered.length,
+        itemBuilder: (context, index) {
+          final proposal = filtered[index];
+          return _FinanceProposalRow(
+            proposal: proposal,
+            chrome: chrome,
+            formatCurrency: _formatCurrency,
+            extractAmount: _extractAmount,
+            formatLastModified: _formatLastModified,
+            statusLabel: _financeStatusLabel,
+            statusColor: _financeStatusColor,
+            onView: () {
+              final proposalId = proposal['id']?.toString();
+              final title =
+                  (proposal['title'] ?? 'Untitled Proposal').toString();
+              if (proposalId == null || proposalId.isEmpty) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => BlankDocumentEditorPage(
+                    proposalId: proposalId,
+                    proposalTitle: title,
+                    readOnly: false,
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  String _financeBucketForFilter(String filter) {
+    switch (filter) {
+      case 'pending_review':
+        return 'Pending Review';
+      case 'in_pricing':
+        return 'In Pricing';
+      case 'released':
+        return 'Released';
+      case 'signed':
+        return 'Signed';
+      default:
+        return 'All';
+    }
+  }
+
+  String _financeStatusLabel(String statusRaw) {
+    final bucket = _financePipelineBucket(statusRaw);
+    switch (bucket) {
+      case 'In Pricing':
+        return 'Pricing In Progress';
+      case 'Pending Review':
+        return 'Sent for Approval';
+      case 'Released':
+        return 'Released';
+      case 'Signed':
+        return 'Awaiting Signature';
+      default:
+        final s = statusRaw.trim();
+        return s.isEmpty ? 'Drafted' : s;
+    }
+  }
+
+  Color _financeStatusColor(String statusRaw) {
+    final bucket = _financePipelineBucket(statusRaw);
+    switch (bucket) {
+      case 'In Pricing':
+        return const Color(0xFF5C389D);
+      case 'Pending Review':
+        return const Color(0xFFEA990C);
+      case 'Released':
+        return const Color(0xFF6CA510);
+      case 'Signed':
+        return const Color(0xFF6095CC);
+      default:
+        return const Color(0xFF4B5563);
+    }
+  }
+
+  String _formatLastModified(dynamic date) {
+    if (date == null) return 'Unknown';
+    if (date is String) {
+      try {
+        final hasTimezone = RegExp(r'(Z|[+-]\\d{2}:\\d{2})$').hasMatch(date);
+        final parsedRaw = DateTime.parse(date);
+        final parsed = hasTimezone
+            ? parsedRaw.toLocal()
+            : DateTime.utc(
+                parsedRaw.year,
+                parsedRaw.month,
+                parsedRaw.day,
+                parsedRaw.hour,
+                parsedRaw.minute,
+                parsedRaw.second,
+                parsedRaw.millisecond,
+                parsedRaw.microsecond,
+              ).toLocal();
+        final now = DateTime.now();
+
+        bool isSameDay(DateTime a, DateTime b) {
+          return a.year == b.year && a.month == b.month && a.day == b.day;
+        }
+
+        final today = DateTime(now.year, now.month, now.day);
+        final parsedDay = DateTime(parsed.year, parsed.month, parsed.day);
+
+        if (isSameDay(parsedDay, today)) {
+          return 'Today, ${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
+        }
+
+        final yesterday = today.subtract(const Duration(days: 1));
+        if (isSameDay(parsedDay, yesterday)) {
+          return 'Yesterday, ${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
+        }
+
+        return '${parsed.day}/${parsed.month}/${parsed.year}';
+      } catch (_) {
+        return date.toString();
+      }
+    }
+
+    return date.toString();
   }
 
   Widget _buildBreadcrumb() {
@@ -2654,11 +3568,11 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       signed.toDouble(),
     ];
     final colors = <Color>[
-      Colors.orange,
-      const Color(0xFF0F9D58),
-      const Color(0xFF34A853),
-      const Color(0xFFEA4335),
-      const Color(0xFF4285F4),
+      const Color(0xFF9CA3AF),
+      const Color(0xFF3B82F6),
+      const Color(0xFFF59E0B),
+      const Color(0xFFEAB308),
+      const Color(0xFF84CC16),
     ];
 
     final maxY = (ys.fold<double>(0, (a, b) => a > b ? a : b)).clamp(1, 999);
@@ -3024,11 +3938,14 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     );
   }
 
-  Widget _buildHeader(AppState app, bool isMobile) {
+  Widget _buildHeader(AppState app, bool isMobile, ManagerChromeTheme chrome) {
     final userName = app.currentUser?['full_name'] ??
         app.currentUser?['first_name'] ??
         app.currentUser?['email'] ??
         'Finance User';
+    final unreadMessages = _unreadNotificationCount(app, messagesOnly: true);
+    final unreadNotifications =
+        _unreadNotificationCount(app, messagesOnly: false);
 
     return Container(
       height: 70,
@@ -3048,63 +3965,142 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(
-              child: Text(
-                'Finance Dashboard',
-                style: PremiumTheme.titleLarge.copyWith(fontSize: 22),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: Row(
+                children: [
+                  Text(
+                    _currentTab == 'proposals'
+                        ? 'Finance Proposal Management'
+                        : 'Finance Dashboard',
+                    style: TextStyle(
+                      color: chrome.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(width: 14),
+                  if (!isMobile)
+                    Flexible(
+                      child: Text(
+                        'Hello, ${userName.toString()}',
+                        style: TextStyle(
+                          color: chrome.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
               ),
             ),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildNotificationButton(app),
-                if (!isMobile) ...[
-                  const SizedBox(width: 10),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        userName.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    SizedBox(
+                      width: _adminLikeIconDiameter,
+                      height: _adminLikeIconDiameter,
+                      child: IconButton(
+                        tooltip: 'Messages',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                        hoverColor: Colors.transparent,
+                        onPressed: () async {
+                          await app.fetchNotifications();
+                          if (!mounted) return;
+                          _showNotificationsSheet(app, messagesOnly: true);
+                        },
+                        icon: Image.asset(
+                          'assets/images/new icons for manager/messages.png',
+                          width: 52,
+                          height: 52,
+                          fit: BoxFit.contain,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const Text(
-                        'Finance',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(width: 10),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, color: Colors.white),
-                  onSelected: (value) {
-                    if (value == 'logout') {
-                      app.logout();
-                      AuthService.logout();
-                      Navigator.pushNamed(context, '/login');
-                    }
-                  },
-                  itemBuilder: (BuildContext context) => const [
-                    PopupMenuItem<String>(
-                      value: 'logout',
-                      child: Row(
-                        children: [
-                          Icon(Icons.logout),
-                          SizedBox(width: 8),
-                          Text('Logout'),
-                        ],
                       ),
                     ),
+                    if (unreadMessages > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          width: 18,
+                          height: 18,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFC10D00),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            unreadMessages > 9 ? '9+' : unreadMessages.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 0),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    SizedBox(
+                      width: _adminLikeIconDiameter,
+                      height: _adminLikeIconDiameter,
+                      child: IconButton(
+                        tooltip: 'Notifications',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        splashColor: Colors.transparent,
+                        highlightColor: Colors.transparent,
+                        hoverColor: Colors.transparent,
+                        onPressed: () async {
+                          await app.fetchNotifications();
+                          if (!mounted) return;
+                          _showNotificationsSheet(app, messagesOnly: false);
+                        },
+                        icon: Image.asset(
+                          'assets/images/new icons for manager/notifications.png',
+                          width: 52,
+                          height: 52,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                    if (unreadNotifications > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          width: 18,
+                          height: 18,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFC10D00),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            unreadNotifications > 9
+                                ? '9+'
+                                : unreadNotifications.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ],
@@ -3222,58 +4218,29 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   }
 
   Widget _buildRequiresAttention(List<Map<String, dynamic>> proposals) {
-    Widget initialsCircle(String value) {
-      final trimmed = value.trim();
-      final parts = trimmed.split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
-      final chars =
-          parts.take(2).map((p) => p.characters.first.toUpperCase()).join();
-      final label = chars.isNotEmpty ? chars : 'P';
-
-      return Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          color: PremiumTheme.teal.withOpacity(0.14),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withOpacity(0.06)),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: PremiumTheme.labelMedium.copyWith(color: Colors.white),
-        ),
-      );
-    }
-
     Widget item(Map<String, dynamic> p) {
       final title = (p['title'] ?? 'Untitled Proposal').toString();
       final client = (p['client_name'] ?? p['client'] ?? '').toString();
       final status = (p['status'] ?? '').toString();
-      final amount = _extractAmount(p);
       final proposalId = p['id']?.toString();
 
       final content = Row(
         children: [
-          initialsCircle(title),
-          const SizedBox(width: 12),
+          Icon(
+            Icons.check_box,
+            color: const Color(0xFFE11D48).withValues(alpha: 0.9),
+            size: 14,
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
-                  style: PremiumTheme.bodyMedium.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  client.isEmpty ? '—' : client,
-                  style: PremiumTheme.bodyMedium.copyWith(
+                  '$title - ${client.isEmpty ? 'Awaiting review details' : client}',
+                  style: PremiumTheme.bodySmall.copyWith(
                     color: Colors.white70,
+                    fontWeight: FontWeight.w500,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -3282,54 +4249,54 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            _formatCurrency(amount),
-            style: PremiumTheme.bodyMedium.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
+          _buildStatusChip(status.isEmpty ? 'In Pricing' : status),
+          const SizedBox(width: 10),
+          TextButton(
+            onPressed: () {
+              if (proposalId == null || proposalId.isEmpty) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => BlankDocumentEditorPage(
+                    proposalId: proposalId,
+                    proposalTitle: title,
+                    readOnly: false,
+                  ),
+                ),
+              );
+            },
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.white.withValues(alpha: 0.35),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              shape: const StadiumBorder(),
+            ),
+            child: const Text(
+              'VIEW',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
             ),
           ),
-          const SizedBox(width: 12),
-          _buildStatusChip(status.isEmpty ? 'In Pricing' : status),
         ],
       );
 
-      final child = Padding(
+      return Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: content,
       );
-
-      if (proposalId == null || proposalId.isEmpty) return child;
-
-      return InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => BlankDocumentEditorPage(
-                proposalId: proposalId,
-                proposalTitle: title,
-                readOnly: false,
-              ),
-            ),
-          );
-        },
-        child: child,
-      );
     }
+
+    final visible = proposals.take(5).toList();
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: PremiumTheme.darkBg2.withOpacity(0.9),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
-      ),
+      decoration: _panelDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
+              _panelIcon(_requiresAttentionIcon),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -3337,29 +4304,61 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                     Text('Requires Attention', style: PremiumTheme.titleMedium),
                     const SizedBox(height: 4),
                     Text(
-                      'Proposals awaiting finance review or action',
+                      'Proposals Awaiting Review or Action',
                       style: PremiumTheme.bodyMedium
                           .copyWith(color: Colors.white70),
                     ),
                   ],
                 ),
               ),
-              TextButton.icon(
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.95),
+                  shape: BoxShape.circle,
+                ),
+                padding: const EdgeInsets.all(7),
+                child: Image.asset(
+                  'assets/images/new icons for manager/notifications.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  '${visible.length}',
+                  style: PremiumTheme.titleMedium.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
                 onPressed: () {
                   setState(() {
                     _currentTab = 'proposals';
                     _statusFilter = 'pending_review';
                   });
                 },
-                icon: const Icon(Icons.arrow_forward, size: 16),
-                label: const Text('View all'),
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.white,
+                  backgroundColor: const Color(0xFFC10D00),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  shape: const StadiumBorder(),
+                ),
+                child: const Text(
+                  'VIEW ALL',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+          Divider(color: Colors.white.withValues(alpha: 0.35), height: 1),
+          const SizedBox(height: 10),
           if (proposals.isEmpty)
             Text(
               'No proposals currently in pricing.',
@@ -3374,13 +4373,13 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
               ),
               child: Column(
                 children: [
-                  for (int i = 0; i < proposals.take(5).length; i++) ...[
+                  for (int i = 0; i < visible.length; i++) ...[
                     Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 0),
-                      child: item(proposals[i]),
+                      child: item(visible[i]),
                     ),
-                    if (i != proposals.take(5).length - 1)
+                    if (i != visible.length - 1)
                       Divider(
                         height: 1,
                         color: Colors.white.withOpacity(0.08),
@@ -3455,11 +4454,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   Widget _buildFilters() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: PremiumTheme.darkBg2.withValues(alpha: 0.85),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
+      decoration: _panelDecoration(),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isNarrow = constraints.maxWidth < 900;
@@ -3600,11 +4595,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: PremiumTheme.darkBg2.withValues(alpha: 0.9),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
+      decoration: _panelDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -3742,6 +4733,187 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
           fontWeight: FontWeight.w600,
         ),
         overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+class _FinanceProposalRow extends StatelessWidget {
+  const _FinanceProposalRow({
+    required this.proposal,
+    required this.chrome,
+    required this.extractAmount,
+    required this.formatCurrency,
+    required this.formatLastModified,
+    required this.statusLabel,
+    required this.statusColor,
+    required this.onView,
+  });
+
+  final Map<String, dynamic> proposal;
+  final ManagerChromeTheme chrome;
+  final double Function(Map<String, dynamic>) extractAmount;
+  final String Function(double) formatCurrency;
+  final String Function(dynamic) formatLastModified;
+  final String Function(String) statusLabel;
+  final Color Function(String) statusColor;
+  final VoidCallback onView;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = (proposal['title'] ?? 'Untitled Proposal').toString();
+    final client =
+        (proposal['client_name'] ?? proposal['client'] ?? 'Unknown Client')
+            .toString();
+    final statusRaw = (proposal['status'] ?? '').toString();
+    final amount = extractAmount(proposal);
+    final lastModified =
+        formatLastModified(proposal['updated_at'] ?? proposal['updatedAt']);
+
+    final pillLabel = statusLabel(statusRaw);
+    final pillColor = statusColor(statusRaw);
+
+    return SizedBox(
+      height: 64,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Image.asset(
+              _FinanceDashboardPageState._rowDocIcon,
+              width: 40,
+              height: 40,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 3,
+              child: RichText(
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: title,
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 0.13,
+                        color: chrome.textPrimary,
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' - $client',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 0.13,
+                        color: chrome.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            SizedBox(
+              width: 190,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Last Modified: $lastModified',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w500,
+                    fontSize: 10.5,
+                    letterSpacing: 0.105,
+                    color: chrome.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.left,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            SizedBox(
+              width: 190,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: 160,
+                  height: 23.0,
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(15.69, 0, 15.69, 0),
+                    decoration: BoxDecoration(
+                      color: pillColor,
+                      borderRadius: BorderRadius.circular(26.06),
+                    ),
+                    child: Center(
+                      child: Text(
+                        pillLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 1,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  formatCurrency(amount),
+                  style: PremiumTheme.bodyMedium.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            SizedBox(
+              width: 92,
+              child: OutlinedButton(
+                onPressed: onView,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: const Color(0xFF4B5563),
+                  side: BorderSide.none,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: const Text(
+                  'VIEW',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

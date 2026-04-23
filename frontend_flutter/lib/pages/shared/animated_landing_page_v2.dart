@@ -404,7 +404,7 @@ class _AnimatedLandingPageV2State extends State<AnimatedLandingPageV2>
                       // Learn More button
                       TextButton(
                         onPressed: () {
-                          // Navigate or scroll to features
+                          Navigator.pushNamed(context, '/learn-more');
                         },
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.white,

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../config/app_constants.dart';
 import '../services/asset_service.dart';
 import '../theme/manager_theme_controller.dart';
 
@@ -13,6 +12,10 @@ class AppSideNav extends StatefulWidget {
     required this.onSelect,
     required this.onToggle,
     required this.isAdmin,
+    this.items,
+    this.collapsedWidthOverride,
+    this.expandedWidthOverride,
+    this.showCollapseToggle = false,
   });
 
   final bool isCollapsed;
@@ -20,6 +23,10 @@ class AppSideNav extends StatefulWidget {
   final ValueChanged<String> onSelect;
   final VoidCallback onToggle;
   final bool isAdmin;
+  final List<Map<String, String>>? items;
+  final double? collapsedWidthOverride;
+  final double? expandedWidthOverride;
+  final bool showCollapseToggle;
 
   static const Color activeColor = Color(0xFFC10D00);
   static const Color leftAccentColor = Color(0xFF1565C0);
@@ -30,31 +37,37 @@ class AppSideNav extends StatefulWidget {
   static const List<Map<String, String>> _items = [
     {
       'label': 'Dashboard',
-      'icon': 'assets/images/new icons for manager/Dashboard.png',
+      'icon':
+          'assets/images/Creator_Dashboard/Project Launch_Start_White Badge_Blue.png',
     },
     {
       'label': 'Proposals',
-      'icon': 'assets/images/new icons for manager/proposals.png',
+      'icon':
+          'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Blue.png',
     },
     {
       'label': 'Templates',
-      'icon': 'assets/images/new icons for manager/Templates.png',
+      'icon':
+          'assets/images/Creator_Dashboard/Task Management_White Badge_Blue.png',
     },
     {
       'label': 'Content Library',
-      'icon': 'assets/images/new icons for manager/content library.png',
+      'icon':
+          'assets/images/Creator_Dashboard/Process Flows_Automation_White Badge_Blue.png',
     },
     {
       'label': 'Client Management',
-      'icon': 'assets/images/new icons for manager/client_management.png',
+      'icon':
+          'assets/images/Creator_Dashboard/HR_Team Management_White Badge_Blue.png',
     },
     {
       'label': 'Approved Proposals',
-      'icon': 'assets/images/new icons for manager/Approved proposals.png',
+      'icon': 'assets/images/Creator_Dashboard/Approved_White Badge_Blue.png',
     },
     {
       'label': 'Analytics (My Pipeline)',
-      'icon': 'assets/images/analytics.png',
+      'icon':
+          'assets/images/Creator_Dashboard/Business Growth_Development_White Badge_Blue.png',
     },
   ];
 
@@ -91,13 +104,26 @@ class _AppSideNavState extends State<AppSideNav> {
   @override
   Widget build(BuildContext context) {
     final chrome = context.watch<ManagerThemeController>().chrome;
-    final items = widget.isAdmin ? AppSideNav._adminItems : AppSideNav._items;
+    final items = widget.items ??
+        (widget.isAdmin ? AppSideNav._adminItems : AppSideNav._items);
+
+    final collapsedWidth =
+        widget.collapsedWidthOverride ?? AppSideNav.collapsedWidth;
+    final expandedWidth =
+        widget.expandedWidthOverride ?? AppSideNav.expandedWidth;
+
+    final effectiveCollapsed =
+        widget.showCollapseToggle ? widget.isCollapsed : false;
+
+    // Keep the creator/manager sidebar visually stable while the window resizes.
+    const isCompact = true;
+    const isVeryCompact = false;
+    const isUltraCompact = false;
+    const navToBottomGap = 42.0;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: widget.isCollapsed
-          ? AppSideNav.collapsedWidth
-          : AppSideNav.expandedWidth,
+      width: effectiveCollapsed ? collapsedWidth : expandedWidth,
       decoration: BoxDecoration(
         color: chrome.sidebarBackground,
         border: Border(
@@ -109,110 +135,143 @@ class _AppSideNavState extends State<AppSideNav> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildHeader(widget.isCollapsed, chrome),
+            _buildHeader(
+              effectiveCollapsed,
+              chrome,
+              isCompact: isCompact,
+              isVeryCompact: isVeryCompact,
+              isUltraCompact: isUltraCompact,
+            ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(vertical: 6),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
                   children: [
                     for (final item in items)
                       _buildNavItem(
                         label: item['label']!,
                         assetPath: item['icon']!,
-                        isCollapsed: widget.isCollapsed,
+                        isCollapsed: effectiveCollapsed,
                         chrome: chrome,
+                        isCompact: isCompact,
+                        isVeryCompact: isVeryCompact,
+                        isUltraCompact: isUltraCompact,
                       ),
+                    SizedBox(height: navToBottomGap),
                   ],
                 ),
               ),
             ),
-            _buildBottom(widget.isCollapsed, chrome),
+            _buildBottom(
+              effectiveCollapsed,
+              chrome,
+              isCompact: isCompact,
+              isUltraCompact: isUltraCompact,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(bool isCollapsed, ManagerChromeTheme chrome) {
+  Widget _buildHeader(
+    bool isCollapsed,
+    ManagerChromeTheme chrome, {
+    bool isCompact = false,
+    bool isVeryCompact = false,
+    bool isUltraCompact = false,
+  }) {
     if (isCollapsed) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+        padding: EdgeInsets.symmetric(
+          vertical: isUltraCompact ? 10 : (isCompact ? 14 : 20),
+          horizontal: 10,
+        ),
         child: InkWell(
-          onTap: widget.onToggle,
+          onTap: widget.showCollapseToggle ? widget.onToggle : null,
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            height: 44,
+            height: isUltraCompact ? 34 : (isCompact ? 38 : 44),
             decoration: BoxDecoration(
               color: chrome.sidebarHoverFill,
               borderRadius: BorderRadius.circular(10),
             ),
             alignment: Alignment.center,
-            child: Icon(
-              Icons.keyboard_arrow_right,
-              color: chrome.textPrimary,
-              size: 24,
-            ),
+            child: widget.showCollapseToggle
+                ? Icon(
+                    Icons.keyboard_arrow_right,
+                    color: chrome.textPrimary,
+                    size: isUltraCompact ? 20 : 24,
+                  )
+                : const SizedBox.shrink(),
           ),
         ),
       );
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 30, 16, 20),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        isUltraCompact ? 12 : (isCompact ? 18 : 30),
+        16,
+        isUltraCompact ? 8 : (isCompact ? 12 : 20),
+      ),
       child: Stack(
         children: [
-          Positioned(
-            top: 0,
-            right: 0,
-            child: InkWell(
-              onTap: widget.onToggle,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: chrome.sidebarHoverFill,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.keyboard_arrow_left,
-                  color: chrome.textPrimary,
-                  size: 20,
+          if (widget.showCollapseToggle)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: InkWell(
+                onTap: widget.onToggle,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: isUltraCompact ? 26 : 30,
+                  height: isUltraCompact ? 26 : 30,
+                  decoration: BoxDecoration(
+                    color: chrome.sidebarHoverFill,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.keyboard_arrow_left,
+                    color: chrome.textPrimary,
+                    size: isUltraCompact ? 18 : 20,
+                  ),
                 ),
               ),
             ),
-          ),
           Column(
             children: [
-              const SizedBox(height: 4),
+              SizedBox(height: isUltraCompact ? 0 : 2),
               Image.asset(
                 'assets/images/new icons for manager/khonology_logo.png',
-                height: 36,
+                height: isUltraCompact ? 22 : (isVeryCompact ? 26 : 30),
                 fit: BoxFit.contain,
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: isUltraCompact ? 6 : (isCompact ? 8 : 12)),
               Text(
                 'Welcome to',
                 style: TextStyle(
                   color: chrome.textSecondary,
-                  fontSize: 16,
+                  fontSize: isUltraCompact ? 10.5 : (isCompact ? 11.5 : 12.5),
                   fontWeight: FontWeight.w400,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 'Proposal & SOW Builder',
                 style: TextStyle(
                   color: chrome.textPrimary,
-                  fontSize: 18,
+                  fontSize: isUltraCompact ? 12 : (isCompact ? 13.5 : 15),
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.3,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 22),
+              SizedBox(height: isUltraCompact ? 8 : (isCompact ? 10 : 14)),
               Container(
                 height: 1,
                 color: chrome.divider,
@@ -229,6 +288,10 @@ class _AppSideNavState extends State<AppSideNav> {
     required String assetPath,
     required bool isCollapsed,
     required ManagerChromeTheme chrome,
+    bool isCompact = false,
+    bool isVeryCompact = false,
+    bool isUltraCompact = false,
+    bool isBottomItem = false,
   }) {
     final bool isActive = label == widget.currentLabel;
     final bool isHovering = _hoveringItem == label;
@@ -238,16 +301,38 @@ class _AppSideNavState extends State<AppSideNav> {
       onExit: (_) => setState(() => _hoveringItem = null),
       child: Padding(
         padding: isCollapsed
-            ? const EdgeInsets.symmetric(vertical: 5)
-            : const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            ? EdgeInsets.symmetric(vertical: isUltraCompact ? 2 : 5)
+            : EdgeInsets.symmetric(
+                horizontal: isUltraCompact ? 10 : 14,
+                vertical: isBottomItem
+                    ? (isUltraCompact ? 0.6 : 1.0)
+                    : (isUltraCompact ? 1 : (isCompact ? 1.2 : 2)),
+              ),
         child: Tooltip(
           message: isCollapsed ? label : '',
           child: InkWell(
             onTap: () => widget.onSelect(label),
             borderRadius: BorderRadius.circular(10),
             child: isCollapsed
-                ? _buildCollapsedIcon(assetPath, isActive, isHovering, chrome)
-                : _buildExpandedRow(label, assetPath, isActive, isHovering, chrome),
+                ? _buildCollapsedIcon(
+                    assetPath,
+                    isActive,
+                    isHovering,
+                    chrome,
+                    isCompact: isCompact,
+                    isUltraCompact: isUltraCompact,
+                  )
+                : _buildExpandedRow(
+                    label,
+                    assetPath,
+                    isActive,
+                    isHovering,
+                    chrome,
+                    isCompact: isCompact,
+                    isVeryCompact: isVeryCompact,
+                    isUltraCompact: isUltraCompact,
+                    isBottomItem: isBottomItem,
+                  ),
           ),
         ),
       ),
@@ -259,42 +344,58 @@ class _AppSideNavState extends State<AppSideNav> {
     String assetPath,
     bool isActive,
     bool isHovering,
-    ManagerChromeTheme chrome,
-  ) {
+    ManagerChromeTheme chrome, {
+    bool isCompact = false,
+    bool isVeryCompact = false,
+    bool isUltraCompact = false,
+    bool isBottomItem = false,
+  }) {
     final Color rowHover =
         isHovering ? chrome.sidebarHoverFill : Colors.transparent;
+    final rowVerticalPadding = isBottomItem
+        ? (isUltraCompact ? 3.8 : 4.4)
+        : (isUltraCompact ? 4.5 : (isVeryCompact ? 5.5 : 6.5));
+    final iconSize = isBottomItem
+        ? (isUltraCompact ? 31.0 : 33.0)
+        : (isUltraCompact ? 33.0 : (isCompact ? 35.0 : 37.0));
+    final fontSize = isBottomItem
+        ? (isUltraCompact ? 11.0 : 11.4)
+        : (isUltraCompact ? 11.2 : (isVeryCompact ? 11.6 : 12.0));
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding:
+          EdgeInsets.symmetric(horizontal: 12, vertical: rowVerticalPadding),
       decoration: BoxDecoration(
         color: isActive ? AppSideNav.activeColor : rowHover,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: isActive
-                  ? Colors.white.withOpacity(0.22)
-                  : chrome.sidebarIconCircleFill,
-              shape: BoxShape.circle,
-            ),
-            padding: const EdgeInsets.all(9),
-            child: AssetService.buildImageWidget(assetPath, fit: BoxFit.contain),
+          SizedBox(
+            width: iconSize,
+            height: iconSize,
+            child:
+                AssetService.buildImageWidget(assetPath, fit: BoxFit.contain),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: isUltraCompact ? 10 : 12),
           Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isActive ? Colors.white : chrome.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                height: 1.2,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: 111.87,
+                height: 20.7,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: isActive ? Colors.white : chrome.textPrimary,
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w500,
+                    height: 1.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -306,12 +407,15 @@ class _AppSideNavState extends State<AppSideNav> {
     String assetPath,
     bool isActive,
     bool isHovering,
-    ManagerChromeTheme chrome,
-  ) {
+    ManagerChromeTheme chrome, {
+    bool isCompact = false,
+    bool isUltraCompact = false,
+  }) {
+    final collapsedIconSize = isUltraCompact ? 44.0 : (isCompact ? 50.0 : 56.0);
     return Center(
       child: Container(
-        width: 56,
-        height: 56,
+        width: collapsedIconSize,
+        height: collapsedIconSize,
         decoration: BoxDecoration(
           color: isActive
               ? AppSideNav.activeColor
@@ -320,110 +424,49 @@ class _AppSideNavState extends State<AppSideNav> {
                   : chrome.sidebarCollapsedIconIdle,
           shape: BoxShape.circle,
         ),
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(isUltraCompact ? 9 : 12),
         child: AssetService.buildImageWidget(assetPath, fit: BoxFit.contain),
       ),
     );
   }
 
-  Widget _buildBottom(bool isCollapsed, ManagerChromeTheme chrome) {
+  Widget _buildBottom(
+    bool isCollapsed,
+    ManagerChromeTheme chrome, {
+    bool isCompact = false,
+    bool isUltraCompact = false,
+  }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: isUltraCompact ? 6 : 10),
       child: Column(
         children: [
-          if (!isCollapsed)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              height: 1,
-              color: chrome.divider,
-            ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            child: InkWell(
-              onTap: () =>
-                  context.read<ManagerThemeController>().toggle(),
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isCollapsed ? 0 : 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: chrome.sidebarHoverFill,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: isCollapsed
-                    ? Center(
-                        child: Icon(
-                          chrome.isDark
-                              ? Icons.wb_sunny_rounded
-                              : Icons.dark_mode_rounded,
-                          color: chrome.textPrimary,
-                          size: 22,
-                        ),
-                      )
-                    : Row(
-                        children: [
-                          Icon(
-                            chrome.isDark
-                                ? Icons.wb_sunny_rounded
-                                : Icons.dark_mode_rounded,
-                            color: chrome.textPrimary,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              chrome.isDark ? 'Light mode' : 'Dark mode',
-                              style: TextStyle(
-                                color: chrome.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
           _buildNavItem(
             label: 'Account Profile',
             assetPath: 'assets/images/User_Profile.png',
             isCollapsed: isCollapsed,
             chrome: chrome,
+            isCompact: isCompact,
+            isUltraCompact: isUltraCompact,
+            isBottomItem: true,
           ),
+          if (!isCollapsed)
+            Container(
+              margin: EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: isUltraCompact ? 4 : 6,
+              ),
+              height: 1,
+              color: const Color(0xFFFFFFFF),
+            ),
           _buildNavItem(
             label: 'Logout',
             assetPath: 'assets/images/Logout_KhonoBuzz.png',
             isCollapsed: isCollapsed,
             chrome: chrome,
+            isCompact: isCompact,
+            isUltraCompact: isUltraCompact,
+            isBottomItem: true,
           ),
-          if (!isCollapsed) ...[
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                decoration: BoxDecoration(
-                  color: chrome.sidebarHoverFill,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  AppConstants.fullVersion,
-                  style: TextStyle(
-                    color: chrome.textSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );

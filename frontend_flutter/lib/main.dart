@@ -32,6 +32,7 @@ import 'pages/shared/email_verification_page.dart';
 import 'pages/shared/startup_page.dart';
 import 'pages/shared/proposals_page.dart';
 import 'pages/shared/approved_proposals_page.dart';
+import 'pages/shared/learn_more_page.dart';
 import 'pages/guest/guest_collaboration_page.dart';
 import 'pages/shared/collaboration_router.dart';
 import 'pages/client/client_onboarding_page.dart';
@@ -47,6 +48,7 @@ import 'services/role_service.dart';
 import 'api.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme/manager_theme_controller.dart';
+import 'config/app_constants.dart';
 
 const String _buildSha =
     String.fromEnvironment('BUILD_SHA', defaultValue: 'dev');
@@ -130,6 +132,7 @@ Future<void> main() async {
   // Restore persisted auth session on startup (web)
   AuthService.restoreSessionFromStorage();
   print('🧩 Build SHA: $_buildSha');
+  print('MODULE2_UI_STAMP ${AppConstants.fullVersion}');
   runApp(const MyApp());
 }
 
@@ -458,18 +461,13 @@ class MyApp extends StatelessWidget {
           scaffoldBackgroundColor: Colors.transparent,
         ),
         builder: (context, child) {
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Image.asset(
-                    'assets/images/Global BG.jpg',
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              if (child != null) child,
-            ],
+          // Do not paint Global BG here: it sat behind every route and made
+          // screens that bring their own full-bleed background (manager/admin
+          // shell, login carousel, etc.) look unchanged. Use a neutral fallback
+          // only where a route leaves the scaffold transparent.
+          return ColoredBox(
+            color: const Color(0xFF0A0C10),
+            child: child ?? const SizedBox.shrink(),
           );
         },
         home: const AuthWrapper(),
@@ -477,6 +475,7 @@ class MyApp extends StatelessWidget {
         routes: {
           '/login': (context) => const LoginPage(),
           '/register': (context) => const RegisterPage(),
+          '/learn-more': (context) => const LearnMorePage(),
           '/onboard': (context) {
             // This will be handled by onGenerateRoute, but adding as fallback
             final currentUrl = web.window.location.href;
@@ -698,12 +697,15 @@ class MyApp extends StatelessWidget {
               return const FinanceAnalyticsPage();
             }
             if (isAdmin) {
-              return const admin.AnalyticsPage(mode: admin.AnalyticsPageMode.admin);
+              return const admin.AnalyticsPage(
+                  mode: admin.AnalyticsPageMode.admin);
             }
-            return const admin.AnalyticsPage(mode: admin.AnalyticsPageMode.creator);
+            return const admin.AnalyticsPage(
+                mode: admin.AnalyticsPageMode.creator);
           },
           '/admin_analytics': (context) {
-            return const admin.AnalyticsPage(mode: admin.AnalyticsPageMode.admin);
+            return const admin.AnalyticsPage(
+                mode: admin.AnalyticsPageMode.admin);
           },
           '/admin_history': (context) => const AdminHistoryPage(),
           '/approved-proposals': (context) => const ApprovedProposalsPage(),

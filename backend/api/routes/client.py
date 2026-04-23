@@ -93,12 +93,34 @@ def _now_utc():
 
 
 def _ensure_client_activity_schema(cursor):
+    # Older deployments created this table with UUID columns, but the live
+    # `proposals.id` / `clients.id` columns are INTEGER in this app.
+    # If we attempt to CREATE the table with an incompatible FK type,
+    # Postgres errors out before `IF NOT EXISTS` can help (because the table
+    # already exists with the wrong column types).
+    try:
+        cursor.execute(
+            """
+            SELECT column_name, data_type
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'proposal_client_activity'
+              AND column_name IN ('proposal_id', 'client_id')
+            """
+        )
+        cols = {r['column_name']: r['data_type'] for r in (cursor.fetchall() or [])}
+        if cols.get('proposal_id') == 'uuid' or cols.get('client_id') == 'uuid':
+            cursor.execute("DROP TABLE IF EXISTS proposal_client_activity CASCADE")
+    except Exception:
+        # Best-effort; schema will be (re)created below.
+        pass
+
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS proposal_client_activity (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            proposal_id UUID REFERENCES proposals(id) ON DELETE CASCADE,
-            client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
+            id SERIAL PRIMARY KEY,
+            proposal_id INTEGER REFERENCES proposals(id) ON DELETE CASCADE,
+            client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
             event_type VARCHAR(50) NOT NULL,
             metadata JSONB,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -343,6 +365,27 @@ def _create_client_session(cursor, invitation_token: str, device_id: str):
         'session_id': session_id,
         'expires_at': expires_at,
     }
+
+
+def _revoke_other_client_sessions(cursor, invitation_token: str, device_id: str, keep_session_id: str):
+    """
+    Only one active browser session per (invitation_token, device_id).
+    Revoke older rows so stale tokens fail fast and cannot race the UI after OTP.
+    """
+    try:
+        cursor.execute(
+            """
+            UPDATE client_device_sessions
+            SET revoked_at = NOW()
+            WHERE invitation_token = %s
+              AND device_id = %s
+              AND id <> %s
+              AND revoked_at IS NULL
+            """,
+            (invitation_token, device_id, keep_session_id),
+        )
+    except Exception as exc:
+        print(f"[CLIENT_PORTAL] WARN: could not revoke prior device sessions: {exc}")
 
 
 def _require_client_device_session(cursor, invitation_token: str, device_id: str | None, session_token: str | None):
@@ -765,6 +808,9 @@ def start_client_device_session():
                     (invitation_token, device_id),
                 )
                 session = _create_client_session(cursor, invitation_token, device_id)
+                _revoke_other_client_sessions(
+                    cursor, invitation_token, device_id, session['session_id']
+                )
                 conn.commit()
                 return {
                     'otp_required': False,
@@ -933,6 +979,9 @@ def verify_client_device_otp():
                 (invitation_token, device_id),
             )
             session = _create_client_session(cursor, invitation_token, device_id)
+            _revoke_other_client_sessions(
+                cursor, invitation_token, device_id, session['session_id']
+            )
             conn.commit()
 
             return {
@@ -2872,7 +2921,11 @@ def client_docusign_signed_pdf_api(proposal_id):
         envelopes_api = EnvelopesApi(api_client)
 
         # 'combined' returns a PDF that includes all docs plus the certificate
-        pdf_bytes = envelopes_api.get_document(account_id, envelope_id, document_id='combined')
+        pdf_bytes = envelopes_api.get_document(
+            account_id=account_id,
+            envelope_id=envelope_id,
+            document_id='combined',
+        )
         if isinstance(pdf_bytes, str):
             pdf_bytes = pdf_bytes.encode('utf-8')
 
