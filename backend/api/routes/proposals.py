@@ -915,21 +915,6 @@ def update_proposal(username=None, proposal_id=None, user_id=None, email=None):
                 if any(k in data for k in ['content', 'budget']):
                     return jsonify({'detail': 'Pricing changes are not allowed after proposal is sent to client'}), 403
 
-            # Finance users can only update pricing-related fields.
-            # We enforce this server-side so Finance cannot modify scope/content/client metadata.
-            if is_finance:
-                for forbidden in [
-                    'title',
-                    'client',
-                    'client_name',
-                    'client_email',
-                    'client_id',
-                    'timeline_days',
-                    # Status transitions must go through the dedicated status endpoint
-                    'status',
-                ]:
-                    data.pop(forbidden, None)
-
             if not is_finance and not is_admin and not is_manager:
                 cursor.execute(
                     f"SELECT {owner_col} FROM proposals WHERE id = %s",
@@ -955,7 +940,7 @@ def update_proposal(username=None, proposal_id=None, user_id=None, email=None):
                 except Exception:
                     sections_json = str(data['sections'])
                 params.append(sections_json)
-            if 'status' in data and not is_finance:
+            if 'status' in data:
                 updates.append('status = %s')
                 params.append(data['status'])
             # Determine client / metadata columns safely based on schema
@@ -965,13 +950,12 @@ def update_proposal(username=None, proposal_id=None, user_id=None, email=None):
             elif 'client_name' in existing_columns:
                 client_col = 'client_name'
 
-            if client_col and ('client_name' in data or 'client' in data) and not is_finance:
+            if client_col and ('client_name' in data or 'client' in data):
                 updates.append(f"{client_col} = %s")
                 params.append(data.get('client_name') or data.get('client'))
             if (
                 'client_email' in data
                 and 'client_email' in existing_columns
-                and not is_finance
             ):
                 updates.append('client_email = %s')
                 params.append(data['client_email'])
@@ -981,7 +965,6 @@ def update_proposal(username=None, proposal_id=None, user_id=None, email=None):
             if (
                 'timeline_days' in data
                 and 'timeline_days' in existing_columns
-                and not is_finance
             ):
                 updates.append('timeline_days = %s')
                 params.append(data['timeline_days'])

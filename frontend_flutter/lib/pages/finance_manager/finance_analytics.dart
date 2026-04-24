@@ -32,6 +32,7 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
   final NumberFormat _currencyFormatter =
       NumberFormat.currency(symbol: 'R', decimalDigits: 0);
   Timer? _aiUsageRefreshTimer;
+  Timer? _notificationRefreshTimer;
   int _aiUsageRefreshTick = 0;
 
   static const String _financeIconDir =
@@ -330,11 +331,17 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<AppState>().fetchProposals();
+      final app = context.read<AppState>();
+      app.fetchProposals();
+      app.fetchNotifications();
     });
     _aiUsageRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (!mounted) return;
       setState(() => _aiUsageRefreshTick++);
+    });
+    _notificationRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted) return;
+      context.read<AppState>().fetchNotifications();
     });
   }
 
@@ -522,6 +529,7 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
   @override
   void dispose() {
     _aiUsageRefreshTimer?.cancel();
+    _notificationRefreshTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
