@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'content_library_dialog.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
@@ -4411,6 +4412,15 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
       'sections': _sections.map((section) {
         final cleanDelta =
             _stripHighlightBackgrounds(section.exportRichDelta());
+        final richParagraphs = kIsWeb
+            ? <Map<String, dynamic>>[]
+            : paragraphsFromQuillDelta(
+                cleanDelta,
+                defaultFontFamily: _selectedFont,
+                defaultFontSize: double.tryParse(_selectedFontSize) ?? 12.0,
+                defaultAlignment: section.paragraphAlignment,
+                defaultLineSpacing: section.lineSpacing,
+              ).map((p) => p.toJson()).toList();
         return {
           'id': section.id,
           'title': section.titleController.text,
@@ -4418,13 +4428,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
           'richContentDelta': cleanDelta,
           'lineSpacing': section.lineSpacing,
           'paragraphAlignment': section.paragraphAlignment,
-          'richParagraphs': paragraphsFromQuillDelta(
-            cleanDelta,
-            defaultFontFamily: _selectedFont,
-            defaultFontSize: double.tryParse(_selectedFontSize) ?? 12.0,
-            defaultAlignment: section.paragraphAlignment,
-            defaultLineSpacing: section.lineSpacing,
-          ).map((p) => p.toJson()).toList(),
+          'richParagraphs': richParagraphs,
           'backgroundColor': section.backgroundColor.value,
           'backgroundImageUrl': section.backgroundImageUrl,
           'sectionType': section.sectionType,
