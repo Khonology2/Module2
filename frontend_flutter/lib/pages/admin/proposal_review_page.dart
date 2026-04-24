@@ -5,7 +5,7 @@ import 'dart:convert';
 import '../../api.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
-import '../../theme/manager_theme_controller.dart';
+import '../../theme/manager_theme_controller.dart' show ManagerThemeController, ManagerChromeTheme;
 import '../../theme/premium_theme.dart';
 import '../../widgets/header.dart';
 import '../../widgets/admin/admin_sidebar.dart';
@@ -132,8 +132,19 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
         print('Error fetching from pending approvals: $e');
       }
 
-      // If not found in pending approvals, try to get directly by ID
-      if (proposal == null || proposal.isEmpty) {
+      // Always hydrate from direct proposal-by-id when pending list payload is
+      // missing full document data (pending endpoint intentionally omits large
+      // content fields in some environments).
+      var shouldHydrateFromId = proposal == null || proposal.isEmpty;
+      if (!shouldHydrateFromId) {
+        final rawContent = proposal['content'];
+        if (rawContent == null ||
+            (rawContent is String && rawContent.trim().isEmpty)) {
+          shouldHydrateFromId = true;
+        }
+      }
+
+      if (shouldHydrateFromId) {
         try {
           // Try with /api prefix first
           var response = await http.get(
@@ -157,7 +168,13 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
 
           if (response.statusCode == 200) {
             final data = json.decode(response.body);
-            proposal = Map<String, dynamic>.from(data);
+            final hydrated = Map<String, dynamic>.from(data);
+            // Preserve any list-only fields while preferring hydrated fields.
+            if (proposal != null && proposal.isNotEmpty) {
+              proposal = {...proposal, ...hydrated};
+            } else {
+              proposal = hydrated;
+            }
           }
         } catch (e) {
           print('Error fetching proposal by ID: $e');
@@ -761,6 +778,250 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
     }
   }
 
+  // Mirrors blank_document_editor_page standardized KHONOLOGY header/footer
+  // when [metadata.standardizedProposalLayout] is true (read-only).
+  static const String _stdHeaderLogo =
+      'assets/images/new icons for manager/khonology_logo.png';
+  static const String _stdFooterAsset = 'assets/images/footer.png';
+  static const String _stdRiskGateAsset =
+      'assets/images/new icons for manager/risk_gate_tab.png';
+
+  DateTime _parseStandardizedDateFromMetadata(
+      Map<String, dynamic> metadata) {
+    final raw = metadata['standardizedProposalDate']?.toString().trim() ?? '';
+    if (raw.isEmpty) {
+      return DateTime.now();
+    }
+    final iso = DateTime.tryParse(raw);
+    if (iso != null) return iso;
+    try {
+      return DateFormat('yyyy-MM-dd').parse(raw);
+    } catch (_) {}
+    try {
+      return DateFormat('dd/MM/yyyy').parse(raw);
+    } catch (_) {}
+    return DateTime.now();
+  }
+
+  Widget _readOnlyStandardizedReportFooter() {
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+      ),
+      child: Center(
+        child: Image.asset(
+          _stdFooterAsset,
+          fit: BoxFit.contain,
+          height: 28,
+          errorBuilder: (_, __, ___) => const Text(
+            'CCC',
+            style: TextStyle(
+              color: Color(0xFFC10D00),
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// [showMetaBar] false = cover-style (date under hero); true = red title/date bar.
+  Widget _readOnlyStandardizedReportHeader({
+    required String pageTitle,
+    required bool showMetaBar,
+    required DateTime standardizedDate,
+    bool showRiskIcon = true,
+  }) {
+    return Container(
+      height: 118,
+      decoration: BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage(ManagerChromeTheme.darkBgAsset),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.14),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 22, vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Transform.translate(
+                            offset: const Offset(-8, 0),
+                            child: SizedBox(
+                              height: 50,
+                              child: Image.asset(
+                                _stdHeaderLogo,
+                                fit: BoxFit.contain,
+                                alignment: Alignment.centerLeft,
+                                errorBuilder: (_, __, ___) => const Text(
+                                  'KHONOLOGY',
+                                  style: TextStyle(
+                                    color: Color(0xFFC10D00),
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 2.8,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.only(left: 20),
+                            child: Text(
+                              'PROPOSAL REPORT',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.4,
+                                height: 1.0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (showRiskIcon)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Container(
+                          width: 58,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              width: 2,
+                            ),
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: Transform.scale(
+                            scale: 2.0,
+                            child: Image.asset(
+                              _stdRiskGateAsset,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.health_and_safety,
+                                color: Color(0xFFC10D00),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (!showMetaBar)
+            Container(
+              width: double.infinity,
+              color: Colors.black.withValues(alpha: 0.22),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.calendar_month,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        DateFormat('dd/MM/yyyy').format(standardizedDate),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (showMetaBar)
+            Container(
+              width: double.infinity,
+              color: const Color(0xFFC10D00),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+              child: pageTitle.trim().isEmpty
+                  ? Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        'Date: ${DateFormat('dd/MM/yyyy').format(standardizedDate)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Text(
+                                'Title: ',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  pageTitle,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Date: ${DateFormat('dd/MM/yyyy').format(standardizedDate)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAdminHeader(
     Map<String, dynamic> metadata,
     String? documentTitle,
@@ -924,9 +1185,37 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
         ? Map<String, dynamic>.from(data['metadata'] as Map)
         : <String, dynamic>{};
 
-    final String documentTitle =
-        (data['title'] ?? _proposal?['title'] ?? 'Untitled Document')
-            .toString();
+    bool isTruthy(dynamic value) {
+      if (value is bool) return value;
+      if (value is int) return value == 1;
+      if (value is String) {
+        final v = value.trim().toLowerCase();
+        return v == 'true' || v == '1' || v == 't' || v == 'yes';
+      }
+      return false;
+    }
+
+    final useStandardized =
+        isTruthy(metadata['standardizedProposalLayout']);
+    final DateTime standardizedDate =
+        _parseStandardizedDateFromMetadata(metadata);
+    final rawDocTitle = (data['title'] ?? _proposal?['title'] ?? '')
+        .toString()
+        .trim();
+    final String? displayDocumentTitleForCustomHeader =
+        rawDocTitle.isNotEmpty ? rawDocTitle : null;
+
+    final headerLogoUrl = metadata['headerLogoUrl'] as String?;
+    final headerBackgroundImageUrl =
+        metadata['headerBackgroundImageUrl'] as String?;
+    final footerLogoUrl = metadata['footerLogoUrl'] as String?;
+    final showCustomHeader = !useStandardized &&
+        ((headerLogoUrl != null && headerLogoUrl.trim().isNotEmpty) ||
+            (headerBackgroundImageUrl != null &&
+                headerBackgroundImageUrl.trim().isNotEmpty));
+    final showCustomFooter = !useStandardized &&
+        footerLogoUrl != null &&
+        footerLogoUrl.trim().isNotEmpty;
 
     const double pageWidth = 900;
     const double pageHeight = 1273;
@@ -938,19 +1227,8 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
             final index = entry.key;
             final section = entry.value;
 
-            final sectionTitle =
-                (section['title'] ?? 'Untitled Section').toString();
+            final sectionPageTitle = (section['title'] ?? '').toString();
             final sectionContent = (section['content'] ?? '').toString();
-
-            bool isTruthy(dynamic value) {
-              if (value is bool) return value;
-              if (value is int) return value == 1;
-              if (value is String) {
-                final v = value.trim().toLowerCase();
-                return v == 'true' || v == '1' || v == 't' || v == 'yes';
-              }
-              return false;
-            }
 
             String normalize(dynamic value) {
               return (value ?? '')
@@ -972,6 +1250,106 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
                 : int.tryParse(section['backgroundColor']?.toString() ?? '');
             final Color backgroundColor =
                 bgColorValue != null ? Color(bgColorValue) : Colors.white;
+
+            Widget buildScrollableSectionBody() {
+              return Expanded(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 60,
+                      vertical: 24,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (sectionContent.isNotEmpty)
+                          Text(
+                            sectionContent,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF1A1A1A),
+                              height: 1.8,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        if (section['tables'] is List)
+                          ...((section['tables'] as List)
+                              .where((t) => t is Map)
+                              .map((t) {
+                            final table = DocumentTable.fromJson(
+                              Map<String, dynamic>.from(t as Map),
+                            );
+                            return TableWidget(
+                              sectionIndex: index,
+                              tableIndex: null,
+                              table: table,
+                              currencySymbol: 'R',
+                              readOnly: true,
+                            );
+                          })),
+                        if (section['positionedPricingTables'] is List)
+                          ...((section['positionedPricingTables'] as List)
+                              .where((p) => p is Map)
+                              .map((p) {
+                            final positioned =
+                                PositionedPricingTable.fromJson(
+                              Map<String, dynamic>.from(p as Map),
+                            );
+                            return TableWidget(
+                              sectionIndex: index,
+                              tableIndex: null,
+                              table: positioned.table,
+                              currencySymbol: 'R',
+                              readOnly: true,
+                            );
+                          })),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            if (useStandardized && isCover) {
+              return Container(
+                width: pageWidth,
+                height: pageHeight,
+                margin: const EdgeInsets.only(bottom: 32),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _readOnlyStandardizedReportHeader(
+                      pageTitle: sectionPageTitle,
+                      showMetaBar: false,
+                      standardizedDate: standardizedDate,
+                    ),
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        color: Colors.white,
+                        child: backgroundImageUrl == null
+                            ? const SizedBox.shrink()
+                            : Image.network(
+                                backgroundImageUrl,
+                                fit: BoxFit.cover,
+                                alignment: Alignment.topCenter,
+                              ),
+                      ),
+                    ),
+                    _readOnlyStandardizedReportFooter(),
+                  ],
+                ),
+              );
+            }
 
             return Container(
               width: pageWidth,
@@ -997,96 +1375,30 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
                   ),
                 ],
               ),
-              child: isCover
-                  ? const SizedBox.expand()
-                  : Column(
-                      children: [
-                        _buildAdminHeader(metadata, documentTitle),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 60,
-                                vertical: 24,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    sectionTitle.isEmpty
-                                        ? 'Untitled Section'
-                                        : sectionTitle,
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF1A3A52),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  Text(
-                                    (sectionContent.isEmpty &&
-                                            !(section['tables'] is List &&
-                                                (section['tables'] as List)
-                                                    .isNotEmpty) &&
-                                            !(section['positionedPricingTables']
-                                                    is List &&
-                                                (section['positionedPricingTables']
-                                                        as List)
-                                                    .isNotEmpty))
-                                        ? '(No content in this section)'
-                                        : sectionContent,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Color(0xFF1A1A1A),
-                                      height: 1.8,
-                                      letterSpacing: 0.2,
-                                    ),
-                                  ),
-                                  if (section['tables'] is List)
-                                    ...((section['tables'] as List)
-                                        .where((t) => t is Map)
-                                        .map((t) {
-                                      final table = DocumentTable.fromJson(
-                                        Map<String, dynamic>.from(t as Map),
-                                      );
-                                      return TableWidget(
-                                        sectionIndex: index,
-                                        tableIndex: null,
-                                        table: table,
-                                        currencySymbol: 'R',
-                                        readOnly: true,
-                                      );
-                                    })),
-                                  if (section['positionedPricingTables']
-                                      is List)
-                                    ...((section['positionedPricingTables']
-                                            as List)
-                                        .where((p) => p is Map)
-                                        .map((p) {
-                                      final positioned =
-                                          PositionedPricingTable.fromJson(
-                                        Map<String, dynamic>.from(p as Map),
-                                      );
-                                      return TableWidget(
-                                        sectionIndex: index,
-                                        tableIndex: null,
-                                        table: positioned.table,
-                                        currencySymbol: 'R',
-                                        readOnly: true,
-                                      );
-                                    })),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        _buildAdminFooter(
-                          metadata: metadata,
-                          pageNumber: index + 1,
-                          totalPages: sections.length,
-                        ),
-                      ],
+              child: Column(
+                children: [
+                  if (useStandardized)
+                    _readOnlyStandardizedReportHeader(
+                      pageTitle: sectionPageTitle,
+                      showMetaBar: true,
+                      standardizedDate: standardizedDate,
+                    )
+                  else if (showCustomHeader)
+                    _buildAdminHeader(
+                      metadata,
+                      displayDocumentTitleForCustomHeader,
                     ),
+                  buildScrollableSectionBody(),
+                  if (useStandardized)
+                    _readOnlyStandardizedReportFooter()
+                  else if (showCustomFooter)
+                    _buildAdminFooter(
+                      metadata: metadata,
+                      pageNumber: index + 1,
+                      totalPages: sections.length,
+                    ),
+                ],
+              ),
             );
           }),
         ],
@@ -1134,12 +1446,16 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
                     children: [
                       // Main content area
                       Expanded(
-                        child: SingleChildScrollView(
+                        child: Scrollbar(
                           controller: _scrollController,
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                          thumbVisibility: true,
+                          interactive: true,
+                          child: SingleChildScrollView(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                               // Proposal header
                               GlassContainer(
                                 borderRadius: 20,
@@ -1450,7 +1766,8 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
                                   ],
                                 ),
                               ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),

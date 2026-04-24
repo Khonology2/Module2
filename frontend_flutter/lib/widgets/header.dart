@@ -26,6 +26,15 @@ class DocumentHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasTitle = title != null && title!.trim().isNotEmpty;
+    final hasBg = backgroundImageUrl != null &&
+        backgroundImageUrl!.trim().isNotEmpty;
+    final hasAnyPlacement =
+        leading != null || center != null || trailing != null;
+    final hasSubtitle =
+        subtitle != null && subtitle!.trim().isNotEmpty;
+    if (!hasTitle && !hasSubtitle && !hasBg && !hasAnyPlacement) {
+      return const SizedBox.shrink();
+    }
 
     final leftContent = Row(
       mainAxisSize: MainAxisSize.min,
@@ -136,6 +145,11 @@ class DocumentFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasPage = pageNumber != null && totalPages != null;
+    if (leading == null && !hasPage && trailing == null) {
+      return const SizedBox.shrink();
+    }
+
     final footerContent = Container(
       height: 60,
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
@@ -150,9 +164,7 @@ class DocumentFooter extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (leading != null ||
-              (pageNumber != null && totalPages != null) ||
-              trailing != null)
+          if (leading != null || hasPage || trailing != null)
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
