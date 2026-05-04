@@ -1,6 +1,7 @@
 // ignore_for_file: unused_field, unused_element, unused_local_variable, deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:ui' show FontFeature;
 import 'package:provider/provider.dart';
 import 'dart:convert';
@@ -34,6 +35,7 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
   final NumberFormat _currencyFormatter =
       NumberFormat.currency(symbol: 'R', decimalDigits: 0);
   late AnimationController _animationController;
+  Timer? _notificationRefreshTimer;
   int _highRiskCount = 0;
   int _approvedThisMonthCount = 0;
   int _sentToClientCount = 0;
@@ -76,10 +78,15 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
       context.read<AppState>().setAdminNavLabel('Dashboard');
       context.read<AppState>().fetchNotifications();
     });
+    _notificationRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted) return;
+      context.read<AppState>().fetchNotifications();
+    });
   }
 
   @override
   void dispose() {
+    _notificationRefreshTimer?.cancel();
     _animationController.dispose();
     _scrollController.dispose();
     super.dispose();

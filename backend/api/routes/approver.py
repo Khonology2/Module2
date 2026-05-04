@@ -43,6 +43,17 @@ def get_pending_approvals(username=None, user_id=None, email=None):
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
+            def _risk_level_from_status(status_val):
+                key = (status_val or '')
+                key = key.strip().upper() if isinstance(key, str) else ''
+                if key == 'BLOCK':
+                    return 'critical'
+                if key == 'REVIEW':
+                    return 'high'
+                if key == 'PASS':
+                    return 'low'
+                return ''
+
             def _get_table_columns(table_name: str):
                 cursor.execute(
                     """
@@ -123,30 +134,44 @@ def get_pending_approvals(username=None, user_id=None, email=None):
             # exceed typical client timeouts; review pages load full content by id.
             query = f'''
                 SELECT 
-                    id,
-                    title,
+                    p.id,
+                    p.title,
                     NULL::text AS content,
                     {client_expr} AS client,
                     {client_email_expr} AS client_email,
                     {owner_expr} AS user_id,
-                    status,
-                    created_at,
-                    updated_at,
-                    {budget_expr} AS budget
-                FROM proposals
-                WHERE LOWER(COALESCE(status, '')) IN (
+                    p.status,
+                    p.created_at,
+                    p.updated_at,
+                    {budget_expr} AS budget,
+                    rr.status AS risk_status,
+                    rr.risk_score AS risk_score,
+                    rr.overridden AS risk_overridden,
+                    rr.created_at AS risk_run_created_at
+                FROM proposals p
+                LEFT JOIN LATERAL (
+                    SELECT status, risk_score, overridden, created_at
+                    FROM risk_gate_runs
+                    WHERE proposal_id = p.id
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ) rr ON TRUE
+                WHERE LOWER(COALESCE(p.status, '')) IN (
                     'pending ceo approval',
                     'pending approval',
                     'in review',
                     'submitted'
                 )
-                ORDER BY updated_at DESC, created_at DESC
+                ORDER BY p.updated_at DESC, p.created_at DESC
             '''
 
             cursor.execute(query)
             rows = cursor.fetchall()
             proposals = []
             for row in rows:
+                risk_status = row.get('risk_status')
+                risk_score = row.get('risk_score')
+                risk_level = _risk_level_from_status(risk_status)
                 proposals.append({
                     'id': row['id'],
                     'title': row['title'],
@@ -159,6 +184,16 @@ def get_pending_approvals(username=None, user_id=None, email=None):
                     'budget': row.get('budget'),
                     'created_at': row['created_at'].isoformat() if row['created_at'] else None,
                     'updated_at': row['updated_at'].isoformat() if row['updated_at'] else None,
+                    'risk_status': risk_status,
+                    'risk_score': risk_score,
+                    'risk_level': risk_level,
+                    'risk_overridden': row.get('risk_overridden'),
+                    'risk_run_created_at': row.get('risk_run_created_at').isoformat() if row.get('risk_run_created_at') else None,
+                    'risk_gate': {
+                        'status': risk_status,
+                        'risk_score': risk_score,
+                        'risk_level': risk_level,
+                    },
                 })
             return {'proposals': proposals}, 200
     except Exception as e:
@@ -175,6 +210,17 @@ def get_all_proposals_for_admin(username=None, user_id=None, email=None):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            def _risk_level_from_status(status_val):
+                key = (status_val or '')
+                key = key.strip().upper() if isinstance(key, str) else ''
+                if key == 'BLOCK':
+                    return 'critical'
+                if key == 'REVIEW':
+                    return 'high'
+                if key == 'PASS':
+                    return 'low'
+                return ''
 
             resolved_user_id = user_id
             if not resolved_user_id:
@@ -260,6 +306,9 @@ def get_all_proposals_for_admin(username=None, user_id=None, email=None):
             rows = cursor.fetchall() or []
             proposals = []
             for row in rows:
+                risk_status = row.get('risk_status')
+                risk_score = row.get('risk_score')
+                risk_level = _risk_level_from_status(risk_status)
                 proposals.append({
                     'id': row.get('id'),
                     'title': row.get('title'),
@@ -271,10 +320,16 @@ def get_all_proposals_for_admin(username=None, user_id=None, email=None):
                     'user_id': row.get('user_id'),
                     'status': row.get('status'),
                     'budget': row.get('budget'),
-                    'risk_score': row.get('risk_score'),
-                    'risk_status': row.get('risk_status'),
+                    'risk_score': risk_score,
+                    'risk_status': risk_status,
+                    'risk_level': risk_level,
                     'risk_overridden': row.get('risk_overridden'),
                     'risk_run_created_at': row.get('risk_run_created_at').isoformat() if row.get('risk_run_created_at') else None,
+                    'risk_gate': {
+                        'status': risk_status,
+                        'risk_score': risk_score,
+                        'risk_level': risk_level,
+                    },
                     'created_at': row.get('created_at').isoformat() if row.get('created_at') else None,
                     'updated_at': row.get('updated_at').isoformat() if row.get('updated_at') else None,
                     'updatedAt': row.get('updated_at').isoformat() if row.get('updated_at') else None,

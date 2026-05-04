@@ -75,6 +75,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   bool _handledInitialOpen = false;
   int _aiUsageRefreshTick = 0;
   Timer? _aiUsageRefreshTimer;
+  Timer? _notificationRefreshTimer;
   Future<Map<String, dynamic>?>? _aiUsageFuture;
 
   static const String _financeIconDir =
@@ -165,7 +166,11 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadData();
+      if (!mounted) return;
+      context.read<AppState>().fetchNotifications();
+    });
     _aiUsageFuture = _fetchAiUsageAnalytics();
     _aiUsageRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted) return;
@@ -174,6 +179,10 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
         _aiUsageRefreshTick++;
         _aiUsageFuture = _fetchAiUsageAnalytics();
       });
+    });
+    _notificationRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted) return;
+      context.read<AppState>().fetchNotifications();
     });
   }
 
@@ -252,6 +261,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   @override
   void dispose() {
     _aiUsageRefreshTimer?.cancel();
+    _notificationRefreshTimer?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     _proposalsListScrollController.dispose();
