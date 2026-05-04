@@ -92,6 +92,25 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
   final Set<String> _sectionRichListenersAttached = {};
   String _selectedCurrency = 'Rand (ZAR)';
 
+  ImageProvider _networkImageProvider(
+    String url, {
+    int? cacheWidth,
+    int? cacheHeight,
+  }) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) {
+      return const AssetImage('');
+    }
+    if (kIsWeb && (cacheWidth != null || cacheHeight != null)) {
+      return ResizeImage(
+        NetworkImage(trimmed),
+        width: cacheWidth,
+        height: cacheHeight,
+      );
+    }
+    return NetworkImage(trimmed);
+  }
+
   Widget _buildPositionedPricingTable(
     int sectionIndex,
     int positionedIndex,
@@ -7695,6 +7714,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                         backgroundImageUrl,
                         fit: BoxFit.cover,
                         alignment: Alignment.topCenter,
+                        cacheWidth: kIsWeb ? (pageWidth * 2).round() : null,
+                        cacheHeight: kIsWeb ? (pageHeight * 2).round() : null,
                       ),
                     ),
             ),
@@ -7730,7 +7751,11 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                 : Colors.white,
             image: section.backgroundImageUrl != null
                 ? DecorationImage(
-                    image: NetworkImage(section.backgroundImageUrl!),
+                    image: _networkImageProvider(
+                      section.backgroundImageUrl!,
+                      cacheWidth: kIsWeb ? (pageWidth * 2).round() : null,
+                      cacheHeight: kIsWeb ? (pageHeight * 2).round() : null,
+                    ),
                     fit: BoxFit.cover,
                     opacity: isCover ? 1.0 : 0.7, // Full-bleed cover image
                   )
