@@ -32,6 +32,8 @@ class FinanceDashboardV2Page extends StatefulWidget {
 
 class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   bool _isLoading = false;
+  final Map<String, double> _amountCache = {};
+  final Map<String, String> _amountCacheKey = {};
   static const List<String> _validStatusFilters = [
     'all',
     'pending_review',
@@ -75,6 +77,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   bool _handledInitialOpen = false;
   int _aiUsageRefreshTick = 0;
   Timer? _aiUsageRefreshTimer;
+  Timer? _notificationRefreshTimer;
   Future<Map<String, dynamic>?>? _aiUsageFuture;
 
   static const String _financeIconDir =
@@ -165,7 +168,11 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadData();
+      if (!mounted) return;
+      context.read<AppState>().fetchNotifications();
+    });
     _aiUsageFuture = _fetchAiUsageAnalytics();
     _aiUsageRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted) return;
@@ -174,6 +181,11 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
         _aiUsageRefreshTick++;
         _aiUsageFuture = _fetchAiUsageAnalytics();
       });
+    });
+    _notificationRefreshTimer =
+        Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted) return;
+      context.read<AppState>().fetchNotifications();
     });
   }
 
@@ -252,6 +264,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   @override
   void dispose() {
     _aiUsageRefreshTimer?.cancel();
+    _notificationRefreshTimer?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     _proposalsListScrollController.dispose();
@@ -1759,7 +1772,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     setState(() => _isLoading = true);
     try {
       await Future.wait([
-        app.fetchProposals(),
+        app.fetchProposals(light: true),
         app.fetchDashboard(),
         app.fetchNotifications(),
       ]);
@@ -1876,6 +1889,16 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
   }
 
   double _extractAmount(Map<String, dynamic> p) {
+    final proposalId = p['id']?.toString();
+    final cacheKey =
+        '${p['updated_at'] ?? p['updatedAt'] ?? ''}|${p['budget'] ?? ''}|${p['amount'] ?? ''}|${p['total'] ?? ''}|${p['value'] ?? ''}|${p['price'] ?? ''}';
+    if (proposalId != null) {
+      final existingKey = _amountCacheKey[proposalId];
+      if (existingKey == cacheKey && _amountCache.containsKey(proposalId)) {
+        return _amountCache[proposalId] ?? 0;
+      }
+    }
+
     const keys = ['budget', 'amount', 'total', 'value', 'price'];
     for (final k in keys) {
       final v = p[k];
@@ -2004,6 +2027,14 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       if (contentAny is Map) {
         sectionsAny = contentAny['sections'] ?? contentAny;
       } else if (contentAny is String) {
+        final raw = contentAny;
+        if (raw.length > 50000) {
+          if (proposalId != null) {
+            _amountCache[proposalId] = 0;
+            _amountCacheKey[proposalId] = cacheKey;
+          }
+          return 0;
+        }
         try {
           final decoded = jsonDecode(contentAny);
           if (decoded is Map || decoded is List) {
@@ -2013,7 +2044,12 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       }
     }
 
-    return _sumPriceTablesFromSections(sectionsAny);
+    final computed = _sumPriceTablesFromSections(sectionsAny);
+    if (proposalId != null) {
+      _amountCache[proposalId] = computed;
+      _amountCacheKey[proposalId] = cacheKey;
+    }
+    return computed;
   }
 
   String _formatCurrency(double amount) {
@@ -2069,9 +2105,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     final fieldFill = chrome.isDark
         ? Colors.white.withValues(alpha: 0.03)
         : Colors.white.withValues(alpha: 0.96);
-    final fieldBorder = chrome.isDark
-        ? Colors.white24
-        : Colors.black.withValues(alpha: 0.18);
+    final fieldBorder =
+        chrome.isDark ? Colors.white24 : Colors.black.withValues(alpha: 0.18);
     final labelColor = chrome.isDark ? Colors.white70 : chrome.textSecondary;
     final valueColor = chrome.textPrimary;
     final subtleText = chrome.isDark ? Colors.white70 : chrome.textSecondary;
@@ -2079,8 +2114,9 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     final tableHeadingColor = chrome.isDark
         ? Colors.white.withValues(alpha: 0.92)
         : chrome.textPrimary;
-    final tableRowColor =
-        chrome.isDark ? Colors.white70 : chrome.textPrimary.withValues(alpha: 0.92);
+    final tableRowColor = chrome.isDark
+        ? Colors.white70
+        : chrome.textPrimary.withValues(alpha: 0.92);
     final buttonBorder = chrome.isDark
         ? Colors.white.withValues(alpha: 0.16)
         : Colors.black.withValues(alpha: 0.12);
@@ -2261,13 +2297,27 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                 dataRowColor: WidgetStatePropertyAll(fieldFill),
                 dividerThickness: 0.6,
                 columns: [
-                  DataColumn(label: Text('Time', style: TextStyle(color: tableHeadingColor))),
-                  DataColumn(label: Text('User', style: TextStyle(color: tableHeadingColor))),
-                  DataColumn(label: Text('Entity', style: TextStyle(color: tableHeadingColor))),
-                  DataColumn(label: Text('Action', style: TextStyle(color: tableHeadingColor))),
-                  DataColumn(label: Text('Field', style: TextStyle(color: tableHeadingColor))),
-                  DataColumn(label: Text('Old', style: TextStyle(color: tableHeadingColor))),
-                  DataColumn(label: Text('New', style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(
+                      label: Text('Time',
+                          style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(
+                      label: Text('User',
+                          style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(
+                      label: Text('Entity',
+                          style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(
+                      label: Text('Action',
+                          style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(
+                      label: Text('Field',
+                          style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(
+                      label: Text('Old',
+                          style: TextStyle(color: tableHeadingColor))),
+                  DataColumn(
+                      label: Text('New',
+                          style: TextStyle(color: tableHeadingColor))),
                 ],
                 rows: _auditItems.map((r) {
                   final createdAt = (r['created_at'] ?? '').toString();
@@ -2549,7 +2599,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                                               ? Icons.chat_bubble_outline
                                               : Icons.mark_chat_unread_outlined)
                                           : (isRead
-                                              ? Icons.notifications_none_outlined
+                                              ? Icons
+                                                  .notifications_none_outlined
                                               : Icons.notifications_active),
                                       color: isRead
                                           ? const Color(0xFF95A5A6)
@@ -4039,7 +4090,9 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            unreadMessages > 9 ? '9+' : unreadMessages.toString(),
+                            unreadMessages > 9
+                                ? '9+'
+                                : unreadMessages.toString(),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 9,

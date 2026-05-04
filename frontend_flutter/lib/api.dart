@@ -535,11 +535,14 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchProposals() async {
+  Future<void> fetchProposals({bool light = false}) async {
     try {
+      final uri = Uri.parse(
+        light ? "$baseUrl/api/proposals?light=1" : "$baseUrl/api/proposals",
+      );
       final r = await http
           .get(
-        Uri.parse("$baseUrl/api/proposals"),
+        uri,
         headers: _headers,
       )
           .timeout(
@@ -665,11 +668,13 @@ class AppState extends ChangeNotifier {
 
   Future<void> updateProposalStatus(String proposalId, String status) async {
     try {
-      final r = await http.patch(
-        Uri.parse("$baseUrl/api/proposals/$proposalId/status"),
-        headers: _headers,
-        body: jsonEncode({"status": status}),
-      );
+      final r = await http
+          .patch(
+            Uri.parse("$baseUrl/api/proposals/$proposalId/status"),
+            headers: _headers,
+            body: jsonEncode({"status": status}),
+          )
+          .timeout(const Duration(seconds: 30));
       if (r.statusCode != 200) {
         throw Exception(
           'Failed to update proposal status (${r.statusCode}): ${r.body}',

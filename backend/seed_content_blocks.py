@@ -4,6 +4,7 @@ from datetime import datetime
 
 import psycopg2
 from dotenv import load_dotenv
+from urllib.parse import urlparse, parse_qs
 
 # Ensure database schema exists before attempting to seed. When the script is
 # invoked during deployment (e.g. as part of Render startCommand) it may run
@@ -27,21 +28,52 @@ load_dotenv()
 
 def get_db_config():
     """Get database configuration with SSL support for Render"""
-    config = {
-        'host': os.getenv('DB_HOST', 'localhost'),
-        'port': int(os.getenv('DB_PORT', 5432)),
-        'database': os.getenv('DB_NAME', 'proposal_sow_builder'),
-        'user': os.getenv('DB_USER', 'postgres'),
-        'password': os.getenv('DB_PASSWORD', 'postgres'),
-    }
-    
-    # Add SSL mode for external connections (like Render)
-    db_sslmode = os.getenv('DB_SSLMODE')
-    if db_sslmode:
-        config['sslmode'] = db_sslmode
-    elif 'render.com' in config['host'].lower():
-        config['sslmode'] = 'require'
-    
+    database_url = (os.getenv('DATABASE_URL') or '').strip()
+    if database_url:
+        parsed = urlparse(database_url)
+        scheme = (parsed.scheme or '').lower()
+        if scheme.startswith('postgresql+'):
+            scheme = 'postgresql'
+        if scheme not in ('postgres', 'postgresql'):
+            raise ValueError(
+                'DATABASE_URL must start with postgres:// or postgresql:// '
+                '(optionally with a driver like postgresql+psycopg2://)'
+            )
+
+        config = {
+            'host': parsed.hostname,
+            'port': parsed.port or 5432,
+            'database': (parsed.path or '').lstrip('/'),
+            'user': parsed.username,
+            'password': parsed.password,
+        }
+
+        query = parse_qs(parsed.query or '')
+        sslmode_from_url = (query.get('sslmode') or [None])[0]
+        db_sslmode = sslmode_from_url or os.getenv('DB_SSLMODE')
+        if db_sslmode:
+            config['sslmode'] = db_sslmode
+        elif (config.get('host') or '').lower().find('render.com') != -1:
+            config['sslmode'] = 'require'
+    else:
+        config = {
+            'host': os.getenv('DB_HOST', 'localhost'),
+            'port': int(os.getenv('DB_PORT', 5432)),
+            'database': os.getenv('DB_NAME', 'proposal_sow_builder'),
+            'user': os.getenv('DB_USER', 'postgres'),
+            'password': os.getenv('DB_PASSWORD', 'postgres'),
+        }
+
+        # Add SSL mode for external connections (like Render)
+        db_sslmode = os.getenv('DB_SSLMODE')
+        if db_sslmode:
+            config['sslmode'] = db_sslmode
+        elif 'render.com' in (config.get('host') or '').lower():
+            config['sslmode'] = 'require'
+
+    connect_timeout = int(os.getenv('DB_CONNECT_TIMEOUT', '10'))
+    config['connect_timeout'] = connect_timeout
+
     return config
 
 DATABASE_CONFIG = get_db_config()

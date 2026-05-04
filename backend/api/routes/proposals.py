@@ -529,6 +529,13 @@ def get_proposals(username=None, user_id=None, email=None):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+
+            light_mode = str(request.args.get('light') or '').strip().lower() in [
+                '1',
+                'true',
+                'yes',
+                'y',
+            ]
             
             print(f"🔍 Looking for proposals for user {username} (user_id: {user_id}, email: {email})")
             
@@ -596,7 +603,9 @@ def get_proposals(username=None, user_id=None, email=None):
             
             # Finance/Admin/Manager users can see all proposals (including drafts).
             if is_finance or is_admin or is_manager:
-                select_cols = ['id', 'title', 'content', 'status']
+                select_cols = ['id', 'title', 'status']
+                if not light_mode:
+                    select_cols.append('content')
                 if 'owner_id' in existing_columns:
                     select_cols.append('owner_id')
                 elif 'user_id' in existing_columns:
@@ -616,7 +625,7 @@ def get_proposals(username=None, user_id=None, email=None):
                     select_cols.append('updated_at')
                 if 'template_key' in existing_columns:
                     select_cols.append('template_key')
-                if 'sections' in existing_columns:
+                if (not light_mode) and 'sections' in existing_columns:
                     select_cols.append('sections')
                 if 'pdf_url' in existing_columns:
                     select_cols.append('pdf_url')
@@ -628,7 +637,9 @@ def get_proposals(username=None, user_id=None, email=None):
 
             # Build query dynamically based on available columns for non-finance users
             elif 'owner_id' in existing_columns:
-                select_cols = ['id', 'owner_id', 'title', 'content', 'status']
+                select_cols = ['id', 'owner_id', 'title', 'status']
+                if not light_mode:
+                    select_cols.append('content')
                 if 'client' in existing_columns:
                     select_cols.append('client')
                 elif 'client_name' in existing_columns:
@@ -640,7 +651,7 @@ def get_proposals(username=None, user_id=None, email=None):
                     select_cols.append('updated_at')
                 if 'template_key' in existing_columns:
                     select_cols.append('template_key')
-                if 'sections' in existing_columns:
+                if (not light_mode) and 'sections' in existing_columns:
                     select_cols.append('sections')
                 if 'pdf_url' in existing_columns:
                     select_cols.append('pdf_url')
@@ -650,7 +661,9 @@ def get_proposals(username=None, user_id=None, email=None):
                      ORDER BY created_at DESC'''
                 cursor.execute(query, (user_id,))
             elif 'user_id' in existing_columns:
-                select_cols = ['id', 'user_id', 'title', 'content', 'status']
+                select_cols = ['id', 'user_id', 'title', 'status']
+                if not light_mode:
+                    select_cols.append('content')
                 if 'client' in existing_columns:
                     select_cols.append('client')
                 elif 'client_name' in existing_columns:
@@ -681,41 +694,44 @@ def get_proposals(username=None, user_id=None, email=None):
             for row in rows:
                 try:
                     row_dict = dict(zip(column_names, row))
-                    
-                    # Parse sections JSON
-                    sections_data: object = {}
-                    if 'sections' in row_dict and row_dict['sections']:
-                        try:
-                            if isinstance(row_dict['sections'], str):
-                                sections_data = json.loads(row_dict['sections'])
-                            elif isinstance(row_dict['sections'], (dict, list)):
-                                sections_data = row_dict['sections']
-                        except (json.JSONDecodeError, TypeError):
-                            sections_data = {}
 
-                    # Fallback: some environments store sections inside content JSON.
-                    if (not sections_data or sections_data == {}) and row_dict.get('content'):
-                        try:
-                            content_obj = (
-                                json.loads(row_dict['content'])
-                                if isinstance(row_dict['content'], str)
-                                else row_dict['content']
-                            )
-                            if isinstance(content_obj, dict) and isinstance(content_obj.get('sections'), list):
-                                sections_data = content_obj.get('sections')
-                            elif isinstance(content_obj, list):
-                                sections_data = content_obj
-                        except Exception:
-                            pass
-                    
+                    sections_data: object = {}
+                    if not light_mode:
+                        # Parse sections JSON
+                        if 'sections' in row_dict and row_dict['sections']:
+                            try:
+                                if isinstance(row_dict['sections'], str):
+                                    sections_data = json.loads(row_dict['sections'])
+                                elif isinstance(row_dict['sections'], (dict, list)):
+                                    sections_data = row_dict['sections']
+                            except (json.JSONDecodeError, TypeError):
+                                sections_data = {}
+
+                        # Fallback: some environments store sections inside content JSON.
+                        if (not sections_data or sections_data == {}) and row_dict.get('content'):
+                            try:
+                                content_obj = (
+                                    json.loads(row_dict['content'])
+                                    if isinstance(row_dict['content'], str)
+                                    else row_dict['content']
+                                )
+                                if isinstance(content_obj, dict) and isinstance(content_obj.get('sections'), list):
+                                    sections_data = content_obj.get('sections')
+                                elif isinstance(content_obj, list):
+                                    sections_data = content_obj
+                            except Exception:
+                                pass
+
                     # Build proposal object
                     proposal = {
                         'id': row_dict.get('id'),
                         'title': row_dict.get('title') or '',
-                        'content': row_dict.get('content') or '',
                         'status': row_dict.get('status') or 'Draft',
-                        'sections': sections_data,
                     }
+
+                    if not light_mode:
+                        proposal['content'] = row_dict.get('content') or ''
+                        proposal['sections'] = sections_data
                     
                     # Handle user/owner ID
                     if 'owner_id' in row_dict:
@@ -747,7 +763,10 @@ def get_proposals(username=None, user_id=None, email=None):
                     else:
                         proposal['budget'] = None
 
-                    if proposal.get('budget') is None or float(proposal.get('budget') or 0) <= 0:
+                    if (not light_mode) and (
+                        proposal.get('budget') is None
+                        or float(proposal.get('budget') or 0) <= 0
+                    ):
                         try:
                             content_obj = None
                             if row_dict.get('content'):
@@ -915,21 +934,6 @@ def update_proposal(username=None, proposal_id=None, user_id=None, email=None):
                 if any(k in data for k in ['content', 'budget']):
                     return jsonify({'detail': 'Pricing changes are not allowed after proposal is sent to client'}), 403
 
-            # Finance users can only update pricing-related fields.
-            # We enforce this server-side so Finance cannot modify scope/content/client metadata.
-            if is_finance:
-                for forbidden in [
-                    'title',
-                    'client',
-                    'client_name',
-                    'client_email',
-                    'client_id',
-                    'timeline_days',
-                    # Status transitions must go through the dedicated status endpoint
-                    'status',
-                ]:
-                    data.pop(forbidden, None)
-
             if not is_finance and not is_admin and not is_manager:
                 cursor.execute(
                     f"SELECT {owner_col} FROM proposals WHERE id = %s",
@@ -955,7 +959,7 @@ def update_proposal(username=None, proposal_id=None, user_id=None, email=None):
                 except Exception:
                     sections_json = str(data['sections'])
                 params.append(sections_json)
-            if 'status' in data and not is_finance:
+            if 'status' in data:
                 updates.append('status = %s')
                 params.append(data['status'])
             # Determine client / metadata columns safely based on schema
@@ -965,13 +969,12 @@ def update_proposal(username=None, proposal_id=None, user_id=None, email=None):
             elif 'client_name' in existing_columns:
                 client_col = 'client_name'
 
-            if client_col and ('client_name' in data or 'client' in data) and not is_finance:
+            if client_col and ('client_name' in data or 'client' in data):
                 updates.append(f"{client_col} = %s")
                 params.append(data.get('client_name') or data.get('client'))
             if (
                 'client_email' in data
                 and 'client_email' in existing_columns
-                and not is_finance
             ):
                 updates.append('client_email = %s')
                 params.append(data['client_email'])
@@ -981,7 +984,6 @@ def update_proposal(username=None, proposal_id=None, user_id=None, email=None):
             if (
                 'timeline_days' in data
                 and 'timeline_days' in existing_columns
-                and not is_finance
             ):
                 updates.append('timeline_days = %s')
                 params.append(data['timeline_days'])
