@@ -129,7 +129,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                     const SizedBox(height: 6),
                     Text(
                       subtitle,
-                      style: PremiumTheme.bodyMedium.copyWith(color: Colors.white70),
+                      style: PremiumTheme.bodyMedium
+                          .copyWith(color: Colors.white70),
                     ),
                   ],
                 ),
@@ -332,14 +333,15 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final app = context.read<AppState>();
-      app.fetchProposals();
+      app.fetchProposals(light: true);
       app.fetchNotifications();
     });
     _aiUsageRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (!mounted) return;
       setState(() => _aiUsageRefreshTick++);
     });
-    _notificationRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+    _notificationRefreshTimer =
+        Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted) return;
       context.read<AppState>().fetchNotifications();
     });
@@ -388,9 +390,10 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
         Widget alertRow(Map<String, dynamic> item, {required bool checked}) {
           final type =
               (item['type'] ?? 'Alert Title').toString().replaceAll('_', ' ');
-          final details = (item['client'] ?? item['message'] ?? item['detail'] ?? '')
-              .toString()
-              .trim();
+          final details =
+              (item['client'] ?? item['message'] ?? item['detail'] ?? '')
+                  .toString()
+                  .trim();
           final line = details.isEmpty ? type : '$type - $details';
           return Row(
             children: [
@@ -414,7 +417,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                 style: TextButton.styleFrom(
                   backgroundColor: Colors.white.withValues(alpha: 0.35),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   shape: const StadiumBorder(),
                 ),
                 child: const Text(
@@ -443,11 +447,13 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Financial Alerts', style: PremiumTheme.titleMedium),
+                        Text('Financial Alerts',
+                            style: PremiumTheme.titleMedium),
                         const SizedBox(height: 4),
                         Text(
                           'Items requiring financial attention.',
-                          style: PremiumTheme.bodyMedium.copyWith(color: Colors.white70),
+                          style: PremiumTheme.bodyMedium
+                              .copyWith(color: Colors.white70),
                         ),
                       ],
                     ),
@@ -468,7 +474,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       '$count',
-                      style: PremiumTheme.titleMedium.copyWith(fontWeight: FontWeight.w800),
+                      style: PremiumTheme.titleMedium
+                          .copyWith(fontWeight: FontWeight.w800),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -477,12 +484,14 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.white,
                       backgroundColor: const Color(0xFFC10D00),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
                       shape: const StadiumBorder(),
                     ),
                     child: const Text(
                       'VIEW ALL',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                      style:
+                          TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ],
@@ -506,7 +515,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                   child: Center(
                     child: Text(
                       'No alerts requiring attention.',
-                      style: PremiumTheme.bodyMedium.copyWith(color: Colors.white60),
+                      style: PremiumTheme.bodyMedium
+                          .copyWith(color: Colors.white60),
                     ),
                   ),
                 )
@@ -554,8 +564,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
             height: 200,
             child: Center(
               child: CircularProgressIndicator(
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.7)),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                    Colors.white.withOpacity(0.7)),
               ),
             ),
           );
@@ -625,8 +635,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                 Expanded(
                   child: Text(
                     label,
-                    style:
-                        PremiumTheme.labelMedium.copyWith(color: Colors.white70),
+                    style: PremiumTheme.labelMedium
+                        .copyWith(color: Colors.white70),
                   ),
                 ),
                 Text(
@@ -715,7 +725,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                   statTile('Success', n(totals['success_count']).toString()),
                   statTile('Failed', n(totals['failed_count']).toString()),
                   statTile('Blocked', n(totals['blocked_count']).toString()),
-                  statTile('Acceptance', '${acceptanceRate.toStringAsFixed(1)}%'),
+                  statTile(
+                      'Acceptance', '${acceptanceRate.toStringAsFixed(1)}%'),
                   statTile('Tokens', totalTokens),
                   statTile('Cost', totalCost),
                   statTile(
@@ -785,7 +796,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                     const SizedBox(height: 6),
                     Text(
                       'Endpoints: $endpointCount | Users: $usersCount',
-                      style: PremiumTheme.bodySmall.copyWith(color: Colors.white54),
+                      style: PremiumTheme.bodySmall
+                          .copyWith(color: Colors.white54),
                     ),
                   ],
                 );
@@ -1317,7 +1329,14 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
   }
 
   Widget _buildRevenueProjectionsChart() {
-    final months = ["Oct '25", "Nov '25", "Dec '25", "Jan '26", "Feb '26", "Mar '26"];
+    final months = [
+      "Oct '25",
+      "Nov '25",
+      "Dec '25",
+      "Jan '26",
+      "Feb '26",
+      "Mar '26"
+    ];
     final projected = [2.20, 2.35, 2.55, 2.85, 2.45, 3.05];
     final actual = [2.05, 2.30, 2.50, 2.80, 3.00, 3.20];
     const yTick = 0.6;
@@ -1388,10 +1407,10 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                   ),
                 ),
                 titlesData: FlTitlesData(
-                  topTitles:
-                      const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles:
-                      const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
@@ -1439,7 +1458,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                     getTooltipItems: (touchedSpots) {
                       if (touchedSpots.isEmpty) return [];
                       final x = touchedSpots.first.x.round();
-                      final month = (x >= 0 && x < months.length) ? months[x] : '';
+                      final month =
+                          (x >= 0 && x < months.length) ? months[x] : '';
                       final proj = projected[x];
                       final act = actual[x];
                       return [
@@ -1610,8 +1630,7 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
             Expanded(
               child: Text(
                 'Added detail is useful or required.',
-                style:
-                    PremiumTheme.bodySmall.copyWith(color: Colors.white54),
+                style: PremiumTheme.bodySmall.copyWith(color: Colors.white54),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -1705,7 +1724,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                   const SizedBox(width: 8),
                   Text(
                     'Hello, ${userName.toString()}',
-                    style: PremiumTheme.bodySmall.copyWith(color: Colors.white70),
+                    style:
+                        PremiumTheme.bodySmall.copyWith(color: Colors.white70),
                   ),
                 ],
               ],
@@ -1863,7 +1883,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
 
               return Container(
                 constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(bottomSheetContext).size.height * 0.8,
+                  maxHeight:
+                      MediaQuery.of(bottomSheetContext).size.height * 0.8,
                 ),
                 padding: EdgeInsets.only(
                   bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
@@ -1922,7 +1943,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                                 ),
                               IconButton(
                                 onPressed: () => Navigator.of(context).pop(),
-                                icon: const Icon(Icons.close, color: Colors.white),
+                                icon: const Icon(Icons.close,
+                                    color: Colors.white),
                               ),
                             ],
                           ),
@@ -1959,21 +1981,24 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                                   final notification = notifications[index];
                                   final title =
                                       notification['title']?.toString().trim();
-                                  final message =
-                                      notification['message']?.toString().trim() ??
-                                          '';
-                                  final isRead = notification['is_read'] == true;
-                                  final timeLabel = _formatNotificationTimestamp(
-                                      notification['created_at']);
+                                  final message = notification['message']
+                                          ?.toString()
+                                          .trim() ??
+                                      '';
+                                  final isRead =
+                                      notification['is_read'] == true;
+                                  final timeLabel =
+                                      _formatNotificationTimestamp(
+                                          notification['created_at']);
 
                                   final dynamic notificationIdRaw =
                                       notification['id'];
-                                  final int? notificationId =
-                                      notificationIdRaw is int
-                                          ? notificationIdRaw
-                                          : int.tryParse(
-                                              notificationIdRaw?.toString() ?? '',
-                                            );
+                                  final int? notificationId = notificationIdRaw
+                                          is int
+                                      ? notificationIdRaw
+                                      : int.tryParse(
+                                          notificationIdRaw?.toString() ?? '',
+                                        );
 
                                   return ListTile(
                                     onTap: () async {
@@ -1991,7 +2016,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                                               ? Icons.chat_bubble_outline
                                               : Icons.mark_chat_unread_outlined)
                                           : (isRead
-                                              ? Icons.notifications_none_outlined
+                                              ? Icons
+                                                  .notifications_none_outlined
                                               : Icons.notifications_active),
                                       color: isRead
                                           ? const Color(0xFF95A5A6)
@@ -2009,11 +2035,13 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                                       ),
                                     ),
                                     subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         if (message.isNotEmpty)
                                           Padding(
-                                            padding: const EdgeInsets.only(top: 4),
+                                            padding:
+                                                const EdgeInsets.only(top: 4),
                                             child: Text(
                                               message,
                                               style: const TextStyle(
@@ -2024,7 +2052,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                                           ),
                                         if (timeLabel.isNotEmpty)
                                           Padding(
-                                            padding: const EdgeInsets.only(top: 4),
+                                            padding:
+                                                const EdgeInsets.only(top: 4),
                                             child: Text(
                                               timeLabel,
                                               style: const TextStyle(
@@ -2415,7 +2444,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                                   final narrow = c.maxWidth < 980;
                                   final revenue = _buildDashboardStylePanel(
                                     title: 'Revenue Projections',
-                                    subtitle: 'Projected vs Actual Monthly Revenue.',
+                                    subtitle:
+                                        'Projected vs Actual Monthly Revenue.',
                                     iconPath: _revenuePanelIcon,
                                     child: _buildRevenueProjectionsChart(),
                                   );

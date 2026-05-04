@@ -1085,39 +1085,13 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
         );
         _sections.add(coverSection);
 
-        final standardizedSections = [
-          DocumentSection(
-            title: 'Company Profile',
-            content:
-                'Add company profile information.\n\nInclude your organization overview, capabilities, and differentiators.',
-            sectionType: 'content',
-          ),
-          DocumentSection(
-            title: 'Title Heading - Left',
-            content:
-                'Add left-column section content.\n\nUse this area for core proposal details and context.',
-            sectionType: 'content',
-          ),
-          DocumentSection(
-            title: 'Title Heading - Right',
-            content:
-                'Add right-column section content.\n\nUse this area for commercial and operational notes.',
-            sectionType: 'content',
-          ),
-          DocumentSection(
-            title: 'Title Heading',
-            content:
-                'Add supporting section details.\n\nInsert additional scope, assumptions, and delivery information.',
-            sectionType: 'content',
-          ),
-          DocumentSection(
-            title: 'Signature & Approval',
-            content:
-                'Signature Name: ______________________\nRole: ______________________\nDate: ______________________\n\nStatus: Verified',
-            sectionType: 'content',
-          ),
-        ];
-        _sections.addAll(standardizedSections);
+        final firstContentPage = DocumentSection(
+          title: 'Untitled Section',
+          content: '',
+          sectionType: 'content',
+          isCoverPage: false,
+        );
+        _sections.add(firstContentPage);
 
         for (final section in _sections) {
           section.contentFocus.addListener(() => setState(() {}));
@@ -5589,39 +5563,46 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                               Expanded(
                                 child: Stack(
                                   children: [
-                                    RawScrollbar(
-                                      controller: _pageScrollController,
-                                      thumbVisibility: true,
-                                      trackVisibility: true,
-                                      interactive: true,
-                                      thickness: 12,
-                                      radius: const Radius.circular(10),
-                                      thumbColor: const Color(0xFFC10D00),
-                                      trackColor:
-                                          Colors.black.withValues(alpha: 0.25),
-                                      trackBorderColor:
-                                          Colors.white.withValues(alpha: 0.25),
-                                      child: SingleChildScrollView(
-                                        controller: _pageScrollController,
-                                        child: Center(
-                                          child: Padding(
+                                    Builder(
+                                      builder: (context) {
+                                        final pages = _buildA4Pages();
+                                        return RawScrollbar(
+                                          controller: _pageScrollController,
+                                          thumbVisibility: true,
+                                          trackVisibility: true,
+                                          interactive: true,
+                                          thickness: 12,
+                                          radius: const Radius.circular(10),
+                                          thumbColor: const Color(0xFFC10D00),
+                                          trackColor: Colors.black
+                                              .withValues(alpha: 0.25),
+                                          trackBorderColor: Colors.white
+                                              .withValues(alpha: 0.25),
+                                          child: ListView.builder(
+                                            controller: _pageScrollController,
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 40,
                                               vertical: 50,
                                             ),
-                                            child: Column(
-                                              children: [
-                                                // Generate A4 pages
-                                                ..._buildA4Pages(),
-                                                // Plus button to add new page
-                                                const SizedBox(height: 24),
-                                                _buildAddPageButton(),
-                                                const SizedBox(height: 40),
-                                              ],
-                                            ),
+                                            itemCount: pages.length + 1,
+                                            itemBuilder: (context, index) {
+                                              if (index < pages.length) {
+                                                return Center(
+                                                  child: pages[index],
+                                                );
+                                              }
+
+                                              return Column(
+                                                children: [
+                                                  const SizedBox(height: 24),
+                                                  _buildAddPageButton(),
+                                                  const SizedBox(height: 40),
+                                                ],
+                                              );
+                                            },
                                           ),
-                                        ),
-                                      ),
+                                        );
+                                      },
                                     ),
                                   ],
                                 ),
@@ -7757,23 +7738,30 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                       cacheHeight: kIsWeb ? (pageHeight * 2).round() : null,
                     ),
                     fit: BoxFit.cover,
-                    opacity: isCover ? 1.0 : 0.7, // Full-bleed cover image
+                    filterQuality:
+                        kIsWeb ? FilterQuality.low : FilterQuality.medium,
+                    // Opacity forces an extra saveLayer/compositing pass. Avoid on web.
+                    opacity: isCover
+                        ? 1.0
+                        : (kIsWeb ? 1.0 : 0.7), // Full-bleed cover image
                   )
                 : null,
             borderRadius:
                 isCover ? BorderRadius.zero : BorderRadius.circular(4),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 5),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            boxShadow: kIsWeb
+                ? const []
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 5),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           child: isCover
               ? (_useStandardizedProposalLayout
