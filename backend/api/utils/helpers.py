@@ -644,6 +644,21 @@ def generate_proposal_pdf(
 
         return header_logo_url, footer_logo_url, header_pos, footer_pos
 
+    def _default_logo_config():
+        header_logo_url = (os.getenv('PDF_HEADER_LOGO_URL') or '').strip() or None
+        footer_logo_url = (os.getenv('PDF_FOOTER_LOGO_URL') or '').strip() or None
+
+        if not header_logo_url:
+            header_logo_url = (os.getenv('KHONOLOGY_LOGO_URL') or '').strip() or None
+
+        header_pos = (os.getenv('PDF_HEADER_LOGO_POSITION') or 'right').strip().lower()
+        footer_pos = (os.getenv('PDF_FOOTER_LOGO_POSITION') or 'left').strip().lower()
+        if header_pos not in ('left', 'center', 'right'):
+            header_pos = 'right'
+        if footer_pos not in ('left', 'center', 'right'):
+            footer_pos = 'left'
+        return header_logo_url, footer_logo_url, header_pos, footer_pos
+
     _SKIP_KEYS = {
         'backgroundColor',
         'backgroundImageUrl',
@@ -895,6 +910,20 @@ def generate_proposal_pdf(
 
     metadata = _get_meta_dict(structured)
     header_logo_url, footer_logo_url, header_logo_pos, footer_logo_pos = _extract_logo_config(metadata)
+
+    if not header_logo_url and not footer_logo_url:
+        default_header_url, default_footer_url, default_header_pos, default_footer_pos = _default_logo_config()
+        header_logo_url = header_logo_url or default_header_url
+        footer_logo_url = footer_logo_url or default_footer_url
+        header_logo_pos = header_logo_pos or default_header_pos
+        footer_logo_pos = footer_logo_pos or default_footer_pos
+    else:
+        default_header_url, default_footer_url, default_header_pos, default_footer_pos = _default_logo_config()
+        header_logo_url = header_logo_url or default_header_url
+        footer_logo_url = footer_logo_url or default_footer_url
+        header_logo_pos = header_logo_pos or default_header_pos
+        footer_logo_pos = footer_logo_pos or default_footer_pos
+
     header_logo_bytes = _fetch_cover_bytes(header_logo_url) if header_logo_url else None
     footer_logo_bytes = _fetch_cover_bytes(footer_logo_url) if footer_logo_url else None
 
