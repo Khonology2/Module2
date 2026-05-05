@@ -624,7 +624,8 @@ class _ProposalsPageState extends State<ProposalsPage>
                   _unreadNotificationCount(app, messagesOnly: messagesOnly);
 
               Future<void> markAllInSheet() async {
-                for (final n in List<Map<String, dynamic>>.from(notifications)) {
+                for (final n
+                    in List<Map<String, dynamic>>.from(notifications)) {
                   if (n['is_read'] == true) continue;
                   final idRaw = n['id'];
                   final id = idRaw is int
@@ -637,7 +638,8 @@ class _ProposalsPageState extends State<ProposalsPage>
               }
 
               Future<void> deleteAllInSheet() async {
-                for (final n in List<Map<String, dynamic>>.from(notifications)) {
+                for (final n
+                    in List<Map<String, dynamic>>.from(notifications)) {
                   final idRaw = n['id'];
                   final id = idRaw is int
                       ? idRaw
@@ -708,8 +710,8 @@ class _ProposalsPageState extends State<ProposalsPage>
                                 ),
                               ),
                               IconButton(
-                                icon:
-                                    const Icon(Icons.close, color: Colors.white),
+                                icon: const Icon(Icons.close,
+                                    color: Colors.white),
                                 onPressed: () => Navigator.of(context).pop(),
                               ),
                             ],
@@ -752,7 +754,8 @@ class _ProposalsPageState extends State<ProposalsPage>
                             final isRead = notification['is_read'] == true;
                             final timeLabel = _formatNotificationTimestamp(
                                 notification['created_at']);
-                            final dynamic notificationIdRaw = notification['id'];
+                            final dynamic notificationIdRaw =
+                                notification['id'];
                             final int? notificationId = notificationIdRaw is int
                                 ? notificationIdRaw
                                 : int.tryParse(
@@ -1355,6 +1358,11 @@ class ProposalItem extends StatelessWidget {
         statusBgColor = const Color(0xFF6CA510); // Green background
         statusColor = Colors.white;
         statusLabel = 'Approved';
+        break;
+      case 'signed':
+        statusBgColor = const Color(0xFF6CA510); // Green background
+        statusColor = Colors.white;
+        statusLabel = 'Signed';
         break;
       case 'declined':
       case 'rejected':

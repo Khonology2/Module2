@@ -3461,9 +3461,9 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       case 'Pending Review':
         return 'Sent for Approval';
       case 'Released':
-        return 'Released';
-      case 'Signed':
         return 'Awaiting Signature';
+      case 'Signed':
+        return 'Signed';
       default:
         final s = statusRaw.trim();
         return s.isEmpty ? 'Drafted' : s;
@@ -3478,9 +3478,9 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       case 'Pending Review':
         return const Color(0xFFEA990C);
       case 'Released':
-        return const Color(0xFF6CA510);
-      case 'Signed':
         return const Color(0xFF6095CC);
+      case 'Signed':
+        return const Color(0xFF6CA510);
       default:
         return const Color(0xFF4B5563);
     }
