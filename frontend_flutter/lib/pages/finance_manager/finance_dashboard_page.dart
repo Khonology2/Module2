@@ -73,7 +73,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage> {
     setState(() => _isLoading = true);
     try {
       await Future.wait([
-        app.fetchProposals(light: true),
+        app.fetchProposals(light: false),
         app.fetchDashboard(),
         app.fetchNotifications(),
       ]);

@@ -1772,12 +1772,12 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     setState(() => _isLoading = true);
     try {
       await Future.wait([
-        app.fetchProposals(light: true),
+        app.fetchProposals(light: false),
         app.fetchDashboard(),
         app.fetchNotifications(),
       ]);
     } catch (e) {
-      debugPrint('Finance dashboard load error: $e');
+      debugPrint('Error loading finance dashboard: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

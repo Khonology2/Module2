@@ -333,7 +333,7 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final app = context.read<AppState>();
-      app.fetchProposals(light: true);
+      app.fetchProposals(light: false);
       app.fetchNotifications();
     });
     _aiUsageRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {

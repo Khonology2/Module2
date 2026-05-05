@@ -496,6 +496,7 @@ def generate_proposal_pdf(
     signer_name=None,
     signer_title=None,
     signed_date=None,
+    standardizedProposalLayout=False,
 ):
     """Generate PDF from proposal content"""
     if not PDF_AVAILABLE:
@@ -966,6 +967,41 @@ def generate_proposal_pdf(
         or metadata.get('standardized_proposal_layout')
     )
 
+    def _read_local_bytes(*parts: str):
+        try:
+            path = os.path.join(*parts)
+            with open(path, 'rb') as f:
+                return f.read()
+        except Exception:
+            return None
+
+    # Standardized layout in Flutter uses local assets.
+    # Prefer those same assets for PDF generation so DocuSign matches manager preview.
+    # Paths are relative to repo root when deployed on Render.
+    _repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+    _frontend_assets = os.path.join(_repo_root, 'frontend_flutter', 'assets')
+    _std_header_bg_bytes = None
+    _std_header_logo_bytes = None
+    _std_footer_asset_bytes = None
+    if use_standardized_layout:
+        _std_header_bg_bytes = _read_local_bytes(
+            _frontend_assets,
+            'images',
+            'new icons for manager',
+            'new_universal_bg_darkmode.png',
+        )
+        _std_header_logo_bytes = _read_local_bytes(
+            _frontend_assets,
+            'images',
+            'new icons for manager',
+            'khonology_logo.png',
+        )
+        _std_footer_asset_bytes = _read_local_bytes(
+            _frontend_assets,
+            'images',
+            'footer.png',
+        )
+
     standardized_date_raw = (
         (metadata.get('standardizedProposalDate') or metadata.get('standardized_proposal_date'))
         if isinstance(metadata, dict)
@@ -996,7 +1032,7 @@ def generate_proposal_pdf(
     else:
         header_bg_url = None
     header_bg_url = header_bg_url or _default_header_bg_url()
-    header_bg_bytes = _fetch_cover_bytes(header_bg_url) if header_bg_url else None
+    header_bg_bytes = _std_header_bg_bytes or (_fetch_cover_bytes(header_bg_url) if header_bg_url else None)
 
     accent_hex = (
         (metadata.get('accentColor') or metadata.get('accent_color'))
@@ -1023,11 +1059,13 @@ def generate_proposal_pdf(
         header_logo_pos = header_logo_pos or default_header_pos
         footer_logo_pos = footer_logo_pos or default_footer_pos
 
-    header_logo_bytes = _fetch_cover_bytes(header_logo_url) if header_logo_url else None
+    header_logo_bytes = _std_header_logo_bytes or (_fetch_cover_bytes(header_logo_url) if header_logo_url else None)
     footer_logo_bytes = _fetch_cover_bytes(footer_logo_url) if footer_logo_url else None
 
     if use_standardized_layout and not footer_logo_bytes:
         footer_logo_bytes = header_logo_bytes
+
+    footer_asset_bytes = _std_footer_asset_bytes
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -1259,6 +1297,26 @@ def generate_proposal_pdf(
         except Exception:
             return
 
+    def _draw_footer_asset(c, _doc, *, img_bytes, y: float, max_h: float):
+        if not img_bytes:
+            return
+        try:
+            page_width, _ = _doc.pagesize
+            img = ImageReader(BytesIO(img_bytes))
+            iw, ih = img.getSize()
+            if not iw or not ih:
+                return
+            left_x = doc.leftMargin
+            right_x = page_width - doc.rightMargin
+            max_w = max(right_x - left_x, 1)
+            scale = min(max_w / float(iw), max_h / float(ih))
+            w = float(iw) * scale
+            h = float(ih) * scale
+            x = (left_x + right_x) / 2.0 - (w / 2.0)
+            c.drawImage(img, x, y, width=w, height=h, preserveAspectRatio=True, mask='auto')
+        except Exception:
+            return
+
     def _draw_cover_page(c, _doc):
         if not cover_bytes:
             return
@@ -1369,13 +1427,12 @@ def generate_proposal_pdf(
             self.line(doc.leftMargin, footer_y + 8, page_width - doc.rightMargin, footer_y + 8)
 
             if use_standardized_layout:
-                _draw_logo(
+                _draw_footer_asset(
                     self,
                     doc,
-                    img_bytes=footer_logo_bytes,
-                    y=footer_y - 6,
-                    height=0.30 * inch,
-                    pos='center',
+                    img_bytes=footer_asset_bytes or footer_logo_bytes,
+                    y=footer_y - 10,
+                    max_h=0.40 * inch,
                 )
             else:
                 _draw_logo(
