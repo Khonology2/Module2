@@ -606,9 +606,20 @@ def generate_proposal_pdf(
         try:
             import urllib.request
 
-            with urllib.request.urlopen(url, timeout=10) as resp:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (compatible; ProposalHubPDF/1.0)',
+                    'Accept': '*/*',
+                },
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
                 return resp.read()
         except Exception:
+            try:
+                print(f"[PDF_GEN] failed_to_fetch_image url={url[:200]}")
+            except Exception:
+                pass
             return None
 
     def _get_meta_dict(structured):
@@ -1014,6 +1025,9 @@ def generate_proposal_pdf(
 
     header_logo_bytes = _fetch_cover_bytes(header_logo_url) if header_logo_url else None
     footer_logo_bytes = _fetch_cover_bytes(footer_logo_url) if footer_logo_url else None
+
+    if use_standardized_layout and not footer_logo_bytes:
+        footer_logo_bytes = header_logo_bytes
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(
