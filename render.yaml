@@ -54,7 +54,7 @@ services:
     env: static
     region: oregon
     plan: starter
-    buildCommand: git clone https://github.com/flutter/flutter.git -b stable /tmp/flutter && export PATH="$PATH:/tmp/flutter/bin" && flutter config --enable-web && cd frontend_flutter && flutter pub get && flutter build web --release --base-href / --dart-define=RISK_GATE_HF_BASE_URL=$RISK_GATE_HF_BASE_URL
+    buildCommand: git clone https://github.com/flutter/flutter.git -b stable /tmp/flutter && export PATH="$PATH:/tmp/flutter/bin" && flutter config --enable-web && cd frontend_flutter && flutter pub get && flutter build web --release --web-renderer html --base-href / --dart-define=RISK_GATE_HF_BASE_URL=$RISK_GATE_HF_BASE_URL
     staticPublishPath: frontend_flutter/build/web
     envVars:
       - key: REACT_APP_API_URL

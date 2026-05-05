@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 class DocumentHeader extends StatelessWidget {
   final String? title;
   final String? subtitle;
   final Widget? leading;
-  final Widget? trailing;
-  final VoidCallback? onTap;
   final Widget? center;
+  final Widget? trailing;
   final String? backgroundImageUrl;
+  final VoidCallback? onTap;
   final bool showDivider;
 
   const DocumentHeader({
@@ -26,12 +27,11 @@ class DocumentHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasTitle = title != null && title!.trim().isNotEmpty;
-    final hasBg = backgroundImageUrl != null &&
-        backgroundImageUrl!.trim().isNotEmpty;
     final hasAnyPlacement =
         leading != null || center != null || trailing != null;
-    final hasSubtitle =
-        subtitle != null && subtitle!.trim().isNotEmpty;
+    final hasSubtitle = subtitle != null && subtitle!.trim().isNotEmpty;
+    final hasBg =
+        backgroundImageUrl != null && backgroundImageUrl!.trim().isNotEmpty;
     if (!hasTitle && !hasSubtitle && !hasBg && !hasAnyPlacement) {
       return const SizedBox.shrink();
     }
@@ -73,6 +73,22 @@ class DocumentHeader extends StatelessWidget {
       ],
     );
 
+    final bool hasBgImage =
+        backgroundImageUrl != null && backgroundImageUrl!.trim().isNotEmpty;
+    final ImageProvider<Object>? bgProvider = !hasBgImage
+        ? null
+        : () {
+            final String trimmedBg = backgroundImageUrl!.trim();
+            if (kIsWeb) {
+              return ResizeImage(
+                NetworkImage(trimmedBg),
+                width: 1200,
+                height: 160,
+              ) as ImageProvider<Object>;
+            }
+            return NetworkImage(trimmedBg) as ImageProvider<Object>;
+          }();
+
     final headerContent = Container(
       height: 80,
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
@@ -83,13 +99,12 @@ class DocumentHeader extends StatelessWidget {
                 bottom: BorderSide(color: Color(0xFFE5E7EB)),
               )
             : null,
-        image:
-            backgroundImageUrl != null && backgroundImageUrl!.trim().isNotEmpty
-                ? DecorationImage(
-                    image: NetworkImage(backgroundImageUrl!),
-                    fit: BoxFit.cover,
-                  )
-                : null,
+        image: bgProvider == null
+            ? null
+            : DecorationImage(
+                image: bgProvider,
+                fit: BoxFit.cover,
+              ),
       ),
       child: Stack(
         children: [

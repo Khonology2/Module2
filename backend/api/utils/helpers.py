@@ -644,6 +644,45 @@ def generate_proposal_pdf(
 
         return header_logo_url, footer_logo_url, header_pos, footer_pos
 
+    def _default_header_bg_url():
+        return (os.getenv('PDF_HEADER_BACKGROUND_URL') or '').strip() or None
+
+    def _default_accent_color():
+        return (os.getenv('PDF_ACCENT_COLOR') or '').strip() or None
+
+    def _parse_hex_color(v, *, default_rgb=(0.756, 0.051, 0.0)):
+        if not v:
+            return default_rgb
+        try:
+            s = str(v).strip()
+            if s.startswith('#'):
+                s = s[1:]
+            if len(s) == 3:
+                s = ''.join(ch + ch for ch in s)
+            if len(s) != 6:
+                return default_rgb
+            r = int(s[0:2], 16) / 255.0
+            g = int(s[2:4], 16) / 255.0
+            b = int(s[4:6], 16) / 255.0
+            return (r, g, b)
+        except Exception:
+            return default_rgb
+
+    def _default_logo_config():
+        header_logo_url = (os.getenv('PDF_HEADER_LOGO_URL') or '').strip() or None
+        footer_logo_url = (os.getenv('PDF_FOOTER_LOGO_URL') or '').strip() or None
+
+        if not header_logo_url:
+            header_logo_url = (os.getenv('KHONOLOGY_LOGO_URL') or '').strip() or None
+
+        header_pos = (os.getenv('PDF_HEADER_LOGO_POSITION') or 'right').strip().lower()
+        footer_pos = (os.getenv('PDF_FOOTER_LOGO_POSITION') or 'left').strip().lower()
+        if header_pos not in ('left', 'center', 'right'):
+            header_pos = 'right'
+        if footer_pos not in ('left', 'center', 'right'):
+            footer_pos = 'left'
+        return header_logo_url, footer_logo_url, header_pos, footer_pos
+
     _SKIP_KEYS = {
         'backgroundColor',
         'backgroundImageUrl',
@@ -895,6 +934,48 @@ def generate_proposal_pdf(
 
     metadata = _get_meta_dict(structured)
     header_logo_url, footer_logo_url, header_logo_pos, footer_logo_pos = _extract_logo_config(metadata)
+    hide_header_footer_on_cover = bool(
+        metadata.get('hideHeaderFooterOnCover')
+        or metadata.get('hide_header_footer_on_cover')
+    )
+
+    header_bg_url = (
+        (metadata.get('headerBackgroundImageUrl') or metadata.get('header_background_image_url'))
+        if isinstance(metadata, dict)
+        else None
+    )
+    if isinstance(header_bg_url, str):
+        header_bg_url = header_bg_url.strip() or None
+    else:
+        header_bg_url = None
+    header_bg_url = header_bg_url or _default_header_bg_url()
+    header_bg_bytes = _fetch_cover_bytes(header_bg_url) if header_bg_url else None
+
+    accent_hex = (
+        (metadata.get('accentColor') or metadata.get('accent_color'))
+        if isinstance(metadata, dict)
+        else None
+    )
+    if isinstance(accent_hex, str):
+        accent_hex = accent_hex.strip() or None
+    else:
+        accent_hex = None
+    accent_hex = accent_hex or _default_accent_color()
+    accent_rgb = _parse_hex_color(accent_hex)
+
+    if not header_logo_url and not footer_logo_url:
+        default_header_url, default_footer_url, default_header_pos, default_footer_pos = _default_logo_config()
+        header_logo_url = header_logo_url or default_header_url
+        footer_logo_url = footer_logo_url or default_footer_url
+        header_logo_pos = header_logo_pos or default_header_pos
+        footer_logo_pos = footer_logo_pos or default_footer_pos
+    else:
+        default_header_url, default_footer_url, default_header_pos, default_footer_pos = _default_logo_config()
+        header_logo_url = header_logo_url or default_header_url
+        footer_logo_url = footer_logo_url or default_footer_url
+        header_logo_pos = header_logo_pos or default_header_pos
+        footer_logo_pos = footer_logo_pos or default_footer_pos
+
     header_logo_bytes = _fetch_cover_bytes(header_logo_url) if header_logo_url else None
     footer_logo_bytes = _fetch_cover_bytes(footer_logo_url) if footer_logo_url else None
 
@@ -904,7 +985,7 @@ def generate_proposal_pdf(
         pagesize=A4,
         leftMargin=0.85 * inch,
         rightMargin=0.85 * inch,
-        topMargin=1.05 * inch,
+        topMargin=1.95 * inch,
         bottomMargin=1.0 * inch,
         title=title or "Proposal",
         author="ProposalHub",
@@ -1085,6 +1166,7 @@ def generate_proposal_pdf(
 
     has_cover_page = bool(cover_bytes)
     header_title = (title or "Proposal").strip() or "Proposal"
+    header_date_text = created_at.strftime('%d/%m/%Y')
 
     def _pos_x(pos: str, *, left_x: float, right_x: float, width: float):
         if pos == 'left':
@@ -1122,6 +1204,64 @@ def generate_proposal_pdf(
         except Exception:
             pass
 
+    def _draw_header_banner(c, _doc, *, report_title: str, page_title: str, date_text: str):
+        page_width, page_height = _doc.pagesize
+        banner_h = 0.60 * inch
+        bar_h = 0.28 * inch
+        top_y = page_height
+
+        c.saveState()
+
+        header_bg_ok = False
+        if header_bg_bytes:
+            try:
+                img = ImageReader(BytesIO(header_bg_bytes))
+                c.drawImage(
+                    img,
+                    0,
+                    top_y - banner_h,
+                    width=page_width,
+                    height=banner_h,
+                    preserveAspectRatio=True,
+                    anchor='c',
+                )
+                header_bg_ok = True
+            except Exception:
+                header_bg_ok = False
+
+        if not header_bg_ok:
+            c.setFillColorRGB(0.07, 0.07, 0.07)
+            c.rect(0, top_y - banner_h, page_width, banner_h, stroke=0, fill=1)
+
+        c.setFillColorRGB(*accent_rgb)
+        c.rect(0, top_y - banner_h - bar_h, page_width, bar_h, stroke=0, fill=1)
+
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont('Helvetica-Bold', 10)
+        c.drawString(doc.leftMargin, top_y - (0.33 * inch), report_title)
+        c.setFont('Helvetica', 9)
+        c.drawRightString(page_width - doc.rightMargin, top_y - (0.33 * inch), date_text)
+
+        _draw_logo(
+            c,
+            doc,
+            img_bytes=header_logo_bytes,
+            y=top_y - (0.52 * inch),
+            height=0.32 * inch,
+            pos=header_logo_pos,
+        )
+
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(doc.leftMargin, top_y - banner_h - (0.20 * inch), f"Title: {page_title}")
+        c.drawRightString(
+            page_width - doc.rightMargin,
+            top_y - banner_h - (0.20 * inch),
+            f"Date: {date_text}",
+        )
+
+        c.restoreState()
+
     class _NumberedCanvas(canvas.Canvas):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
@@ -1142,22 +1282,23 @@ def generate_proposal_pdf(
         def _draw_header_footer(self, total_pages: int):
             page_width, page_height = doc.pagesize
             page_num = self.getPageNumber()
-            if has_cover_page and page_num == 1:
+            if hide_header_footer_on_cover and has_cover_page and page_num == 1:
                 return
             self.saveState()
+            _draw_header_banner(
+                self,
+                doc,
+                report_title='PROPOSAL REPORT',
+                page_title=header_title,
+                date_text=header_date_text,
+            )
+
             self.setFont("Helvetica", 8)
             self.setFillColorRGB(0.25, 0.25, 0.25)
-
-            header_y = page_height - (0.75 * inch)
             footer_y = 0.75 * inch
-
             self.setStrokeColorRGB(0.85, 0.85, 0.85)
             self.setLineWidth(0.5)
-            self.line(doc.leftMargin, header_y - 8, page_width - doc.rightMargin, header_y - 8)
             self.line(doc.leftMargin, footer_y + 8, page_width - doc.rightMargin, footer_y + 8)
-
-            _draw_logo(self, doc, img_bytes=header_logo_bytes, y=header_y - 6, height=0.28 * inch, pos=header_logo_pos)
-            self.drawString(doc.leftMargin, header_y, header_title)
 
             _draw_logo(self, doc, img_bytes=footer_logo_bytes, y=footer_y - 3, height=0.22 * inch, pos=footer_logo_pos)
             footer_right = f"Page {page_num} of {total_pages}"

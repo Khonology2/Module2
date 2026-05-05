@@ -535,11 +535,14 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchProposals() async {
+  Future<void> fetchProposals({bool light = false}) async {
     try {
+      final uri = Uri.parse(
+        light ? "$baseUrl/api/proposals?light=1" : "$baseUrl/api/proposals",
+      );
       final r = await http
           .get(
-        Uri.parse("$baseUrl/api/proposals"),
+        uri,
         headers: _headers,
       )
           .timeout(

@@ -73,7 +73,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage> {
     setState(() => _isLoading = true);
     try {
       await Future.wait([
-        app.fetchProposals(),
+        app.fetchProposals(light: true),
         app.fetchDashboard(),
         app.fetchNotifications(),
       ]);
@@ -555,7 +555,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage> {
                                               ? Icons.chat_bubble_outline
                                               : Icons.mark_chat_unread_outlined)
                                           : (isRead
-                                              ? Icons.notifications_none_outlined
+                                              ? Icons
+                                                  .notifications_none_outlined
                                               : Icons.notifications_active),
                                       color: isRead
                                           ? const Color(0xFF95A5A6)
