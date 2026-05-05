@@ -223,6 +223,83 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
     );
   }
 
+  Widget _glassIconButton({
+    required ManagerChromeTheme chrome,
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback? onTap,
+    Color? iconColor,
+  }) {
+    final enabled = onTap != null;
+    final bg = chrome.isDark
+        ? Colors.black.withValues(alpha: 0.24)
+        : chrome.floatingFill;
+    final border = chrome.isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : chrome.divider;
+
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 160),
+          opacity: enabled ? 1 : 0.45,
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: border),
+            ),
+            child: Center(
+              child: Icon(
+                icon,
+                size: 18,
+                color: iconColor ?? chrome.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _overlayIconButton({
+    required ManagerChromeTheme chrome,
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.40),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.14),
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              icon,
+              size: 16,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSidebarNavItem({
     required String label,
     required String assetPath,
@@ -511,16 +588,45 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: chrome.floatingFill,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: chrome.divider),
-      ),
+      decoration: chrome.floatingPanelDecoration(radius: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.30),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/new icons for manager/Project Management_Red Badge_White.png',
+                    width: 44,
+                    height: 44,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: PremiumTheme.primaryRed,
+                        child: const Icon(
+                          Icons.article_outlined,
+                          size: 20,
+                          color: Colors.white,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -546,24 +652,27 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
                   ],
                 ),
               ),
-              IconButton(
+              _glassIconButton(
+                chrome: chrome,
                 tooltip: "Version history",
-                icon: Icon(Icons.history,
-                    size: 18, color: chrome.textSecondary),
-                onPressed: () => _showVersionHistory(context, item),
+                icon: Icons.history,
+                onTap: () => _showVersionHistory(context, item),
               ),
               if (canEdit) ...[
-                IconButton(
+                const SizedBox(width: 6),
+                _glassIconButton(
+                  chrome: chrome,
                   tooltip: "Edit block",
-                  icon: Icon(Icons.edit_outlined,
-                      size: 18, color: chrome.textSecondary),
-                  onPressed: () => _showEditDialog(context, app, item),
+                  icon: Icons.edit_outlined,
+                  onTap: () => _showEditDialog(context, app, item),
                 ),
-                IconButton(
+                const SizedBox(width: 6),
+                _glassIconButton(
+                  chrome: chrome,
                   tooltip: "Delete block",
-                  icon: const Icon(Icons.delete_outline,
-                      size: 18, color: Colors.redAccent),
-                  onPressed: () => _deleteItem(context, app, item["id"]),
+                  icon: Icons.delete_outline,
+                  iconColor: Colors.redAccent,
+                  onTap: () => _deleteItem(context, app, item["id"]),
                 ),
               ],
             ],
@@ -785,13 +894,7 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      decoration: chrome.isDark
-          ? PremiumTheme.glassCard(
-              borderRadius: 10,
-              gradientStart: templateColor,
-              gradientEnd: templateColor.withOpacity(0.6),
-            )
-          : chrome.floatingPanelDecoration(radius: 10),
+      decoration: chrome.floatingPanelDecoration(radius: 10),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -809,12 +912,21 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
                 Row(
                   children: [
                     Container(
+                      width: 44,
+                      height: 44,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: templateColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(10),
+                        color: chrome.floatingFill,
+                        shape: BoxShape.circle,
                       ),
-                      child: Icon(templateIcon, color: templateColor, size: 24),
+                      child: Image.asset(
+                        'assets/images/content_library.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(templateIcon,
+                              color: templateColor, size: 22);
+                        },
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -843,17 +955,19 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
                       ),
                     ),
                     if (canEdit) ...[
-                      IconButton(
+                      _glassIconButton(
+                        chrome: chrome,
                         tooltip: "Edit template",
-                        icon: Icon(Icons.edit_outlined,
-                            size: 18, color: chrome.textSecondary),
-                        onPressed: () => _showEditDialog(context, app, item),
+                        icon: Icons.edit_outlined,
+                        onTap: () => _showEditDialog(context, app, item),
                       ),
-                      IconButton(
+                      const SizedBox(width: 6),
+                      _glassIconButton(
+                        chrome: chrome,
                         tooltip: "Delete template",
-                        icon: const Icon(Icons.delete_outline,
-                            size: 18, color: Colors.redAccent),
-                        onPressed: () => _deleteItem(context, app, item["id"]),
+                        icon: Icons.delete_outline,
+                        iconColor: Colors.redAccent,
+                        onTap: () => _deleteItem(context, app, item["id"]),
                       ),
                     ],
                   ],
@@ -1675,38 +1789,40 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 24, vertical: 18),
-                            decoration: BoxDecoration(
-                              gradient: chrome.isDark
-                                  ? const LinearGradient(
-                                      colors: [
-                                        Color(0xFF0F172A),
-                                        Color(0xFF1E293B),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    )
-                                  : null,
-                              color: chrome.isDark ? null : chrome.floatingFill,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: chrome.divider,
-                                width: 1,
-                              ),
-                            ),
+                            decoration: chrome.floatingPanelDecoration(radius: 10),
                             child: Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(14),
+                                  width: 80,
+                                  height: 80,
                                   decoration: BoxDecoration(
-                                    color: PremiumTheme.purple
-                                        .withValues(alpha: 0.25),
                                     shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.30),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
                                   ),
-                                  child: Icon(Icons.library_books,
-                                      size: 22,
-                                      color: chrome.isDark
-                                          ? Colors.white
-                                          : ManagerChromeTheme.textDark),
+                                  child: ClipOval(
+                                    child: Image.asset(
+                                      'assets/images/new icons for manager/Project Management_Red Badge_White.png',
+                                      width: 80,
+                                      height: 80,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Container(
+                                          color: PremiumTheme.primaryRed,
+                                          child: const Icon(
+                                            Icons.library_books,
+                                            size: 32,
+                                            color: Colors.white,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
                                 ),
                                 const SizedBox(width: 16),
                                 Column(
@@ -1736,12 +1852,12 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
                                     setState(() => _showAIGenerator = true);
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: PremiumTheme.purple,
+                                    backgroundColor: PremiumTheme.primaryRed,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 18, vertical: 12),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(20),
                                     ),
                                     elevation: 0,
                                   ),
@@ -1754,12 +1870,12 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
                                   onPressed: () =>
                                       _showNewContentMenu(context, app),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: PremiumTheme.teal,
+                                    backgroundColor: PremiumTheme.primaryRed,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 18, vertical: 12),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(20),
                                     ),
                                     elevation: 0,
                                   ),
@@ -1770,716 +1886,762 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
                             ),
                           ),
                           const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 0),
-                            child: Row(
-                              children: [
-                                _buildTabButton(
-                                  chrome: chrome,
-                                  label: "Text Blocks",
-                                  isActive: selectedCategory == "Sections",
-                                  onTap: () {
-                                    setState(() {
-                                      selectedCategory = "Sections";
-                                      currentFolderId = null;
-                                      paginationPage = 1;
-                                    });
-                                  },
-                                ),
-                                _buildTabButton(
-                                  chrome: chrome,
-                                  label: "Image Library",
-                                  isActive: selectedCategory == "Images",
-                                  onTap: () {
-                                    setState(() {
-                                      selectedCategory = "Images";
-                                      currentFolderId = null;
-                                      paginationPage = 1;
-                                    });
-                                  },
-                                ),
-                                _buildTabButton(
-                                  chrome: chrome,
-                                  label: "Templates",
-                                  isActive: selectedCategory == "Templates" ||
-                                      selectedCategory == "Template",
-                                  onTap: () {
-                                    setState(() {
-                                      selectedCategory = "Templates";
-                                      currentFolderId = null;
-                                      paginationPage = 1;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.all(0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: searchCtrl,
-                                    onChanged: (v) =>
-                                        setState(() => searchQuery = v),
-                                    style: TextStyle(color: chrome.textPrimary),
-                                    decoration: InputDecoration(
-                                      prefixIcon: const Icon(Icons.search),
-                                      prefixIconColor: chrome.textSecondary,
-                                      hintText: "Search content, tags...",
-                                      hintStyle:
-                                          TextStyle(color: chrome.textMuted),
-                                      filled: true,
-                                      fillColor: chrome.fieldFill,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                        borderSide: BorderSide(
-                                          color: chrome.fieldBorder,
-                                        ),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                        borderSide: BorderSide(
-                                          color: chrome.fieldBorder,
-                                        ),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                        borderSide: BorderSide(
-                                          color: PremiumTheme.purple
-                                              .withValues(alpha: 0.8),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12),
-                                  decoration: BoxDecoration(
-                                    color: chrome.fieldFill,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: chrome.fieldBorder,
-                                    ),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: typeFilter,
-                                      dropdownColor: chrome.dropdownSurface,
-                                      iconEnabledColor: chrome.textSecondary,
-                                      style: TextStyle(
-                                          color: chrome.textPrimary,
-                                          fontSize: 13),
-                                      items: const [
-                                        DropdownMenuItem(
-                                            value: "all",
-                                            child: Text("All Types")),
-                                      ],
-                                      onChanged: (v) {
-                                        setState(() {
-                                          typeFilter = v ?? 'all';
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          // Filter/Sort Bar
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: chrome.floatingFill,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: chrome.divider,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.sort,
-                                    size: 18, color: chrome.textSecondary),
-                                const SizedBox(width: 12),
-                                DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: sortBy,
-                                    dropdownColor: chrome.dropdownSurface,
-                                    iconEnabledColor: chrome.textSecondary,
-                                    isDense: true,
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        color: chrome.textPrimary),
-                                    items: sortOptions.map((option) {
-                                      return DropdownMenuItem(
-                                        value: option,
-                                        child: Text(option),
-                                      );
-                                    }).toList(),
-                                    onChanged: (value) {
-                                      setState(() {
-                                        sortBy = value!;
-                                        paginationPage = 1;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          // Pagination Info
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                "${startIdx + 1}-${endIdx} of ${filteredItems.length}",
-                                style: TextStyle(
-                                    fontSize: 12, color: chrome.textSecondary),
-                              ),
-                              Row(
-                                children: [
-                                  IconButton(
-                                    onPressed: paginationPage > 1
-                                        ? () => setState(() => paginationPage--)
-                                        : null,
-                                    icon: const Icon(Icons.chevron_left),
-                                    iconSize: 20,
-                                    color: chrome.textSecondary,
-                                  ),
-                                  IconButton(
-                                    onPressed: paginationPage < totalPages
-                                        ? () => setState(() => paginationPage++)
-                                        : null,
-                                    icon: const Icon(Icons.chevron_right),
-                                    iconSize: 20,
-                                    color: chrome.textSecondary,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          // Content List or Grid
                           Expanded(
-                            child: pagedItems.isEmpty
-                                ? Center(
-                                    child: Text(
-                                      "No items found",
-                                      style: TextStyle(
-                                          color: chrome.textSecondary),
-                                    ),
-                                  )
-                                : RawScrollbar(
-                                    controller: _listScrollController,
-                                    thumbVisibility: true,
-                                    trackVisibility: true,
-                                    thumbColor: chrome.scrollbarThumb
-                                        .withValues(alpha: 0.85),
-                                    trackColor: chrome.scrollbarTrack,
-                                    radius: const Radius.circular(6),
-                                    thickness: 6,
-                                    child: (selectedCategory == "Images")
-                                    ? GridView.builder(
-                                        controller: _listScrollController,
-                                        gridDelegate:
-                                            const SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 3,
-                                          crossAxisSpacing: 8,
-                                          mainAxisSpacing: 8,
-                                          childAspectRatio: 0.8,
-                                        ),
-                                        itemCount: pagedItems.length,
-                                        itemBuilder: (ctx, i) {
-                                          final item = pagedItems[i];
-                                          final isFolder =
-                                              item["is_folder"] ?? false;
-
-                                          if (isFolder) {
-                                            // Folder - show as card with folder icon
-                                            return GestureDetector(
-                                              onTap: () => setState(() =>
-                                                  currentFolderId = item["id"]),
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  color: chrome.floatingFill,
-                                                  borderRadius:
-                                                      BorderRadius.circular(10),
-                                                  border: Border.all(
-                                                    color: chrome.divider,
-                                                  ),
-                                                ),
-                                                child: Column(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  children: [
-                                                    Icon(Icons.folder,
-                                                        color:
-                                                            PremiumTheme.purple,
-                                                        size: 48),
-                                                    const SizedBox(height: 12),
-                                                    Padding(
-                                                      padding: const EdgeInsets
-                                                          .symmetric(
-                                                          horizontal: 8),
-                                                      child: Text(
-                                                        item["label"] ??
-                                                            item["key"] ??
-                                                            "Folder",
-                                                        maxLines: 2,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        textAlign:
-                                                            TextAlign.center,
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: chrome
-                                                              .textPrimary,
+                            child: Container(
+                              padding: const EdgeInsets.all(18),
+                              decoration: chrome.floatingPanelDecoration(radius: 10),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      _buildTabButton(
+                                        chrome: chrome,
+                                        label: "Text Blocks",
+                                        isActive: selectedCategory == "Sections",
+                                        onTap: () {
+                                          setState(() {
+                                            selectedCategory = "Sections";
+                                            currentFolderId = null;
+                                            paginationPage = 1;
+                                          });
+                                        },
+                                      ),
+                                      const SizedBox(width: 8),
+                                      _buildTabButton(
+                                        chrome: chrome,
+                                        label: "Image Library",
+                                        isActive: selectedCategory == "Images",
+                                        onTap: () {
+                                          setState(() {
+                                            selectedCategory = "Images";
+                                            currentFolderId = null;
+                                            paginationPage = 1;
+                                          });
+                                        },
+                                      ),
+                                      const SizedBox(width: 8),
+                                      _buildTabButton(
+                                        chrome: chrome,
+                                        label: "Templates",
+                                        isActive: selectedCategory == "Templates" ||
+                                            selectedCategory == "Template",
+                                        onTap: () {
+                                          setState(() {
+                                            selectedCategory = "Templates";
+                                            currentFolderId = null;
+                                            paginationPage = 1;
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: SizedBox(
+                                          height: 43.060546875,
+                                          child: Stack(
+                                            alignment: Alignment.centerLeft,
+                                            children: [
+                                              Positioned.fill(
+                                                child: Padding(
+                                                  padding: const EdgeInsets.only(left: 22),
+                                                  child: Container(
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFF3D3D3D),
+                                                      borderRadius: BorderRadius.circular(22),
+                                                    ),
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.only(left: 36, right: 12),
+                                                      child: Center(
+                                                        child: TextField(
+                                                          controller: searchCtrl,
+                                                          onChanged: (v) => setState(() => searchQuery = v),
+                                                          style: const TextStyle(color: Colors.white),
+                                                          decoration: const InputDecoration(
+                                                            hintText: 'Search content, tags...',
+                                                            hintStyle: TextStyle(
+                                                              color: Color(0xFF9CA3AF),
+                                                              fontSize: 14,
+                                                            ),
+                                                            border: InputBorder.none,
+                                                            contentPadding: EdgeInsets.zero,
+                                                            isDense: true,
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
-                                                  ],
+                                                  ),
                                                 ),
                                               ),
-                                            );
-                                          }
-
-                                          // File/Image card item
-                                          bool isImage =
-                                              selectedCategory == "Images";
-                                          String? imageUrl =
-                                              isImage ? item["content"] : null;
-
-                                          final _gRole = (app.currentUser?['role'] ?? '')
-                                              .toString().toLowerCase().trim();
-                                          final canEditGrid = _gRole == 'admin' ||
-                                              _gRole == 'ceo' ||
-                                              _gRole == 'manager' ||
-                                              _gRole == 'creator' ||
-                                              _gRole == 'user';
-
-                                          return GestureDetector(
-                                            onLongPress: canEditGrid
-                                                ? () {
-                                              showDialog(
-                                                context: context,
-                                                builder: (ctx) => AlertDialog(
-                                                  title: const Text("Options"),
-                                                  actions: [
-                                                    TextButton(
-                                                      onPressed: () {
-                                                        Navigator.pop(ctx);
-                                                        _showEditDialog(
-                                                            context, app, item);
-                                                      },
-                                                      child: const Text("Edit"),
-                                                    ),
-                                                    TextButton(
-                                                      onPressed: () {
-                                                        Navigator.pop(ctx);
-                                                        _deleteItem(context,
-                                                            app, item["id"]);
-                                                      },
-                                                      child:
-                                                          const Text("Delete"),
+                                              Container(
+                                                width: 43,
+                                                height: 43,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors.black.withValues(alpha: 0.35),
+                                                      blurRadius: 12,
+                                                      offset: const Offset(0, 4),
                                                     ),
                                                   ],
                                                 ),
+                                                child: ClipOval(
+                                                  child: Image.asset(
+                                                    'assets/images/new icons for manager/Search_Seek_Red Badge_White.png',
+                                                    width: 43,
+                                                    height: 43,
+                                                    fit: BoxFit.cover,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF4B5563),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: DropdownButtonHideUnderline(
+                                          child: DropdownButton<String>(
+                                            value: typeFilter,
+                                            dropdownColor: const Color(0xFF4B5563),
+                                            iconEnabledColor: Colors.white,
+                                            style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 13),
+                                            items: const [
+                                              DropdownMenuItem(
+                                                  value: "all",
+                                                  child: Text("All Types")),
+                                            ],
+                                            onChanged: (v) {
+                                              setState(() {
+                                                typeFilter = v ?? 'all';
+                                              });
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF3D3D3D),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: Colors.white.withValues(alpha: 0.12),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.sort,
+                                            size: 18, color: Colors.white),
+                                        const SizedBox(width: 12),
+                                        DropdownButtonHideUnderline(
+                                          child: DropdownButton<String>(
+                                            value: sortBy,
+                                            dropdownColor: const Color(0xFF3D3D3D),
+                                            iconEnabledColor: Colors.white,
+                                            isDense: true,
+                                            style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.white),
+                                            items: sortOptions.map((option) {
+                                              return DropdownMenuItem(
+                                                value: option,
+                                                child: Text(option),
                                               );
-                                            }
+                                            }).toList(),
+                                            onChanged: (value) {
+                                              setState(() {
+                                                sortBy = value!;
+                                                paginationPage = 1;
+                                              });
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        "${startIdx + 1}-${endIdx} of ${filteredItems.length}",
+                                        style: TextStyle(
+                                            fontSize: 12, color: chrome.textSecondary),
+                                      ),
+                                      Row(
+                                        children: [
+                                          _glassIconButton(
+                                            chrome: chrome,
+                                            tooltip: 'Previous page',
+                                            icon: Icons.chevron_left,
+                                            onTap: paginationPage > 1
+                                                ? () => setState(() => paginationPage--)
                                                 : null,
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color: chrome.floatingFill,
-                                                borderRadius:
-                                                    BorderRadius.circular(10),
-                                                border: Border.all(
-                                                  color: chrome.divider,
-                                                ),
-                                              ),
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.stretch,
-                                                children: [
-                                                  Expanded(
-                                                    child: Stack(
-                                                      children: [
-                                                        ClipRRect(
-                                                          borderRadius:
-                                                              const BorderRadius
-                                                                  .only(
-                                                            topLeft:
-                                                                Radius.circular(
-                                                                    12),
-                                                            topRight:
-                                                                Radius.circular(
-                                                                    12),
-                                                          ),
-                                                          child: isImage &&
-                                                                  imageUrl !=
-                                                                      null
-                                                              ? Image.network(
-                                                                  imageUrl,
-                                                                  fit: BoxFit
-                                                                      .cover,
-                                                                  errorBuilder:
-                                                                      (context,
-                                                                          error,
-                                                                          stackTrace) {
-                                                                    return Container(
-                                                                      color: Colors
-                                                                              .grey[
-                                                                          200],
-                                                                      child: const Icon(
-                                                                          Icons
-                                                                              .image_not_supported,
-                                                                          color:
-                                                                              Colors.grey),
-                                                                    );
-                                                                  },
-                                                                  loadingBuilder:
-                                                                      (context,
-                                                                          child,
-                                                                          loadingProgress) {
-                                                                    if (loadingProgress ==
-                                                                        null)
-                                                                      return child;
-                                                                    return Container(
-                                                                      color: Colors
-                                                                          .white
-                                                                          .withValues(
-                                                                              alpha: 0.04),
-                                                                      child:
-                                                                          const Center(
-                                                                        child:
-                                                                            SizedBox(
-                                                                          width:
-                                                                              20,
-                                                                          height:
-                                                                              20,
-                                                                          child:
-                                                                              CircularProgressIndicator(
-                                                                            strokeWidth:
-                                                                                2,
-                                                                          ),
-                                                                        ),
-                                                                      ),
-                                                                    );
-                                                                  },
-                                                                )
-                                                              : Container(
-                                                                  color: Colors
-                                                                      .white
-                                                                      .withValues(
-                                                                          alpha:
-                                                                              0.04),
-                                                                  child: Center(
-                                                                    child:
-                                                                        Column(
-                                                                      mainAxisAlignment:
-                                                                          MainAxisAlignment
-                                                                              .center,
-                                                                      children: [
-                                                                        Icon(
-                                                                          _getFileIcon(item["label"] ??
-                                                                              ""),
-                                                                          size:
-                                                                              48,
-                                                                          color:
-                                                                              PremiumTheme.purple,
-                                                                        ),
-                                                                        const SizedBox(
-                                                                            height:
-                                                                                8),
-                                                                        Text(
-                                                                          _getFileExtension(item["label"] ??
-                                                                              ""),
-                                                                          style:
-                                                                              TextStyle(
-                                                                            fontSize:
-                                                                                11,
-                                                                            color:
-                                                                                chrome.textSecondary,
-                                                                          ),
-                                                                        ),
-                                                                      ],
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                        ),
-                                                        if (isImage && canEditGrid)
-                                                          Positioned(
-                                                            top: 8,
-                                                            right: 8,
-                                                            child: Row(
+                                          ),
+                                          const SizedBox(width: 8),
+                                          _glassIconButton(
+                                            chrome: chrome,
+                                            tooltip: 'Next page',
+                                            icon: Icons.chevron_right,
+                                            onTap: paginationPage < totalPages
+                                                ? () => setState(() => paginationPage++)
+                                                : null,
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Expanded(
+                                    child: pagedItems.isEmpty
+                                        ? Center(
+                                            child: Text(
+                                              "No items found",
+                                              style: TextStyle(
+                                                  color: chrome.textSecondary),
+                                            ),
+                                          )
+                                        : RawScrollbar(
+                                            controller: _listScrollController,
+                                            thumbVisibility: true,
+                                            trackVisibility: true,
+                                            thumbColor: chrome.scrollbarThumb
+                                                .withValues(alpha: 0.85),
+                                            trackColor: chrome.scrollbarTrack,
+                                            radius: const Radius.circular(6),
+                                            thickness: 6,
+                                            child: selectedCategory == "Images"
+                                                ? GridView.builder(
+                                                    controller: _listScrollController,
+                                                    gridDelegate:
+                                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                                      crossAxisCount: 3,
+                                                      crossAxisSpacing: 8,
+                                                      mainAxisSpacing: 8,
+                                                      childAspectRatio: 0.8,
+                                                    ),
+                                                    itemCount: pagedItems.length,
+                                                    itemBuilder: (ctx, i) {
+                                                      final item = pagedItems[i];
+                                                      final isFolder =
+                                                          item["is_folder"] ?? false;
+
+                                                      if (isFolder) {
+                                                        // Folder - show as card with folder icon
+                                                        return GestureDetector(
+                                                          onTap: () => setState(() =>
+                                                              currentFolderId =
+                                                                  item["id"]),
+                                                          child: Container(
+                                                            decoration: BoxDecoration(
+                                                              color: chrome.floatingFill,
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(10),
+                                                              border: Border.all(
+                                                                color: chrome.divider,
+                                                              ),
+                                                            ),
+                                                            child: Column(
+                                                              mainAxisAlignment:
+                                                                  MainAxisAlignment
+                                                                      .center,
                                                               children: [
-                                                                InkWell(
-                                                                  onTap: () =>
-                                                                      _showEditDialog(
-                                                                          context,
-                                                                          app,
-                                                                          item),
-                                                                  child:
-                                                                      Container(
-                                                                    decoration:
-                                                                        BoxDecoration(
-                                                                      color: Colors
-                                                                          .black
-                                                                          .withOpacity(
-                                                                              0.4),
-                                                                      borderRadius:
-                                                                          BorderRadius.circular(
-                                                                              6),
-                                                                    ),
-                                                                    padding:
-                                                                        const EdgeInsets
-                                                                            .all(
-                                                                            6),
-                                                                    child: const Icon(
-                                                                        Icons
-                                                                            .edit,
-                                                                        size:
-                                                                            16,
-                                                                        color: Colors
-                                                                            .white),
-                                                                  ),
+                                                                Icon(
+                                                                  Icons.folder,
+                                                                  color: PremiumTheme
+                                                                      .purple,
+                                                                  size: 48,
                                                                 ),
                                                                 const SizedBox(
-                                                                    width: 8),
-                                                                InkWell(
-                                                                  onTap: () =>
-                                                                      _deleteItem(
-                                                                          context,
-                                                                          app,
-                                                                          item[
-                                                                              "id"]),
-                                                                  child:
-                                                                      Container(
-                                                                    decoration:
-                                                                        BoxDecoration(
-                                                                      color: Colors
-                                                                          .black
-                                                                          .withOpacity(
-                                                                              0.4),
-                                                                      borderRadius:
-                                                                          BorderRadius.circular(
-                                                                              6),
+                                                                    height: 12),
+                                                                Padding(
+                                                                  padding:
+                                                                      const EdgeInsets
+                                                                          .symmetric(
+                                                                          horizontal:
+                                                                              8),
+                                                                  child: Text(
+                                                                    item["label"] ??
+                                                                        item["key"] ??
+                                                                        "Folder",
+                                                                    maxLines: 2,
+                                                                    overflow:
+                                                                        TextOverflow
+                                                                            .ellipsis,
+                                                                    textAlign: TextAlign
+                                                                        .center,
+                                                                    style:
+                                                                        TextStyle(
+                                                                      fontSize: 12,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w600,
+                                                                      color: chrome
+                                                                          .textPrimary,
                                                                     ),
-                                                                    padding:
-                                                                        const EdgeInsets
-                                                                            .all(
-                                                                            6),
-                                                                    child: const Icon(
-                                                                        Icons
-                                                                            .delete,
-                                                                        size:
-                                                                            16,
-                                                                        color: Colors
-                                                                            .white),
                                                                   ),
                                                                 ),
                                                               ],
                                                             ),
                                                           ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  Padding(
-                                                    padding:
-                                                        const EdgeInsets.all(
-                                                            12),
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Text(
-                                                          item["label"] ??
-                                                              item["key"] ??
-                                                              "",
-                                                          maxLines: 2,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            color: chrome
-                                                                .textPrimary,
+                                                        );
+                                                      }
+
+                                                      // File/Image card item
+                                                      bool isImage =
+                                                          selectedCategory ==
+                                                              "Images";
+                                                      String? imageUrl = isImage
+                                                          ? item["content"]
+                                                          : null;
+
+                                                      final _gRole =
+                                                          (app.currentUser?
+                                                                      ['role'] ??
+                                                                  '')
+                                                              .toString()
+                                                              .toLowerCase()
+                                                              .trim();
+                                                      final canEditGrid =
+                                                          _gRole == 'admin' ||
+                                                              _gRole == 'ceo' ||
+                                                              _gRole ==
+                                                                  'manager' ||
+                                                              _gRole ==
+                                                                  'creator' ||
+                                                              _gRole == 'user';
+
+                                                      return GestureDetector(
+                                                        onLongPress: canEditGrid
+                                                            ? () {
+                                                                showDialog(
+                                                                  context: context,
+                                                                  builder: (ctx) =>
+                                                                      AlertDialog(
+                                                                    title: const Text(
+                                                                        "Options"),
+                                                                    actions: [
+                                                                      TextButton(
+                                                                        onPressed:
+                                                                            () {
+                                                                          Navigator.pop(
+                                                                              ctx);
+                                                                          _showEditDialog(
+                                                                            context,
+                                                                            app,
+                                                                            item,
+                                                                          );
+                                                                        },
+                                                                        child: const Text(
+                                                                            "Edit"),
+                                                                      ),
+                                                                      TextButton(
+                                                                        onPressed:
+                                                                            () {
+                                                                          Navigator.pop(
+                                                                              ctx);
+                                                                          _deleteItem(
+                                                                            context,
+                                                                            app,
+                                                                            item["id"],
+                                                                          );
+                                                                        },
+                                                                        child: const Text(
+                                                                            "Delete"),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                );
+                                                              }
+                                                            : null,
+                                                        child: Container(
+                                                          decoration: BoxDecoration(
+                                                            color: chrome.floatingFill,
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(10),
+                                                            border: Border.all(
+                                                              color: chrome.divider,
+                                                            ),
+                                                          ),
+                                                          child: Column(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .stretch,
+                                                            children: [
+                                                              Expanded(
+                                                                child: Stack(
+                                                                  children: [
+                                                                    ClipRRect(
+                                                                      borderRadius:
+                                                                          const BorderRadius
+                                                                              .only(
+                                                                        topLeft: Radius
+                                                                            .circular(
+                                                                                12),
+                                                                        topRight: Radius
+                                                                            .circular(
+                                                                                12),
+                                                                      ),
+                                                                      child: isImage &&
+                                                                              imageUrl !=
+                                                                                  null
+                                                                          ? Image.network(
+                                                                              imageUrl,
+                                                                              fit: BoxFit
+                                                                                  .cover,
+                                                                              errorBuilder:
+                                                                                  (context,
+                                                                                      error,
+                                                                                      stackTrace) {
+                                                                                return Container(
+                                                                                  color: Colors
+                                                                                          .grey[
+                                                                                      200],
+                                                                                  child: const Icon(
+                                                                                    Icons
+                                                                                        .image_not_supported,
+                                                                                    color:
+                                                                                        Colors
+                                                                                            .grey,
+                                                                                  ),
+                                                                                );
+                                                                              },
+                                                                              loadingBuilder:
+                                                                                  (context,
+                                                                                      child,
+                                                                                      loadingProgress) {
+                                                                                if (loadingProgress ==
+                                                                                    null) {
+                                                                                  return child;
+                                                                                }
+                                                                                return Container(
+                                                                                  color: Colors
+                                                                                      .white
+                                                                                      .withValues(
+                                                                                          alpha:
+                                                                                              0.04),
+                                                                                  child: const Center(
+                                                                                    child:
+                                                                                        SizedBox(
+                                                                                      width: 20,
+                                                                                      height: 20,
+                                                                                      child:
+                                                                                          CircularProgressIndicator(
+                                                                                        strokeWidth:
+                                                                                            2,
+                                                                                      ),
+                                                                                    ),
+                                                                                  ),
+                                                                                );
+                                                                              },
+                                                                            )
+                                                                          : Container(
+                                                                              color: Colors
+                                                                                  .white
+                                                                                  .withValues(
+                                                                                      alpha:
+                                                                                          0.04),
+                                                                              child: Center(
+                                                                                child: Column(
+                                                                                  mainAxisAlignment:
+                                                                                      MainAxisAlignment
+                                                                                          .center,
+                                                                                  children: [
+                                                                                    Icon(
+                                                                                      _getFileIcon(
+                                                                                        item["label"] ??
+                                                                                            "",
+                                                                                      ),
+                                                                                      size: 48,
+                                                                                      color: PremiumTheme
+                                                                                          .purple,
+                                                                                    ),
+                                                                                    const SizedBox(
+                                                                                        height:
+                                                                                            8),
+                                                                                    Text(
+                                                                                      _getFileExtension(
+                                                                                        item["label"] ??
+                                                                                            "",
+                                                                                      ),
+                                                                                      style:
+                                                                                          TextStyle(
+                                                                                        fontSize:
+                                                                                            11,
+                                                                                        color:
+                                                                                            chrome.textSecondary,
+                                                                                      ),
+                                                                                    ),
+                                                                                  ],
+                                                                                ),
+                                                                              ),
+                                                                            ),
+                                                                    ),
+                                                                    if (isImage &&
+                                                                        canEditGrid)
+                                                                      Positioned(
+                                                                        top: 8,
+                                                                        right: 8,
+                                                                        child: Row(
+                                                                          children: [
+                                                                            _overlayIconButton(
+                                                                              chrome: chrome,
+                                                                              tooltip: 'Edit',
+                                                                              icon: Icons.edit,
+                                                                              onTap: () =>
+                                                                                  _showEditDialog(
+                                                                                context,
+                                                                                app,
+                                                                                item,
+                                                                              ),
+                                                                            ),
+                                                                            const SizedBox(
+                                                                                width: 8),
+                                                                            _overlayIconButton(
+                                                                              chrome: chrome,
+                                                                              tooltip: 'Delete',
+                                                                              icon: Icons.delete,
+                                                                              onTap: () =>
+                                                                                  _deleteItem(
+                                                                                context,
+                                                                                app,
+                                                                                item["id"],
+                                                                              ),
+                                                                            ),
+                                                                          ],
+                                                                        ),
+                                                                      ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                              Padding(
+                                                                padding:
+                                                                    const EdgeInsets
+                                                                        .all(12),
+                                                                child: Column(
+                                                                  crossAxisAlignment:
+                                                                      CrossAxisAlignment
+                                                                          .start,
+                                                                  children: [
+                                                                    Text(
+                                                                      item["label"] ??
+                                                                          item["key"] ??
+                                                                          "",
+                                                                      maxLines: 2,
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis,
+                                                                      style:
+                                                                          TextStyle(
+                                                                        fontSize: 12,
+                                                                        fontWeight:
+                                                                            FontWeight
+                                                                                .w600,
+                                                                        color: chrome
+                                                                            .textPrimary,
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(
+                                                                        height: 4),
+                                                                    Text(
+                                                                      _formatDate(
+                                                                        item["created_at"] ??
+                                                                            "",
+                                                                      ),
+                                                                      style:
+                                                                          TextStyle(
+                                                                        fontSize: 10,
+                                                                        color: chrome
+                                                                            .textMuted,
+                                                                      ),
+                                                                    ),
+                                                                    if (item["tags"]
+                                                                            is List &&
+                                                                        (item["tags"]
+                                                                                as List)
+                                                                            .isNotEmpty) ...[
+                                                                      const SizedBox(
+                                                                          height: 6),
+                                                                      Wrap(
+                                                                        spacing: 4,
+                                                                        runSpacing: 4,
+                                                                        children: (item[
+                                                                                    "tags"]
+                                                                                as List)
+                                                                            .take(2)
+                                                                            .map<Widget>(
+                                                                              (tag) => Container(
+                                                                                padding: const EdgeInsets.symmetric(
+                                                                                  horizontal: 6,
+                                                                                  vertical: 2,
+                                                                                ),
+                                                                                decoration: BoxDecoration(
+                                                                                  color: Colors.blue[50],
+                                                                                  borderRadius: BorderRadius.circular(4),
+                                                                                ),
+                                                                                child: Text(
+                                                                                  tag.toString(),
+                                                                                  style: TextStyle(
+                                                                                    fontSize: 10,
+                                                                                    color: Colors.blue[700],
+                                                                                  ),
+                                                                                ),
+                                                                              ),
+                                                                            )
+                                                                            .toList(),
+                                                                      ),
+                                                                    ],
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ],
                                                           ),
                                                         ),
-                                                        const SizedBox(
-                                                            height: 4),
-                                                        Text(
-                                                          _formatDate(item[
-                                                                  "created_at"] ??
-                                                              ""),
-                                                          style: TextStyle(
-                                                            fontSize: 10,
-                                                            color: chrome
-                                                                .textMuted,
-                                                          ),
+                                                      );
+                                                    },
+                                                  )
+                                                : (selectedCategory ==
+                                                            "Template" ||
+                                                        selectedCategory ==
+                                                            "Templates")
+                                                    ? ListView.builder(
+                                                        controller:
+                                                            _listScrollController,
+                                                        itemCount:
+                                                            pagedItems.length,
+                                                        itemBuilder: (ctx, i) {
+                                                          final item =
+                                                              pagedItems[i];
+                                                          // Check if item is a full template (has JSON structure with templateType and sections)
+                                                          final content =
+                                                              (item["content"] ??
+                                                                      "")
+                                                                  .toString();
+                                                          final key =
+                                                              (item["key"] ??
+                                                                      "")
+                                                                  .toString()
+                                                                  .toLowerCase();
+                                                          final label =
+                                                              (item["label"] ??
+                                                                      "")
+                                                                  .toString()
+                                                                  .toLowerCase();
+
+                                                          // Full template detection: must have JSON structure OR key/label indicating full template
+                                                          bool isFullTemplate =
+                                                              false;
+
+                                                          // Check for JSON structure in content
+                                                          try {
+                                                            if (content
+                                                                .trim()
+                                                                .startsWith(
+                                                                    '{')) {
+                                                              final decoded =
+                                                                  jsonDecode(
+                                                                      content);
+                                                              if (decoded is Map &&
+                                                                  decoded.containsKey(
+                                                                      'templateType') &&
+                                                                  decoded.containsKey(
+                                                                      'sections')) {
+                                                                isFullTemplate =
+                                                                    true;
+                                                              }
+                                                            }
+                                                          } catch (e) {
+                                                            // Not JSON, continue checking
+                                                          }
+
+                                                          // Also check key/label patterns
+                                                          if (!isFullTemplate) {
+                                                            if (key.contains(
+                                                                    "_template") &&
+                                                                (key.contains(
+                                                                        "proposal") ||
+                                                                    key.contains(
+                                                                        "sow") ||
+                                                                    key.contains(
+                                                                        "consulting"))) {
+                                                              isFullTemplate =
+                                                                  true;
+                                                            } else if (label
+                                                                    .contains(
+                                                                        "template") &&
+                                                                (label.contains(
+                                                                        "proposal") ||
+                                                                    label.contains(
+                                                                        "sow") ||
+                                                                    label.contains(
+                                                                        "consulting") ||
+                                                                    label.contains(
+                                                                        "delivery"))) {
+                                                              isFullTemplate =
+                                                                  true;
+                                                            } else if (content
+                                                                    .contains(
+                                                                        '"templateType"') &&
+                                                                content.contains(
+                                                                    '"sections"')) {
+                                                              isFullTemplate =
+                                                                  true;
+                                                            }
+                                                          }
+
+                                                          if (isFullTemplate) {
+                                                            return _buildTemplateCard(
+                                                              context: context,
+                                                              app: app,
+                                                              item: item,
+                                                              chrome: chrome,
+                                                            );
+                                                          }
+
+                                                          // Show as template module/block (individual section)
+                                                          return _buildTextBlockCard(
+                                                            context: context,
+                                                            app: app,
+                                                            item: item,
+                                                            chrome: chrome,
+                                                          );
+                                                        },
+                                                      )
+                                                    : ListView.builder(
+                                                        controller:
+                                                            _listScrollController,
+                                                        itemCount:
+                                                            pagedItems.length,
+                                                        itemBuilder: (ctx, i) =>
+                                                            _buildTextBlockCard(
+                                                          context: context,
+                                                          app: app,
+                                                          item: pagedItems[i],
+                                                          chrome: chrome,
                                                         ),
-                                                        if (item["tags"]
-                                                                is List &&
-                                                            (item["tags"]
-                                                                    as List)
-                                                                .isNotEmpty) ...[
-                                                          const SizedBox(
-                                                              height: 6),
-                                                          Wrap(
-                                                            spacing: 4,
-                                                            runSpacing: 4,
-                                                            children: (item[
-                                                                        "tags"]
-                                                                    as List)
-                                                                .take(2)
-                                                                .map<Widget>(
-                                                                    (tag) =>
-                                                                        Container(
-                                                                          padding:
-                                                                              const EdgeInsets.symmetric(
-                                                                            horizontal:
-                                                                                6,
-                                                                            vertical:
-                                                                                2,
-                                                                          ),
-                                                                          decoration:
-                                                                              BoxDecoration(
-                                                                            color:
-                                                                                Colors.blue[50],
-                                                                            borderRadius:
-                                                                                BorderRadius.circular(
-                                                                              4,
-                                                                            ),
-                                                                          ),
-                                                                          child:
-                                                                              Text(
-                                                                            tag.toString(),
-                                                                            style:
-                                                                                TextStyle(
-                                                                              fontSize: 10,
-                                                                              color: Colors.blue[700],
-                                                                            ),
-                                                                          ),
-                                                                        ))
-                                                                .toList(),
-                                                          ),
-                                                        ],
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      )
-                                    : (selectedCategory == "Template" ||
-                                            selectedCategory == "Templates")
-                                        ? ListView.builder(
-                                            controller: _listScrollController,
-                                            itemCount: pagedItems.length,
-                                            itemBuilder: (ctx, i) {
-                                              final item = pagedItems[i];
-                                              // Check if item is a full template (has JSON structure with templateType and sections)
-                                              final content =
-                                                  (item["content"] ?? "")
-                                                      .toString();
-                                              final key = (item["key"] ?? "")
-                                                  .toString()
-                                                  .toLowerCase();
-                                              final label =
-                                                  (item["label"] ?? "")
-                                                      .toString()
-                                                      .toLowerCase();
-
-                                              // Full template detection: must have JSON structure OR key/label indicating full template
-                                              bool isFullTemplate = false;
-
-                                              // Check for JSON structure in content
-                                              try {
-                                                if (content
-                                                    .trim()
-                                                    .startsWith('{')) {
-                                                  final decoded =
-                                                      jsonDecode(content);
-                                                  if (decoded is Map &&
-                                                      decoded.containsKey(
-                                                          'templateType') &&
-                                                      decoded.containsKey(
-                                                          'sections')) {
-                                                    isFullTemplate = true;
-                                                  }
-                                                }
-                                              } catch (e) {
-                                                // Not JSON, continue checking
-                                              }
-
-                                              // Also check key/label patterns
-                                              if (!isFullTemplate) {
-                                                if (key.contains("_template") &&
-                                                    (key.contains("proposal") ||
-                                                        key.contains("sow") ||
-                                                        key.contains(
-                                                            "consulting"))) {
-                                                  isFullTemplate = true;
-                                                } else if (label
-                                                        .contains("template") &&
-                                                    (label.contains(
-                                                            "proposal") ||
-                                                        label.contains("sow") ||
-                                                        label.contains(
-                                                            "consulting") ||
-                                                        label.contains(
-                                                            "delivery"))) {
-                                                  isFullTemplate = true;
-                                                } else if (content.contains(
-                                                        '"templateType"') &&
-                                                    content.contains(
-                                                        '"sections"')) {
-                                                  isFullTemplate = true;
-                                                }
-                                              }
-
-                                              if (isFullTemplate) {
-                                                return _buildTemplateCard(
-                                                  context: context,
-                                                  app: app,
-                                                  item: item,
-                                                  chrome: chrome,
-                                                );
-                                              } else {
-                                                // Show as template module/block (individual section)
-                                                return _buildTextBlockCard(
-                                                  context: context,
-                                                  app: app,
-                                                  item: item,
-                                                  chrome: chrome,
-                                                );
-                                              }
-                                            },
-                                          )
-                                        : ListView.builder(
-                                            controller: _listScrollController,
-                                            itemCount: pagedItems.length,
-                                            itemBuilder: (ctx, i) =>
-                                                _buildTextBlockCard(
-                                              context: context,
-                                              app: app,
-                                              item: pagedItems[i],
-                                              chrome: chrome,
-                                            ),
+                                                      ),
                                           ),
                                   ),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -2507,35 +2669,26 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
     required bool isActive,
     required VoidCallback onTap,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 12),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFFC10D00) : chrome.filterInactiveBg,
           borderRadius: BorderRadius.circular(10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isActive
-                  ? const Color(0xFFE3F2FD)
-                  : chrome.filterInactiveBg,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isActive
-                    ? const Color(0xFF2196F3)
-                    : chrome.divider,
-              ),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                color: isActive
-                    ? const Color(0xFF1565C0)
-                    : chrome.textPrimary,
-              ),
-            ),
+          border: Border.all(
+            color: chrome.filterBorder,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            color: isActive ? Colors.white : chrome.textPrimary,
+            fontSize: 11,
+            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+            letterSpacing: 0.3,
           ),
         ),
       ),
@@ -2546,9 +2699,25 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
     await showDialog(
       context: context,
       builder: (ctx) {
+        final chrome = ctx.watch<ManagerThemeController>().chrome;
         final isTemplates = selectedCategory == "Templates";
         final isImages = selectedCategory == "Images";
         return AlertDialog(
+          backgroundColor: chrome.dropdownSurface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: chrome.divider),
+          ),
+          titleTextStyle: TextStyle(
+            color: chrome.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+          contentTextStyle: TextStyle(
+            color: chrome.textPrimary,
+            fontSize: 14,
+          ),
           title: const Text("New Content"),
           content: SingleChildScrollView(
             child: Column(
@@ -2556,8 +2725,9 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
               children: [
                 if (isTemplates)
                   ListTile(
-                    leading: const Icon(Icons.style),
-                    title: const Text("Create Template"),
+                    leading: const Icon(Icons.style, color: PremiumTheme.primaryRed),
+                    title: Text("Create Template",
+                        style: TextStyle(color: chrome.textPrimary)),
                     onTap: () {
                       Navigator.pop(ctx);
                       _showCreateDialog(context, app);
@@ -2565,8 +2735,10 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
                   ),
                 if (isTemplates)
                   ListTile(
-                    leading: const Icon(Icons.upload_file),
-                    title: const Text("Upload Template"),
+                    leading: const Icon(Icons.upload_file,
+                        color: PremiumTheme.primaryRed),
+                    title: Text("Upload Template",
+                        style: TextStyle(color: chrome.textPrimary)),
                     onTap: () {
                       Navigator.pop(ctx);
                       _showUploadTemplateDialog(context, app);
@@ -2574,8 +2746,10 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
                   ),
                 if (!isTemplates)
                   ListTile(
-                    leading: const Icon(Icons.upload_file),
-                    title: const Text("Upload"),
+                    leading: const Icon(Icons.upload_file,
+                        color: PremiumTheme.primaryRed),
+                    title: Text("Upload",
+                        style: TextStyle(color: chrome.textPrimary)),
                     onTap: () {
                       Navigator.pop(ctx);
                       _uploadFile(context, app);
@@ -2583,16 +2757,19 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
                   ),
                 if (isImages)
                   ListTile(
-                    leading: const Icon(Icons.link),
-                    title: const Text("Add Image URL"),
+                    leading: const Icon(Icons.link, color: PremiumTheme.primaryRed),
+                    title: Text("Add Image URL",
+                        style: TextStyle(color: chrome.textPrimary)),
                     onTap: () {
                       Navigator.pop(ctx);
                       _addImageUrl(context, app);
                     },
                   ),
                 ListTile(
-                  leading: const Icon(Icons.create_new_folder),
-                  title: const Text("New Folder"),
+                  leading: const Icon(Icons.create_new_folder,
+                      color: PremiumTheme.primaryRed),
+                  title:
+                      Text("New Folder", style: TextStyle(color: chrome.textPrimary)),
                   onTap: () {
                     Navigator.pop(ctx);
                     _showNewFolderDialog(context, app);
@@ -2604,6 +2781,9 @@ class _ContentLibraryPageState extends State<ContentLibraryPage>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
+              style: TextButton.styleFrom(
+                foregroundColor: PremiumTheme.primaryRed,
+              ),
               child: const Text("Close"),
             ),
           ],
