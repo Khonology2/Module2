@@ -26,6 +26,7 @@ try:
         Paragraph,
         Spacer,
         PageBreak,
+        Flowable,
         Table as PdfTable,
         TableStyle,
     )
@@ -939,6 +940,41 @@ def generate_proposal_pdf(
         or metadata.get('hide_header_footer_on_cover')
     )
 
+    def _is_truthy(value) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            return value == 1
+        if isinstance(value, str):
+            v = value.strip().lower()
+            return v in ('true', '1', 't', 'yes', 'y')
+        return False
+
+    use_standardized_layout = _is_truthy(
+        metadata.get('standardizedProposalLayout')
+        or metadata.get('standardized_proposal_layout')
+    )
+
+    standardized_date_raw = (
+        (metadata.get('standardizedProposalDate') or metadata.get('standardized_proposal_date'))
+        if isinstance(metadata, dict)
+        else None
+    )
+    standardized_date = None
+    if isinstance(standardized_date_raw, str) and standardized_date_raw.strip():
+        s = standardized_date_raw.strip()
+        try:
+            standardized_date = datetime.fromisoformat(s.replace('Z', '+00:00'))
+        except Exception:
+            standardized_date = None
+        if standardized_date is None:
+            for fmt in ('%Y-%m-%d', '%d/%m/%Y'):
+                try:
+                    standardized_date = datetime.strptime(s, fmt)
+                    break
+                except Exception:
+                    continue
+
     header_bg_url = (
         (metadata.get('headerBackgroundImageUrl') or metadata.get('header_background_image_url'))
         if isinstance(metadata, dict)
@@ -1053,6 +1089,20 @@ def generate_proposal_pdf(
         elements.append(Spacer(1, 0.01 * inch))
         elements.append(PageBreak())
 
+    class _SectionTitleMarker(Flowable):
+        def __init__(self, section_title: str):
+            super().__init__()
+            self.section_title = (section_title or '').strip()
+
+        def wrap(self, availWidth, availHeight):
+            return 0, 0
+
+        def draw(self):
+            try:
+                self.canv._current_section_title = self.section_title
+            except Exception:
+                pass
+
     t_elements0 = time.perf_counter()
 
     # Hard cap number of sections rendered in preview.
@@ -1098,6 +1148,7 @@ def generate_proposal_pdf(
             except Exception:
                 pass
             numbered_title = f"{idx + 1}. {section_title}".strip()
+            elements.append(_SectionTitleMarker(section_title))
             elements.append(Paragraph(html.escape(numbered_title), heading_style))
 
             # Optional: render subsection blocks if the body is structured.
@@ -1147,6 +1198,7 @@ def generate_proposal_pdf(
     t_elements_ms = (time.perf_counter() - t_elements0) * 1000.0
 
     elements.append(PageBreak())
+    elements.append(_SectionTitleMarker('Signature'))
     elements.append(Paragraph("Signature", heading_style))
     elements.append(Spacer(1, 0.3 * inch))
     elements.append(Paragraph("Please sign in the space below.", content_style))
@@ -1166,7 +1218,8 @@ def generate_proposal_pdf(
 
     has_cover_page = bool(cover_bytes)
     header_title = (title or "Proposal").strip() or "Proposal"
-    header_date_text = created_at.strftime('%d/%m/%Y')
+    header_date_dt = standardized_date or created_at
+    header_date_text = header_date_dt.strftime('%d/%m/%Y')
 
     def _pos_x(pos: str, *, left_x: float, right_x: float, width: float):
         if pos == 'left':
@@ -1285,11 +1338,12 @@ def generate_proposal_pdf(
             if hide_header_footer_on_cover and has_cover_page and page_num == 1:
                 return
             self.saveState()
+            page_title = getattr(self, '_current_section_title', None) or header_title
             _draw_header_banner(
                 self,
                 doc,
                 report_title='PROPOSAL REPORT',
-                page_title=header_title,
+                page_title=page_title,
                 date_text=header_date_text,
             )
 
@@ -1300,9 +1354,26 @@ def generate_proposal_pdf(
             self.setLineWidth(0.5)
             self.line(doc.leftMargin, footer_y + 8, page_width - doc.rightMargin, footer_y + 8)
 
-            _draw_logo(self, doc, img_bytes=footer_logo_bytes, y=footer_y - 3, height=0.22 * inch, pos=footer_logo_pos)
-            footer_right = f"Page {page_num} of {total_pages}"
-            self.drawRightString(page_width - doc.rightMargin, footer_y, footer_right)
+            if use_standardized_layout:
+                _draw_logo(
+                    self,
+                    doc,
+                    img_bytes=footer_logo_bytes,
+                    y=footer_y - 6,
+                    height=0.30 * inch,
+                    pos='center',
+                )
+            else:
+                _draw_logo(
+                    self,
+                    doc,
+                    img_bytes=footer_logo_bytes,
+                    y=footer_y - 3,
+                    height=0.22 * inch,
+                    pos=footer_logo_pos,
+                )
+                footer_right = f"Page {page_num} of {total_pages}"
+                self.drawRightString(page_width - doc.rightMargin, footer_y, footer_right)
             self.restoreState()
 
     t_build0 = time.perf_counter()
