@@ -56,6 +56,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   String? _overviewError;
   Map<String, dynamic>? _overview;
   String _dashboardDocFilter = 'all';
+  int _unreadClientNotifications = 0;
+  DateTime? _clientNotificationsLastSeenAt;
   Map<String, int> _statusCounts = {
     'pending': 0,
     'approved': 0,
@@ -286,6 +288,184 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _extractTokenAndLoad();
     });
+  }
+
+  String _clientNotificationsLastSeenKey() {
+    final t = (_accessToken ?? '').trim();
+    if (t.isEmpty) return 'lukens_client_notifications_last_seen';
+    return 'lukens_client_notifications_last_seen_$t';
+  }
+
+  DateTime? _loadClientNotificationsLastSeen() {
+    if (!kIsWeb) return null;
+    try {
+      final raw = web.window.localStorage[_clientNotificationsLastSeenKey()];
+      if (raw == null || raw.trim().isEmpty) return null;
+      return DateTime.tryParse(raw.trim());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _persistClientNotificationsLastSeen(DateTime dt) {
+    _clientNotificationsLastSeenAt = dt;
+    if (!kIsWeb) return;
+    try {
+      web.window.localStorage[_clientNotificationsLastSeenKey()] =
+          dt.toUtc().toIso8601String();
+    } catch (_) {}
+  }
+
+  int _computeUnreadClientNotifications() {
+    final lastSeen = _clientNotificationsLastSeenAt;
+    final activity = _overview?['activity'];
+    if (activity is! List) return 0;
+
+    var unread = 0;
+    for (final raw in activity) {
+      if (raw is! Map) continue;
+      final createdRaw = raw['created_at'] ?? raw['createdAt'];
+      final created = createdRaw is DateTime
+          ? createdRaw
+          : DateTime.tryParse(createdRaw?.toString() ?? '');
+      if (created == null) continue;
+      if (lastSeen == null || created.isAfter(lastSeen)) unread++;
+    }
+    return unread;
+  }
+
+  void _refreshClientNotificationBadge() {
+    final unread = _computeUnreadClientNotifications();
+    if (!mounted) return;
+    setState(() {
+      _unreadClientNotifications = unread;
+    });
+  }
+
+  void _showClientNotificationsSheet() {
+    final chrome = context.read<ManagerThemeController>().chrome;
+    final activityRaw = _overview?['activity'];
+    final activity = activityRaw is List
+        ? activityRaw
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e.cast<String, dynamic>()))
+            .toList()
+        : <Map<String, dynamic>>[];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        final darkSurface = const Color(0xFF0B0B0C);
+        return Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom),
+          child: Container(
+            decoration: BoxDecoration(
+              color: darkSurface,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(18)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+            ),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(bottomSheetContext).size.height * 0.8,
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Notifications',
+                      style: TextStyle(
+                        color: chrome.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.of(bottomSheetContext).pop(),
+                      icon: Icon(Icons.close, color: chrome.textSecondary),
+                      tooltip: 'Close',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (activity.isEmpty)
+                  Text(
+                    'No notifications yet.',
+                    style: TextStyle(color: chrome.textSecondary, fontSize: 13),
+                  )
+                else
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: activity.length,
+                      separatorBuilder: (_, __) => Divider(
+                        height: 18,
+                        thickness: 1,
+                        color: chrome.divider,
+                      ),
+                      itemBuilder: (context, idx) {
+                        final a = activity[idx];
+                        final createdRaw = a['created_at'] ?? a['createdAt'];
+                        final created = createdRaw is DateTime
+                            ? createdRaw
+                            : DateTime.tryParse(createdRaw?.toString() ?? '');
+                        final subtitle =
+                            created != null ? _timeAgo(created) : '';
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Icon(
+                                _activityIcon(
+                                    (a['event_type'] ?? '').toString()),
+                                color: chrome.textSecondary,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _activityLabel(a),
+                                    style: TextStyle(
+                                      color: chrome.textPrimary,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  if (subtitle.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        subtitle,
+                                        style: TextStyle(
+                                          color: chrome.textSecondary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   bool get _isOverviewDashboard => widget.showSummary && _selectedNavIndex == 0;
@@ -1626,8 +1806,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               _buildHeaderIconButton(
                 assetPath:
                     'assets/images/new icons for manager/notifications.png',
-                onTap: () {},
-                badge: 2,
+                onTap: () async {
+                  await _loadDashboardOverview();
+                  final now = DateTime.now().toUtc();
+                  _persistClientNotificationsLastSeen(now);
+                  _refreshClientNotificationBadge();
+                  if (!mounted) return;
+                  _showClientNotificationsSheet();
+                },
+                badge: _unreadClientNotifications > 0
+                    ? _unreadClientNotifications
+                    : null,
               ),
             ],
           ),
@@ -2478,8 +2667,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           // Notification bell with badge
           _buildHeaderIconButton(
             assetPath: 'assets/images/new icons for manager/notifications.png',
-            onTap: () {},
-            badge: 2,
+            onTap: () async {
+              await _loadDashboardOverview();
+              final now = DateTime.now().toUtc();
+              _persistClientNotificationsLastSeen(now);
+              _refreshClientNotificationBadge();
+              if (!mounted) return;
+              _showClientNotificationsSheet();
+            },
+            badge: _unreadClientNotifications > 0
+                ? _unreadClientNotifications
+                : null,
           ),
         ],
       ),
@@ -3135,6 +3333,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     _deviceId = _getOrCreateDeviceId();
     _loadCachedClientSession();
 
+    _clientNotificationsLastSeenAt = _loadClientNotificationsLastSeen();
+
     _loadClientProposals();
   }
 
@@ -3423,6 +3623,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         _overview = decoded;
         _overviewLoading = false;
       });
+
+      _refreshClientNotificationBadge();
     } catch (e) {
       if (!mounted) return;
       setState(() {

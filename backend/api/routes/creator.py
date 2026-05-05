@@ -1072,6 +1072,122 @@ def send_to_client(username=None, proposal_id=None):
             )
             conn.commit()
 
+            try:
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS proposal_client_activity (
+                        id SERIAL PRIMARY KEY,
+                        proposal_id INTEGER REFERENCES proposals(id) ON DELETE CASCADE,
+                        client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+                        event_type VARCHAR(50) NOT NULL,
+                        metadata JSONB,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+                cursor.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_activity_client_created
+                    ON proposal_client_activity(client_id, created_at DESC)
+                    """
+                )
+
+                client_email_for_activity = (proposal.get('client_email') or '').strip()
+                client_id_for_activity = None
+                if client_email_for_activity:
+                    cursor.execute(
+                        """
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = 'clients'
+                        """
+                    )
+                    client_cols = {
+                        (r.get('column_name') if isinstance(r, dict) else r[0])
+                        for r in (cursor.fetchall() or [])
+                    }
+
+                    company_col = 'company_name' if 'company_name' in client_cols else ('name' if 'name' in client_cols else None)
+                    contact_col = 'contact_person' if 'contact_person' in client_cols else None
+
+                    insert_cols = ['email']
+                    insert_vals = [client_email_for_activity]
+                    if company_col:
+                        insert_cols.append(company_col)
+                        insert_vals.append((proposal.get('client_name') or proposal.get('client') or client_email_for_activity).strip())
+                    if contact_col:
+                        insert_cols.append(contact_col)
+                        insert_vals.append((proposal.get('client_name') or '').strip() or None)
+
+                    cols_sql = ', '.join(insert_cols)
+                    placeholders = ', '.join(['%s'] * len(insert_cols))
+                    update_sql = None
+                    if company_col:
+                        update_sql = f"{company_col} = COALESCE(EXCLUDED.{company_col}, clients.{company_col})"
+
+                    if update_sql:
+                        cursor.execute(
+                            f"""
+                            INSERT INTO clients ({cols_sql})
+                            VALUES ({placeholders})
+                            ON CONFLICT (email) DO UPDATE SET {update_sql}
+                            RETURNING id
+                            """,
+                            tuple(insert_vals),
+                        )
+                    else:
+                        cursor.execute(
+                            f"""
+                            INSERT INTO clients ({cols_sql})
+                            VALUES ({placeholders})
+                            ON CONFLICT (email) DO NOTHING
+                            RETURNING id
+                            """,
+                            tuple(insert_vals),
+                        )
+
+                    row = cursor.fetchone()
+                    if row and (row.get('id') if isinstance(row, dict) else row[0]) is not None:
+                        client_id_for_activity = row.get('id') if isinstance(row, dict) else row[0]
+                    else:
+                        cursor.execute(
+                            "SELECT id FROM clients WHERE lower(email) = lower(%s) LIMIT 1",
+                            (client_email_for_activity,),
+                        )
+                        c_row = cursor.fetchone()
+                        if c_row:
+                            client_id_for_activity = (
+                                c_row.get('id') if isinstance(c_row, dict) else c_row[0]
+                            )
+
+                if client_id_for_activity:
+                    metadata = {
+                        'proposal_id': proposal_id,
+                        'proposal_title': proposal.get('title'),
+                        'sender_username': username,
+                        'sender_name': sender.get('full_name')
+                        or sender.get('username')
+                        or username,
+                    }
+                    cursor.execute(
+                        """
+                        INSERT INTO proposal_client_activity
+                        (proposal_id, client_id, event_type, metadata, created_at)
+                        VALUES (%s, %s, %s, %s::jsonb, NOW())
+                        """,
+                        (
+                            proposal_id,
+                            client_id_for_activity,
+                            'proposal_sent',
+                            json.dumps(metadata),
+                        ),
+                    )
+                    conn.commit()
+            except Exception as activity_err:
+                print(
+                    f"⚠️ Failed to log proposal_sent activity for proposal {proposal_id}: {activity_err}"
+                )
+
             log_finance_audit_async(
                 user_id=sender.get('id'),
                 username=username,

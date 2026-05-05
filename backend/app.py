@@ -2590,7 +2590,7 @@ def reject_proposal(username, proposal_id):
         traceback.print_exc()
         return {'detail': str(e)}, 500
 
-@app.patch("/proposals/<int:proposal_id>/status")
+@app.post("/proposals/<int:proposal_id>/update_status")
 @token_required
 def update_proposal_status(username, proposal_id):
     try:
@@ -2609,22 +2609,6 @@ def update_proposal_status(username, proposal_id):
         conn.commit()
         release_pg_conn(conn)
         return {'detail': 'Status updated'}, 200
-    except Exception as e:
-        return {'detail': str(e)}, 500
-
-@app.post("/proposals/<int:proposal_id>/send_to_client")
-@token_required
-def send_to_client(username, proposal_id):
-    try:
-        conn = _pg_conn()
-        cursor = conn.cursor()
-        cursor.execute(
-            '''UPDATE proposals SET status = 'Sent to Client' WHERE id = %s''',
-            (proposal_id,)
-        )
-        conn.commit()
-        release_pg_conn(conn)
-        return {'detail': 'Proposal sent to client'}, 200
     except Exception as e:
         return {'detail': str(e)}, 500
 
