@@ -1092,6 +1092,16 @@ def send_to_client(username=None, proposal_id=None):
                     """
                 )
 
+                # Always log proposal_sent activity (client_id can be NULL if no email available)
+                metadata = {
+                    'proposal_id': proposal_id,
+                    'proposal_title': proposal.get('title'),
+                    'sender_username': username,
+                    'sender_name': sender.get('full_name')
+                    or sender.get('username')
+                    or username,
+                }
+
                 client_email_for_activity = (proposal.get('client_email') or '').strip()
                 client_id_for_activity = None
                 if client_email_for_activity:
@@ -1160,29 +1170,21 @@ def send_to_client(username=None, proposal_id=None):
                                 c_row.get('id') if isinstance(c_row, dict) else c_row[0]
                             )
 
-                if client_id_for_activity:
-                    metadata = {
-                        'proposal_id': proposal_id,
-                        'proposal_title': proposal.get('title'),
-                        'sender_username': username,
-                        'sender_name': sender.get('full_name')
-                        or sender.get('username')
-                        or username,
-                    }
-                    cursor.execute(
-                        """
-                        INSERT INTO proposal_client_activity
-                        (proposal_id, client_id, event_type, metadata, created_at)
-                        VALUES (%s, %s, %s, %s::jsonb, NOW())
-                        """,
-                        (
-                            proposal_id,
-                            client_id_for_activity,
-                            'proposal_sent',
-                            json.dumps(metadata),
-                        ),
-                    )
-                    conn.commit()
+                # Log activity with or without client_id (client_id is nullable in schema)
+                cursor.execute(
+                    """
+                    INSERT INTO proposal_client_activity
+                    (proposal_id, client_id, event_type, metadata, created_at)
+                    VALUES (%s, %s, %s, %s::jsonb, NOW())
+                    """,
+                    (
+                        proposal_id,
+                        client_id_for_activity,  # Can be NULL
+                        'proposal_sent',
+                        json.dumps(metadata),
+                    ),
+                )
+                conn.commit()
             except Exception as activity_err:
                 print(
                     f"⚠️ Failed to log proposal_sent activity for proposal {proposal_id}: {activity_err}"

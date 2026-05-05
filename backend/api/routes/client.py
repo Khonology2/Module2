@@ -3033,21 +3033,37 @@ def get_client_dashboard_overview_api():
             if c_row:
                 client_id = c_row.get('id') if isinstance(c_row, dict) else c_row[0]
 
-            if client_id and proposal_ids:
-                cursor.execute(
-                    """
-                    SELECT a.event_type, a.created_at, a.metadata,
-                           p.id::text as proposal_id, p.title as proposal_title, p.status as proposal_status
-                    FROM proposal_client_activity a
-                    JOIN proposals p ON p.id = a.proposal_id
-                    WHERE a.client_id = %s
-                      AND a.proposal_id::text = ANY(%s)
-                    ORDER BY a.created_at DESC
-                    LIMIT 10
-                    """,
-                    (client_id, proposal_ids),
-                )
-                recent_activity = cursor.fetchall() or []
+            if proposal_ids:
+                if client_id:
+                    cursor.execute(
+                        """
+                        SELECT a.event_type, a.created_at, a.metadata,
+                               p.id::text as proposal_id, p.title as proposal_title, p.status as proposal_status
+                        FROM proposal_client_activity a
+                        JOIN proposals p ON p.id = a.proposal_id
+                        WHERE (a.client_id = %s OR a.proposal_id::text = ANY(%s))
+                          AND a.proposal_id::text = ANY(%s)
+                        ORDER BY a.created_at DESC
+                        LIMIT 10
+                        """,
+                        (client_id, proposal_ids, proposal_ids),
+                    )
+                    recent_activity = cursor.fetchall() or []
+                else:
+                    # Fallback: query by proposal_ids only (handles case where client wasn't linked during send)
+                    cursor.execute(
+                        """
+                        SELECT a.event_type, a.created_at, a.metadata,
+                               p.id::text as proposal_id, p.title as proposal_title, p.status as proposal_status
+                        FROM proposal_client_activity a
+                        JOIN proposals p ON p.id = a.proposal_id
+                        WHERE a.proposal_id::text = ANY(%s)
+                        ORDER BY a.created_at DESC
+                        LIMIT 10
+                        """,
+                        (proposal_ids,),
+                    )
+                    recent_activity = cursor.fetchall() or []
 
             cutoff_sql = "NOW() - (%s || ' weeks')::interval"
             if proposal_ids:
