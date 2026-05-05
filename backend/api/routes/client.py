@@ -3033,6 +3033,8 @@ def get_client_dashboard_overview_api():
             if c_row:
                 client_id = c_row.get('id') if isinstance(c_row, dict) else c_row[0]
 
+            print(f"[NOTIFY_DEBUG] client_email={client_email}, client_id={client_id}, proposal_ids={proposal_ids}")
+
             if proposal_ids:
                 if client_id:
                     cursor.execute(
@@ -3064,6 +3066,8 @@ def get_client_dashboard_overview_api():
                         (proposal_ids,),
                     )
                     recent_activity = cursor.fetchall() or []
+
+            print(f"[NOTIFY_DEBUG] activity_count={len(recent_activity)}")
 
             cutoff_sql = "NOW() - (%s || ' weeks')::interval"
             if proposal_ids:
