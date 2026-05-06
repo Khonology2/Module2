@@ -1699,14 +1699,8 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
     return Container(
       height: 66,
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.25),
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.white.withOpacity(0.06),
-            width: 1,
-          ),
-        ),
+      decoration: const BoxDecoration(
+        color: Colors.transparent,
       ),
       child: Row(
         children: [
@@ -1722,10 +1716,22 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
                 ),
                 if (!isMobile) ...[
                   const SizedBox(width: 8),
-                  Text(
-                    'Hello, ${userName.toString()}',
-                    style:
-                        PremiumTheme.bodySmall.copyWith(color: Colors.white70),
+                  RichText(
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    text: TextSpan(
+                      style: PremiumTheme.bodySmall
+                          .copyWith(color: Colors.white70),
+                      children: [
+                        const TextSpan(text: 'Hello, '),
+                        TextSpan(
+                          text: userName.toString(),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ],
@@ -2314,56 +2320,56 @@ class _FinanceAnalyticsPageState extends State<FinanceAnalyticsPage> {
         ),
       ),
       body: ManagerPageBackground(
-        child: Column(
+        child: Row(
           children: [
-            _buildHeader(app, isMobile),
+            FinanceSidebar(
+              isCollapsed: isSidebarCollapsed,
+              currentPage: 'Analytics',
+              showAudit: showAudit,
+              pendingBadge: pendingBadge > 0 ? pendingBadge : null,
+              managerChrome: chrome,
+              onToggle: app.toggleFinanceSidebar,
+              onSelect: (label) {
+                if (label == 'Dashboard' || label == 'Proposals') {
+                  Navigator.pushNamed(context, '/finance_dashboard');
+                  return;
+                }
+                if (label == 'Client Management') {
+                  Navigator.pushNamed(
+                    context,
+                    '/finance_dashboard',
+                    arguments: const {'initialTab': 'clients'},
+                  );
+                  return;
+                }
+                if (label == 'Audit') {
+                  Navigator.pushNamed(
+                    context,
+                    '/finance_dashboard',
+                    arguments: const {'initialTab': 'audit'},
+                  );
+                  return;
+                }
+                if (label == 'Analytics') {
+                  return;
+                }
+                if (label == 'Account Profile') {
+                  Navigator.pushReplacementNamed(
+                      context, '/manager_account_profile');
+                  return;
+                }
+                if (label == 'Sign Out' || label == 'Logout') {
+                  app.logout();
+                  AuthService.logout();
+                  Navigator.pushNamed(context, '/login');
+                  return;
+                }
+              },
+            ),
             Expanded(
-              child: Row(
+              child: Column(
                 children: [
-                  FinanceSidebar(
-                    isCollapsed: isSidebarCollapsed,
-                    currentPage: 'Analytics',
-                    showAudit: showAudit,
-                    pendingBadge: pendingBadge > 0 ? pendingBadge : null,
-                    managerChrome: chrome,
-                    onToggle: app.toggleFinanceSidebar,
-                    onSelect: (label) {
-                      if (label == 'Dashboard' || label == 'Proposals') {
-                        Navigator.pushNamed(context, '/finance_dashboard');
-                        return;
-                      }
-                      if (label == 'Client Management') {
-                        Navigator.pushNamed(
-                          context,
-                          '/finance_dashboard',
-                          arguments: const {'initialTab': 'clients'},
-                        );
-                        return;
-                      }
-                      if (label == 'Audit') {
-                        Navigator.pushNamed(
-                          context,
-                          '/finance_dashboard',
-                          arguments: const {'initialTab': 'audit'},
-                        );
-                        return;
-                      }
-                      if (label == 'Analytics') {
-                        return;
-                      }
-                      if (label == 'Account Profile') {
-                        Navigator.pushReplacementNamed(
-                            context, '/manager_account_profile');
-                        return;
-                      }
-                      if (label == 'Sign Out' || label == 'Logout') {
-                        app.logout();
-                        AuthService.logout();
-                        Navigator.pushNamed(context, '/login');
-                        return;
-                      }
-                    },
-                  ),
+                  _buildHeader(app, isMobile),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
