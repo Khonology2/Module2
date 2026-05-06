@@ -388,22 +388,35 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
         backendRole == 'admin' || backendRole == 'ceo' ? 'Admin' : 'Manager';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: chrome.floatingPanelDecoration(radius: 10),
+      height: 96,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: chrome.headerBarFill,
+        border: Border(
+          bottom: BorderSide(
+            color: chrome.divider,
+            width: 1,
+          ),
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Approved Proposals',
-                style: PremiumTheme.titleLarge.copyWith(
+                style: TextStyle(
                   color: chrome.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 'View proposals that have been approved and signed by clients',
                 style: TextStyle(color: chrome.textSecondary, fontSize: 13),
@@ -446,29 +459,23 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
   }
 
   Widget _buildHeroSection() {
+    final chrome = context.watch<ManagerThemeController>().chrome;
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [PremiumTheme.teal, PremiumTheme.teal.withValues(alpha: 0.8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(10),
-      ),
+      decoration: chrome.floatingPanelDecoration(radius: 10),
       child: Row(
         children: [
           Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.check_circle,
-              color: Colors.white,
-              size: 28,
+            width: 60,
+            height: 61,
+            child: Image.asset(
+              'assets/images/Creator_Dashboard/Send_Paper Plane_White Badge_Red.png',
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.send,
+                color: Colors.white,
+                size: 56,
+              ),
             ),
           ),
           const SizedBox(width: 20),
@@ -476,10 +483,10 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Client-Approved Proposals',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: chrome.textPrimary,
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                   ),
@@ -489,7 +496,7 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
                   _approvedProposals.isEmpty
                       ? 'No proposals have been approved by clients yet.'
                       : '${_approvedProposals.length} proposal${_approvedProposals.length == 1 ? '' : 's'} approved by clients${_lastApprovedDate != null ? ' (last approved ${_formatRelativeDate(_lastApprovedDate!)})' : ''}.',
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  style: TextStyle(color: chrome.textSecondary, fontSize: 13),
                 ),
               ],
             ),
@@ -498,8 +505,8 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
             icon: const Icon(Icons.download),
             label: const Text('Export List'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: PremiumTheme.teal,
+              backgroundColor: chrome.textPrimary,
+              foregroundColor: chrome.textSecondary,
             ),
             onPressed:
                 _approvedProposals.isEmpty ? null : _exportApprovedProposals,
@@ -552,32 +559,45 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.blue.shade400, Colors.blue.shade600],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                decoration: chrome.floatingPanelDecoration(radius: 10),
+                child: Row(
                   children: [
-                    Text(
-                      'Total Approved',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                    Container(
+                      width: 64.94921875,
+                      height: 64.94921875,
+                      child: Image.asset(
+                        'assets/images/Creator_Dashboard/Approved_White Badge_Red.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => const Icon(
+                          Icons.check_circle,
+                          color: Colors.white,
+                          size: 60,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _approvedProposals.length.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.w700,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Total Approved',
+                            style: TextStyle(
+                              color: chrome.textSecondary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _approvedProposals.length.toString(),
+                            style: TextStyle(
+                              color: chrome.textPrimary,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -588,32 +608,45 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.green.shade400, Colors.green.shade600],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                decoration: chrome.floatingPanelDecoration(radius: 10),
+                child: Row(
                   children: [
-                    Text(
-                      'Total Value',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                    Container(
+                      width: 64.94921875,
+                      height: 64.94921875,
+                      child: Image.asset(
+                        'assets/images/Creator_Dashboard/Financial Growth_Development_White Badge_Red.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => const Icon(
+                          Icons.trending_up,
+                          color: Colors.white,
+                          size: 60,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _currencyFormatter.format(_totalApprovedValue),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.w700,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Total Value',
+                            style: TextStyle(
+                              color: chrome.textSecondary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _currencyFormatter.format(_totalApprovedValue),
+                            style: TextStyle(
+                              color: chrome.textPrimary,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -662,23 +695,43 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          color: chrome.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                      Container(
+                        width: 40,
+                        height: 40,
+                        child: Image.asset(
+                          'assets/images/Creator_Dashboard/Data Approval_White Badge_Red.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => const Icon(
+                            Icons.approval,
+                            color: Colors.white,
+                            size: 36,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        client,
-                        style: TextStyle(
-                          color: chrome.textSecondary,
-                          fontSize: 14,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: TextStyle(
+                                color: chrome.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              client,
+                              style: TextStyle(
+                                color: chrome.textSecondary,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
