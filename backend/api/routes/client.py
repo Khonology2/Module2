@@ -1892,7 +1892,7 @@ def client_approve_proposal(proposal_id):
                     from api.utils.helpers import get_frontend_url
                     frontend_url = get_frontend_url()
                     # Use collaboration router to land in correct client viewer
-                    return_url = f"{frontend_url}/#/collaborate?token={invitation_token}&signed=true"
+                    return_url = f"{frontend_url}/?token={invitation_token}&signed=true#/collaborate"
                     
                     envelope_result = create_docusign_envelope(
                         proposal_id=proposal_id,
@@ -2225,7 +2225,7 @@ def get_client_signing_url(proposal_id):
                 # Use a return URL that points back to the client proposals page
                 frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:8081')
                 # Use collaboration router to land in correct client viewer
-                return_url = f"{frontend_url}/#/collaborate?token={invitation_token}&signed=true"
+                return_url = f"{frontend_url}/?token={invitation_token}&signed=true#/collaborate"
                 
                 envelope_result = create_docusign_envelope(
                     proposal_id=proposal_id,
@@ -2636,7 +2636,7 @@ def client_docusign_signing_url_api(proposal_id):
                 generate_proposal_pdf,
             )
             frontend_url = get_frontend_url()
-            return_url = f"{frontend_url}/#/client/proposals?token={invitation_token}&signed=true"
+            return_url = f"{frontend_url}/?token={invitation_token}&signed=true#/client/proposals"
 
             # If an envelope exists, ensure it's a captive recipient envelope.
             # If not (legacy remote signing), create a new envelope for portal signing.

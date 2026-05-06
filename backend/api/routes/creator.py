@@ -1248,6 +1248,7 @@ def send_to_client(username=None, proposal_id=None):
                         permission_col = _pick_first(inv_cols, ['permission_level', 'permission', 'role'])
                         token_col = _pick_first(inv_cols, ['access_token', 'token'])
                         status_col = _pick_first(inv_cols, ['status'])
+                        expires_col = _pick_first(inv_cols, ['expires_at', 'expires', 'token_expires_at'])
                         proposal_id_col = 'proposal_id' if 'proposal_id' in inv_cols else None
 
                         insert_cols = []
@@ -1273,6 +1274,9 @@ def send_to_client(username=None, proposal_id=None):
                         if status_col:
                             insert_cols.append(status_col)
                             insert_vals.append('pending')
+                        if expires_col:
+                            insert_cols.append(expires_col)
+                            insert_vals.append(datetime.utcnow() + timedelta(days=90))
 
                         if proposal_id_col and inv_email_col and insert_cols:
                             placeholders = ', '.join(['%s'] * len(insert_cols))
@@ -1309,7 +1313,7 @@ def send_to_client(username=None, proposal_id=None):
                         print(f"⚠️ Failed to insert collaboration invitation: {inv_err}")
                         traceback.print_exc()
 
-                    client_link = f"{frontend_url}/#/client/proposals?token={access_token}"
+                    client_link = f"{frontend_url}/?token={access_token}#/client/proposals"
                     
                     sender_name = sender.get('full_name') or sender.get('username') or 'Your Team'
                     
@@ -1457,7 +1461,7 @@ def resend_client_email(username=None, proposal_id=None, user_id=None, email=Non
 
                 client_name = (proposal.get('client_name') or 'Client').strip() or 'Client'
                 proposal_title = (proposal.get('title') or 'Proposal').strip() or 'Proposal'
-                client_link = f"{frontend_url}/#/client/proposals?token={access_token}"
+                client_link = f"{frontend_url}/?token={access_token}#/client/proposals"
 
                 email_subject = f"Proposal: {proposal_title}"
                 email_body = f"""
@@ -2876,7 +2880,7 @@ def invite_collaborator(username=None, proposal_id=None, user_id=None, email=Non
                 from api.utils.email import send_email, get_logo_html
                 from api.utils.helpers import get_frontend_url
                 base_url = get_frontend_url()
-                invite_url = f"{base_url}/#/collaborate?token={access_token}"
+                invite_url = f"{base_url}/?token={access_token}#/collaborate"
                 print(f"🔗 Collaboration invitation URL: {invite_url}")
                 
                 email_body = f"""

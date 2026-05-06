@@ -2490,7 +2490,7 @@ def approve_proposal(username, proposal_id):
                         conn.commit()
                         
                         frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:8081')
-                        proposal_url = f"{frontend_url}/#/collaborate?token={access_token}"
+                        proposal_url = f"{frontend_url}/?token={access_token}#/collaborate"
                         
                         email_body = f"""
                         <html>
@@ -3600,7 +3600,7 @@ def invite_collaborator(username, proposal_id):
             
             # Send invitation email
             frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:8081')
-            collaboration_url = f"{frontend_url}/#/collaborate?token={access_token}"
+            collaboration_url = f"{frontend_url}/?token={access_token}#/collaborate"
             
             subject = f"You've been invited to collaborate on '{proposal_title}'"
             html_content = f"""
@@ -5167,7 +5167,7 @@ def client_approve_proposal(proposal_id):
                 )
 
                 frontend_url = get_frontend_url()
-                return_url = f"{frontend_url}/#/collaborate?token={token}&signed=true"
+                return_url = f"{frontend_url}/?token={token}&signed=true#/collaborate"
 
                 envelope_result = create_docusign_envelope(
                     proposal_id=proposal_id,

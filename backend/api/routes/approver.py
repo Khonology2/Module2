@@ -842,7 +842,7 @@ def approve_proposal(username=None, proposal_id=None):
                             print(f"⚠️ Failed to insert collaboration invitation: {inv_insert_err}")
                             traceback.print_exc()
 
-                        client_link = f"{frontend_url}/#/client/proposals?token={access_token}"
+                        client_link = f"{frontend_url}/?token={access_token}#/client/proposals"
 
                         sendgrid_configured = bool(
                             (os.getenv('SENDGRID_API_KEY') or '').strip()
