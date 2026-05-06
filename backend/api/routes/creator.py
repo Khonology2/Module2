@@ -14,6 +14,7 @@ import cloudinary.uploader
 import psycopg2.extras
 from datetime import datetime
 import requests
+import uuid
 
 try:
     from PyPDF2 import PdfReader
@@ -1125,6 +1126,15 @@ def send_to_client(username=None, proposal_id=None):
 
                     insert_cols = ['email']
                     insert_vals = [client_email_for_activity]
+
+                    # name is required NOT NULL
+                    insert_cols.append('name')
+                    insert_vals.append((proposal.get('client_name') or proposal.get('client') or client_email_for_activity).strip() or 'Client')
+
+                    # token is required NOT NULL
+                    insert_cols.append('token')
+                    insert_vals.append(str(uuid.uuid4()))
+
                     if company_col:
                         insert_cols.append(company_col)
                         insert_vals.append((proposal.get('client_name') or proposal.get('client') or client_email_for_activity).strip())
@@ -1134,30 +1144,22 @@ def send_to_client(username=None, proposal_id=None):
 
                     cols_sql = ', '.join(insert_cols)
                     placeholders = ', '.join(['%s'] * len(insert_cols))
-                    update_sql = None
+                    update_parts = ['name = COALESCE(EXCLUDED.name, clients.name)']
                     if company_col:
-                        update_sql = f"{company_col} = COALESCE(EXCLUDED.{company_col}, clients.{company_col})"
+                        update_parts.append(f"{company_col} = COALESCE(EXCLUDED.{company_col}, clients.{company_col})")
+                    if contact_col:
+                        update_parts.append(f"{contact_col} = COALESCE(EXCLUDED.{contact_col}, clients.{contact_col})")
+                    update_sql = ', '.join(update_parts)
 
-                    if update_sql:
-                        cursor.execute(
-                            f"""
-                            INSERT INTO clients ({cols_sql})
-                            VALUES ({placeholders})
-                            ON CONFLICT (email) DO UPDATE SET {update_sql}
-                            RETURNING id
-                            """,
-                            tuple(insert_vals),
-                        )
-                    else:
-                        cursor.execute(
-                            f"""
-                            INSERT INTO clients ({cols_sql})
-                            VALUES ({placeholders})
-                            ON CONFLICT (email) DO NOTHING
-                            RETURNING id
-                            """,
-                            tuple(insert_vals),
-                        )
+                    cursor.execute(
+                        f"""
+                        INSERT INTO clients ({cols_sql})
+                        VALUES ({placeholders})
+                        ON CONFLICT (email) DO UPDATE SET {update_sql}
+                        RETURNING id
+                        """,
+                        tuple(insert_vals),
+                    )
 
                     row = cursor.fetchone()
                     if row and (row.get('id') if isinstance(row, dict) else row[0]) is not None:
@@ -1191,6 +1193,10 @@ def send_to_client(username=None, proposal_id=None):
                 conn.commit()
                 print(f"[SEND_TO_CLIENT] ✅ Activity logged for proposal {proposal_id}")
             except Exception as activity_err:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
                 print(
                     f"⚠️ Failed to log proposal_sent activity for proposal {proposal_id}: {activity_err}"
                 )

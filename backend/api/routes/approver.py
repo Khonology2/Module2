@@ -8,6 +8,7 @@ import secrets
 import html
 import psycopg2.extras
 import json
+import uuid
 from datetime import datetime, timedelta
 
 from api.utils.database import get_db_connection
@@ -634,14 +635,15 @@ def approve_proposal(username=None, proposal_id=None):
                     if client_email and '@' in client_email:
                         cursor.execute(
                             """
-                            INSERT INTO clients (email, company_name, contact_person)
-                            VALUES (%s, %s, %s)
+                            INSERT INTO clients (email, name, company_name, contact_person, token)
+                            VALUES (%s, %s, %s, %s, %s)
                             ON CONFLICT (email) DO UPDATE SET
+                                name = COALESCE(EXCLUDED.name, clients.name),
                                 company_name = COALESCE(EXCLUDED.company_name, clients.company_name),
                                 contact_person = COALESCE(EXCLUDED.contact_person, clients.contact_person)
                             RETURNING id
                             """,
-                            (client_email, client_name or client_email, client_name or ''),
+                            (client_email, client_name or client_email or 'Client', client_name or client_email, client_name or '', str(uuid.uuid4())),
                         )
                         row = cursor.fetchone()
                         if row and (row.get('id') if isinstance(row, dict) else row[0]) is not None:
@@ -671,6 +673,10 @@ def approve_proposal(username=None, proposal_id=None):
                     conn.commit()
                     print(f"[APPROVER_ACTIVITY] Logged proposal_sent for proposal {proposal_id}, client_id={client_id_for_activity}")
                 except Exception as activity_err:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
                     print(f"⚠️ [APPROVER] Failed to log proposal_sent activity for proposal {proposal_id}: {activity_err}")
 
                 log_finance_audit_async(
