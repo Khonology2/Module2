@@ -1,6 +1,11 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
 import '../../config/app_constants.dart';
+import '../../services/auth_service.dart';
+import '../../services/role_service.dart';
+import '../../api.dart';
 
 class CinematicSequencePage extends StatefulWidget {
   const CinematicSequencePage({super.key});
@@ -11,9 +16,143 @@ class CinematicSequencePage extends StatefulWidget {
 
 class _CinematicSequencePageState extends State<CinematicSequencePage> {
   bool _isLightMode = false;
+  bool _isProcessingToken = false;
+  String? _urlSsoToken;
+  final TextEditingController _tokenController = TextEditingController();
+  static const bool _showTokenField =
+      bool.fromEnvironment('SHOW_SSO_TOKEN_FIELD', defaultValue: true);
 
   static const Color _white = Color(0xFFFFFFFF);
   static const Color _lightText = Color(0xFF090812);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _urlSsoToken = _extractTokenFromUrl();
+      // Deployment flow: user clicks GET STARTED to exchange token.
+      // If a token exists in URL, preload it for explicit submit.
+      if (_urlSsoToken != null &&
+          _urlSsoToken!.isNotEmpty &&
+          _tokenController.text.trim().isEmpty) {
+        _tokenController.text = _urlSsoToken!;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tokenController.dispose();
+    super.dispose();
+  }
+
+  String? _extractTokenFromUrl() {
+    final uri = Uri.base;
+    String? token = uri.queryParameters['token'] ??
+        uri.queryParameters['jwt'] ??
+        uri.queryParameters['access_token'] ??
+        uri.queryParameters['id_token'];
+
+    if ((token == null || token.isEmpty) && uri.fragment.isNotEmpty) {
+      final match = RegExp(r'(?:token|jwt|access_token|id_token)=([^&#]+)')
+          .firstMatch(uri.fragment);
+      if (match != null) {
+        token = Uri.decodeComponent(match.group(1)!);
+      }
+    }
+
+    // Extra fallback for Flutter web hash/deep-link formats.
+    if ((token == null || token.isEmpty)) {
+      final href = Uri.base.toString();
+      final match =
+          RegExp(r'(?:token|jwt|access_token|id_token)=([^&#]+)').firstMatch(href);
+      if (match != null) {
+        token = Uri.decodeComponent(match.group(1)!);
+      }
+    }
+
+    if (token == null || token.trim().isEmpty) return null;
+    return token.trim();
+  }
+
+  Future<void> _exchangeSsoToken(String token) async {
+    if (!mounted || _isProcessingToken) return;
+    setState(() {
+      _isProcessingToken = true;
+    });
+    try {
+      final loginResult = await AuthService.loginWithSsoToken(token);
+      final userProfile = loginResult?['user'] as Map<String, dynamic>?;
+      final accessToken = loginResult?['access_token'] as String?;
+      final backendDashboard = loginResult?['dashboard']?.toString();
+      final backendRole = loginResult?['role']?.toString();
+
+      if (!mounted || userProfile == null || accessToken == null) {
+        return;
+      }
+
+      final appState = context.read<AppState>();
+      appState.authToken = accessToken;
+      appState.currentUser = userProfile;
+
+      final roleService = context.read<RoleService>();
+      await roleService.initializeRoleFromUser(userProfile);
+      await appState.init();
+
+      final roleKey = (backendRole ?? userProfile['role']?.toString() ?? '')
+          .toLowerCase()
+          .trim()
+          .replaceAll('-', '_')
+          .replaceAll(' ', '_');
+
+      final dashboardRoute = backendDashboard ??
+          (roleKey == 'admin' ||
+                  roleKey == 'ceo' ||
+                  roleKey == 'clientreviewer' ||
+                  roleKey == 'client_reviewer' ||
+                  roleKey == 'reviewer'
+              ? '/approver_dashboard'
+              : roleKey == 'finance' ||
+                      roleKey == 'finance_manager' ||
+                      roleKey == 'financial_manager' ||
+                      roleKey.contains('finance')
+                  ? '/finance_dashboard'
+                  : roleKey.contains('admin') ||
+                          roleKey.contains('approver')
+                      ? '/approver_dashboard'
+                      : roleKey.contains('manager') ||
+                              roleKey.contains('creator')
+                          ? '/creator_dashboard'
+                  : '/creator_dashboard');
+
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, dashboardRoute, (route) => false);
+    } catch (e) {
+      debugPrint('SSO token exchange failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingToken = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _onGetStartedPressed() async {
+    final manualToken = _tokenController.text.trim();
+    if (manualToken.isNotEmpty) {
+      await _exchangeSsoToken(manualToken);
+      return;
+    }
+
+    if (_urlSsoToken != null && _urlSsoToken!.isNotEmpty) {
+      await _exchangeSsoToken(_urlSsoToken!);
+      return;
+    }
+
+    if (!mounted) return;
+    Navigator.pushNamed(context, '/login');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +218,10 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
                         _HeroPanel(
                           isMobile: isMobile,
                           isLightMode: _isLightMode,
+                          showTokenField: _showTokenField,
+                          tokenController: _tokenController,
+                          onGetStartedPressed: _onGetStartedPressed,
+                          isProcessingToken: _isProcessingToken,
                         ),
                       ],
                     ),
@@ -191,6 +334,17 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
               ),
             ),
           ),
+          if (_isProcessingToken)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.78),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE9293A)),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -200,7 +354,18 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
 class _HeroPanel extends StatelessWidget {
   final bool isMobile;
   final bool isLightMode;
-  const _HeroPanel({required this.isMobile, required this.isLightMode});
+  final bool showTokenField;
+  final bool isProcessingToken;
+  final TextEditingController tokenController;
+  final Future<void> Function() onGetStartedPressed;
+  const _HeroPanel({
+    required this.isMobile,
+    required this.isLightMode,
+    required this.showTokenField,
+    required this.tokenController,
+    required this.onGetStartedPressed,
+    required this.isProcessingToken,
+  });
 
   static const Color _white = Color(0xFFFFFFFF);
   static const Color _lightText = Color(0xFF090812);
@@ -236,6 +401,49 @@ class _HeroPanel extends StatelessWidget {
             ),
           ),
           SizedBox(height: isMobile ? 24 : 32.58),
+          if (showTokenField)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: SizedBox(
+                width: 412.6,
+                child: TextField(
+                  controller: tokenController,
+                  style: TextStyle(color: isLightMode ? _lightText : _white),
+                  decoration: InputDecoration(
+                    hintText: 'Paste token here',
+                    hintStyle: TextStyle(
+                      color: isLightMode
+                          ? _lightText.withValues(alpha: 0.55)
+                          : _white.withValues(alpha: 0.55),
+                    ),
+                    filled: true,
+                    fillColor: isLightMode
+                        ? Colors.white.withValues(alpha: 0.9)
+                        : Colors.black.withValues(alpha: 0.55),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: isLightMode ? _lightText : _white,
+                        width: 1,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: isLightMode
+                            ? _lightText.withValues(alpha: 0.55)
+                            : _white.withValues(alpha: 0.55),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           Wrap(
             alignment: WrapAlignment.center,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -246,7 +454,7 @@ class _HeroPanel extends StatelessWidget {
                 width: 201.3,
                 height: 32.58,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pushNamed(context, '/login'),
+                  onPressed: isProcessingToken ? null : onGetStartedPressed,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _accentRed,
                     foregroundColor: _white,

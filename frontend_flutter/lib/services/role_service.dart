@@ -75,7 +75,11 @@ class RoleService extends ChangeNotifier {
     final role = backendRole.toLowerCase().trim().replaceAll('-', '_');
 
     // Admin roles → Approver (Admin Dashboard)
-    if (role == 'admin' || role == 'ceo' || role == 'approver') {
+    if (role == 'admin' ||
+        role == 'ceo' ||
+        role == 'approver' ||
+        role.contains('admin') ||
+        role.contains('approver')) {
       return UserRole.approver;
     }
 
@@ -84,12 +88,17 @@ class RoleService extends ChangeNotifier {
         role == 'financial_manager' ||
         role == 'finance_manager' ||
         role == 'financial manager' ||
-        role == 'finance manager') {
+        role == 'finance manager' ||
+        role.contains('finance')) {
       return UserRole.finance;
     }
 
     // Manager roles → Creator (Manager Dashboard)
-    if (role == 'manager' || role == 'creator' || role == 'user') {
+    if (role == 'manager' ||
+        role == 'creator' ||
+        role == 'user' ||
+        role.contains('manager') ||
+        role.contains('creator')) {
       return UserRole.creator;
     }
 

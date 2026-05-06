@@ -9,6 +9,7 @@ In psycopg (v3) this is achieved via `row_factory=psycopg.rows.dict_row`.
 
 from __future__ import annotations
 
+import json
 from typing import Any, Callable
 
 
@@ -20,6 +21,24 @@ except Exception:  # pragma: no cover
 
 class RealDictCursor:  # marker class for cursor_factory checks
     pass
+
+
+class Json:
+    """
+    Minimal psycopg2.extras.Json-compatible wrapper.
+
+    Supports calls like `Json(payload)` in SQL parameter lists.
+    """
+
+    def __init__(self, adapted: Any, dumps: Callable[[Any], str] | None = None):
+        self.adapted = adapted
+        self._dumps = dumps or json.dumps
+
+    def dumps(self, obj: Any) -> str:
+        return self._dumps(obj)
+
+    def __str__(self) -> str:
+        return self.dumps(self.adapted)
 
 
 def _ensure_available() -> None:
@@ -35,5 +54,5 @@ def real_dict_cursor_kwargs() -> dict[str, Any]:
     return {"row_factory": _DICT_ROW_FACTORY}
 
 
-__all__ = ["RealDictCursor"]
+__all__ = ["RealDictCursor", "Json"]
 

@@ -13,11 +13,15 @@ class AuthService {
   }
 
   static String? _token;
+  static String? _refreshToken;
+  static String? _role;
   static Map<String, dynamic>? _currentUser;
 
   // Get current user
   static Map<String, dynamic>? get currentUser => _currentUser;
   static String? get token => _token;
+  static String? get refreshToken => _refreshToken;
+  static String? get role => _role;
   static bool get isLoggedIn => _token != null && _currentUser != null;
 
   // Persist session in web localStorage so back/refresh keeps user logged in
@@ -31,7 +35,12 @@ class AuthService {
       print('💾 Is Web: $kIsWeb');
 
       if (kIsWeb && _token != null && _currentUser != null) {
-        final data = json.encode({'token': _token, 'user': _currentUser});
+        final data = json.encode({
+          'access_token': _token,
+          'refresh_token': _refreshToken,
+          'role': _role,
+          'user': _currentUser,
+        });
         print('💾 Data to store length: ${data.length}');
         web.window.localStorage.setItem(_storageKey, data);
         print('✅ Session persisted to localStorage');
@@ -65,7 +74,10 @@ class AuthService {
           final parsed = json.decode(data) as Map<String, dynamic>;
           print('📦 Parsed keys: ${parsed.keys.toList()}');
 
-          final storedToken = parsed['token'] as String?;
+          final storedToken =
+              (parsed['access_token'] ?? parsed['token']) as String?;
+          final storedRefreshToken = parsed['refresh_token'] as String?;
+          final storedRole = parsed['role'] as String?;
           final storedUser = parsed['user'] as Map<String, dynamic>?;
 
           print('📦 Token exists in parsed data: ${storedToken != null}');
@@ -73,6 +85,8 @@ class AuthService {
 
           if (storedToken != null && storedUser != null) {
             _token = storedToken;
+            _refreshToken = storedRefreshToken;
+            _role = storedRole ?? storedUser['role']?.toString();
             _currentUser = storedUser;
             print('✅ Session restored successfully!');
             print('✅ Token: ${_token!.substring(0, 20)}...');
@@ -201,35 +215,98 @@ class AuthService {
     }
   }
 
-  // Login using external Khonobuzz JWT token
-  static Future<Map<String, dynamic>?> loginWithJwt(String jwtToken) async {
+  // Login using upstream SSO token
+  static Future<Map<String, dynamic>?> loginWithSsoToken(String upstreamToken) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/khonobuzz/jwt-login'),
+        Uri.parse('$baseUrl/api/auth/sso-login'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'token': jwtToken}),
+        body: json.encode({'token': upstreamToken}),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         final user = data['user'] as Map<String, dynamic>?;
-        final token = data['token'] as String?;
+        final token = data['access_token'] as String?;
+        final refresh = data['refresh_token'] as String?;
+        final resolvedRole = data['role']?.toString() ?? user?['role']?.toString();
 
-        if (user == null || token == null) {
-          throw Exception('Malformed response from jwt-login endpoint');
+        if (user == null || token == null || refresh == null) {
+          throw Exception('Malformed response from sso-login endpoint');
         }
 
-        setUserData(user, token);
+        _token = token;
+        _refreshToken = refresh;
+        _role = resolvedRole;
+        _currentUser = user;
+        _persistSession();
         return data;
       } else {
-        final error = json.decode(response.body);
-        throw Exception(error['detail'] ??
-            'External JWT login failed with status ${response.statusCode}');
+        Map<String, dynamic> error = {};
+        try {
+          error = json.decode(response.body) as Map<String, dynamic>;
+        } catch (_) {
+          throw Exception(
+              'SSO login failed with status ${response.statusCode}. Response was not JSON.');
+        }
+        throw Exception(error['error'] ??
+            error['detail'] ??
+            'SSO login failed with status ${response.statusCode}');
       }
     } catch (e) {
-      print('External JWT login error: $e');
+      print('SSO login error: $e');
       rethrow;
     }
+  }
+
+  // Backward compatibility for older callers
+  static Future<Map<String, dynamic>?> loginWithJwt(String jwtToken) {
+    return loginWithSsoToken(jwtToken);
+  }
+
+  static Future<String?> refreshAccessToken() async {
+    if (_refreshToken == null) return null;
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'refresh_token': _refreshToken}),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final newAccessToken = data['access_token'] as String?;
+        if (newAccessToken != null && newAccessToken.isNotEmpty) {
+          _token = newAccessToken;
+          _persistSession();
+          return newAccessToken;
+        }
+      }
+    } catch (e) {
+      print('Refresh access token error: $e');
+    }
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> getCurrentUserFromApi() async {
+    if (_token == null) return null;
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/auth/me'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_token',
+      },
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final user = data['user'] as Map<String, dynamic>?;
+      if (user != null) {
+        _currentUser = user;
+        _role = data['role']?.toString() ?? user['role']?.toString();
+        _persistSession();
+      }
+      return data;
+    }
+    return null;
   }
 
   // Resend verification email
@@ -308,6 +385,7 @@ class AuthService {
     print('💾 Setting user: ${userData['email']}');
     _currentUser = userData;
     _token = token;
+    _role = userData['role']?.toString();
     // IMPORTANT: Persist to localStorage so it survives navigation/refresh
     _persistSession();
     print('💾 Session data set and persisted');
@@ -316,6 +394,8 @@ class AuthService {
   // Logout
   static void logout() {
     _token = null;
+    _refreshToken = null;
+    _role = null;
     _currentUser = null;
     _clearSessionStorage();
   }

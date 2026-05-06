@@ -41,10 +41,12 @@ class PersonalDevelopmentHubScreen extends StatefulWidget {
 
 class _PersonalDevelopmentHubScreenState
     extends State<PersonalDevelopmentHubScreen> {
+  static const bool _showManualTokenField = true;
   late List<String> inspirationalLines;
   int _currentLineIndex = 0;
   late Timer _timer;
   bool _isProcessingToken = false;
+  final TextEditingController _tokenController = TextEditingController();
 
   @override
   void initState() {
@@ -80,11 +82,11 @@ class _PersonalDevelopmentHubScreenState
 
     // Check for JWT token in URL
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _handleJwtTokenFromUrl();
+      _handleSsoTokenFromUrl();
     });
   }
 
-  Future<void> _handleJwtTokenFromUrl() async {
+  Future<void> _handleSsoTokenFromUrl() async {
     if (!mounted) return;
 
     final currentUrl = web.window.location.href;
@@ -123,9 +125,11 @@ class _PersonalDevelopmentHubScreenState
     });
 
     try {
-      final loginResult = await AuthService.loginWithJwt(externalToken);
+      final loginResult = await AuthService.loginWithSsoToken(externalToken);
       final userProfile = loginResult?['user'] as Map<String, dynamic>?;
-      final token = loginResult?['token'] as String?;
+      final token = loginResult?['access_token'] as String?;
+      final backendDashboard = loginResult?['dashboard']?.toString();
+      final backendRole = loginResult?['role']?.toString();
 
       if (!mounted) return;
 
@@ -148,27 +152,23 @@ class _PersonalDevelopmentHubScreenState
 
       await appState.init();
 
-      final rawRole = userProfile['role']?.toString() ?? '';
-      final userRole = rawRole.toLowerCase().trim();
-      String dashboardRoute;
-
-      final isAdmin = userRole == 'admin' || userRole == 'ceo';
-      final isFinance = userRole == 'proposal & sow builder - finance' ||
-          userRole == 'finance' ||
-          userRole == 'financial manager';
-      final isManager = userRole == 'manager' ||
-          userRole == 'creator' ||
-          userRole == 'user';
-
-      if (isAdmin) {
-        dashboardRoute = '/approver_dashboard';
-      } else if (isFinance) {
-        dashboardRoute = '/finance_dashboard';
-      } else if (isManager) {
-        dashboardRoute = '/creator_dashboard';
-      } else {
-        dashboardRoute = '/creator_dashboard';
-      }
+      final roleKey = (backendRole ?? userProfile['role']?.toString() ?? '')
+          .toLowerCase()
+          .trim()
+          .replaceAll('-', '_')
+          .replaceAll(' ', '_');
+      final dashboardRoute = backendDashboard ??
+          (roleKey == 'admin' || roleKey == 'ceo'
+              ? '/approver_dashboard'
+              : roleKey == 'finance' ||
+                      roleKey == 'finance_manager' ||
+                      roleKey == 'financial_manager'
+                  ? '/finance_dashboard'
+                  : roleKey == 'clientreviewer' ||
+                          roleKey == 'client_reviewer' ||
+                          roleKey == 'reviewer'
+                      ? '/approver_dashboard'
+                      : '/creator_dashboard');
 
       if (!mounted) return;
 
@@ -193,10 +193,44 @@ class _PersonalDevelopmentHubScreenState
     }
   }
 
+  Future<void> _loginFromManualToken() async {
+    final token = _tokenController.text.trim();
+    if (token.isEmpty || _isProcessingToken) return;
+    setState(() {
+      _isProcessingToken = true;
+    });
+    try {
+      await AuthService.loginWithSsoToken(token);
+      if (!mounted) return;
+      await _handleSsoTokenFromUrl();
+      if (!mounted) return;
+      // Manual login may not have URL params, so route using current auth user data.
+      final currentRole = AuthService.currentUser?['role']?.toString().toLowerCase() ?? '';
+      final roleKey = currentRole.replaceAll('-', '_').replaceAll(' ', '_');
+      final dashboardRoute = roleKey == 'admin'
+          ? '/approver_dashboard'
+          : roleKey.startsWith('finance')
+              ? '/finance_dashboard'
+              : roleKey == 'clientreviewer' || roleKey == 'client_reviewer'
+                  ? '/approver_dashboard'
+                  : '/creator_dashboard';
+      Navigator.pushNamedAndRemoveUntil(context, dashboardRoute, (route) => false);
+    } catch (e) {
+      print('❌ Manual SSO login failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingToken = false;
+        });
+      }
+    }
+  }
+
 
   @override
   void dispose() {
     _timer.cancel();
+    _tokenController.dispose();
     super.dispose();
   }
 
@@ -270,6 +304,48 @@ class _PersonalDevelopmentHubScreenState
                           ),
                         ),
                         const SizedBox(height: 48),
+                        if (_showManualTokenField)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 560),
+                              child: Column(
+                                children: [
+                                  TextField(
+                                    controller: _tokenController,
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: InputDecoration(
+                                      hintText: 'Paste SSO token',
+                                      hintStyle: TextStyle(color: Colors.white.withAlpha(153)),
+                                      filled: true,
+                                      fillColor: Colors.black.withAlpha(153),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: const BorderSide(color: Color(0xFFE9293A)),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: const BorderSide(color: Color(0xFFE9293A)),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: _isProcessingToken ? null : _loginFromManualToken,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFFE9293A),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                      ),
+                                      child: const Text('Login with SSO Token'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),

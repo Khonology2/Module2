@@ -7,8 +7,12 @@ import os
 import json
 import traceback
 from datetime import datetime, timedelta, timezone
+import base64
 import psycopg2
 import psycopg2.extras
+import jwt
+from jwt import InvalidTokenError
+from cryptography.fernet import Fernet, InvalidToken as FernetInvalidToken
 
 from api.utils.database import get_db_connection, _pg_conn, release_pg_conn
 from api.utils.profile_avatar import (
@@ -23,6 +27,255 @@ from api.utils.jwt_validator import JWTValidationError, validate_jwt_token, extr
 from werkzeug.security import check_password_hash
 
 bp = Blueprint('auth', __name__)
+
+ROLE_DASHBOARD_MAP = {
+    'admin': '/approver_dashboard',
+    'client_reviewer': '/approver_dashboard',
+    'manager': '/creator_dashboard',
+    'finance': '/finance_dashboard',
+}
+
+
+def _error(message, code, status):
+    return {'error': message, 'code': code}, status
+
+
+def _normalize_sso_role(raw_role):
+    role_key = (raw_role or '').strip().lower().replace('-', '_').replace(' ', '_')
+    if (
+        role_key in {'admin', 'ceo', 'approver'}
+        or 'admin' in role_key
+        or 'approver' in role_key
+    ):
+        return 'admin'
+    if role_key in {'clientreviewer', 'client_reviewer', 'reviewer'}:
+        return 'client_reviewer'
+    # Handles values such as:
+    # - "finance"
+    # - "financial_manager"
+    # - "Proposal & SOW Builder - Finance"
+    if (
+        role_key.startswith('finance')
+        or role_key in {'financial_manager'}
+        or 'finance' in role_key
+    ):
+        return 'finance'
+    if (
+        role_key in {'manager', 'creator', 'user'}
+        or 'manager' in role_key
+        or 'creator' in role_key
+    ):
+        return 'manager'
+    return 'manager'
+
+
+def _derive_role_from_claims(claims):
+    candidates = []
+    if claims.get('role'):
+        candidates.append(claims.get('role'))
+    roles = claims.get('roles')
+    if isinstance(roles, list):
+        candidates.extend(roles)
+    elif isinstance(roles, str):
+        candidates.append(roles)
+    if claims.get('persona'):
+        candidates.append(claims.get('persona'))
+    if claims.get('user_type'):
+        candidates.append(claims.get('user_type'))
+
+    normalized = [_normalize_sso_role(c) for c in candidates if c is not None]
+    if not normalized:
+        return None
+
+    # Deterministic precedence for multi-role tokens.
+    priority = {'admin': 4, 'finance': 3, 'client_reviewer': 2, 'manager': 1}
+    return max(normalized, key=lambda r: priority.get(r, 0))
+
+
+def _resolve_dashboard(role):
+    return ROLE_DASHBOARD_MAP.get(role, '/creator_dashboard')
+
+
+def _extract_sso_token():
+    data = request.get_json(silent=True) or {}
+    header_token = request.headers.get('X-SSO-Token')
+    auth_header = request.headers.get('Authorization') or ''
+    bearer = auth_header[7:] if auth_header.lower().startswith('bearer ') else None
+    return data.get('token') or header_token or request.args.get('token') or bearer
+
+
+def _looks_like_jwt(token):
+    return isinstance(token, str) and token.count('.') == 2
+
+
+def _decrypt_if_needed(token):
+    if _looks_like_jwt(token):
+        return token
+    key = os.getenv('SSO_DECRYPTION_KEY')
+    if not key:
+        raise ValueError('SSO_DECRYPTION_KEY is not configured')
+    try:
+        fernet = Fernet(key.encode('utf-8'))
+        return fernet.decrypt(token.encode('utf-8')).decode('utf-8')
+    except (FernetInvalidToken, ValueError):
+        return token
+
+
+def _decode_upstream_sso_token(token):
+    secret = os.getenv('SSO_JWT_SECRET')
+    if not secret:
+        raise ValueError('SSO_JWT_SECRET is not configured')
+    return jwt.decode(token, secret, algorithms=['HS256'])
+
+
+def _generate_unique_username(cursor, email):
+    base_username = email.split('@')[0]
+    username = base_username
+    counter = 1
+    while True:
+        cursor.execute('SELECT id FROM users WHERE username = %s', (username,))
+        if cursor.fetchone() is None:
+            return username
+        username = f"{base_username}{counter}"
+        counter += 1
+
+
+def _upsert_sso_user(email, role, claims):
+    name = claims.get('name') or claims.get('full_name') or email.split('@')[0]
+    department = claims.get('department')
+    conn = _pg_conn()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            '''SELECT id, username, email, full_name, role, department, is_active
+               FROM users WHERE email = %s''',
+            (email,),
+        )
+        user = cursor.fetchone()
+        if user:
+            user_id = user[0]
+            cursor.execute(
+                '''UPDATE users
+                   SET role = %s,
+                       full_name = %s,
+                       department = COALESCE(%s, department),
+                       updated_at = CURRENT_TIMESTAMP
+                   WHERE id = %s
+                   RETURNING id, username, email, full_name, role, department, is_active''',
+                (role, name, department, user_id),
+            )
+            updated = cursor.fetchone()
+            conn.commit()
+            return updated
+
+        username = _generate_unique_username(cursor, email)
+        cursor.execute(
+            '''INSERT INTO users (username, email, password_hash, full_name, role, department, is_active, is_email_verified)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+               RETURNING id, username, email, full_name, role, department, is_active''',
+            (username, email, f"sso:{email}", name, role, department, True, True),
+        )
+        created = cursor.fetchone()
+        conn.commit()
+        return created
+    finally:
+        release_pg_conn(conn)
+
+
+def _make_app_access_token(user):
+    # Prefer dedicated app key; fallback keeps local/prod working when only SSO keys exist.
+    secret = os.getenv('APP_JWT_SECRET') or os.getenv('JWT_SECRET') or os.getenv('SSO_JWT_SECRET')
+    if not secret:
+        raise ValueError('APP_JWT_SECRET is not configured')
+    ttl = int(os.getenv('ACCESS_TOKEN_TTL', '900'))
+    now = datetime.now(timezone.utc)
+    payload = {
+        'sub': str(user['id']),
+        'email': user['email'],
+        'role': user['role'],
+        'type': 'access',
+        'iat': int(now.timestamp()),
+        'exp': int((now + timedelta(seconds=ttl)).timestamp()),
+    }
+    return jwt.encode(payload, secret, algorithm='HS256')
+
+
+def _make_app_refresh_token(user):
+    # Prefer dedicated refresh key, then dedicated app key, then SSO key as last fallback.
+    secret = (
+        os.getenv('APP_REFRESH_JWT_SECRET')
+        or os.getenv('APP_JWT_SECRET')
+        or os.getenv('JWT_SECRET')
+        or os.getenv('SSO_JWT_SECRET')
+    )
+    if not secret:
+        raise ValueError('APP_REFRESH_JWT_SECRET is not configured')
+    ttl = int(os.getenv('REFRESH_TOKEN_TTL', '1209600'))
+    now = datetime.now(timezone.utc)
+    payload = {
+        'sub': str(user['id']),
+        'type': 'refresh',
+        'iat': int(now.timestamp()),
+        'exp': int((now + timedelta(seconds=ttl)).timestamp()),
+    }
+    return jwt.encode(payload, secret, algorithm='HS256')
+
+
+def _decode_app_access_token(token):
+    secret = os.getenv('APP_JWT_SECRET') or os.getenv('JWT_SECRET') or os.getenv('SSO_JWT_SECRET')
+    if not secret:
+        raise ValueError('APP_JWT_SECRET is not configured')
+    payload = jwt.decode(token, secret, algorithms=['HS256'])
+    if payload.get('type') != 'access':
+        raise InvalidTokenError('Invalid token type')
+    return payload
+
+
+def _decode_app_refresh_token(token):
+    secret = (
+        os.getenv('APP_REFRESH_JWT_SECRET')
+        or os.getenv('APP_JWT_SECRET')
+        or os.getenv('JWT_SECRET')
+        or os.getenv('SSO_JWT_SECRET')
+    )
+    if not secret:
+        raise ValueError('APP_REFRESH_JWT_SECRET is not configured')
+    payload = jwt.decode(token, secret, algorithms=['HS256'])
+    if payload.get('type') != 'refresh':
+        raise InvalidTokenError('Invalid token type')
+    return payload
+
+
+def _get_sso_user_by_id(user_id):
+    conn = _pg_conn()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            '''SELECT id, username, email, full_name, role, department, is_active
+               FROM users WHERE id = %s''',
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            'id': row[0],
+            'username': row[1],
+            'email': row[2],
+            'full_name': row[3],
+            'role': _normalize_sso_role(row[4]),
+            'department': row[5],
+            'is_active': row[6],
+        }
+    finally:
+        release_pg_conn(conn)
+
+
+def _get_app_bearer_token():
+    auth_header = request.headers.get('Authorization') or ''
+    if not auth_header.lower().startswith('bearer '):
+        return None
+    return auth_header[7:].strip()
 
 # Keep role normalization in one place so registration/login stay consistent.
 def _normalize_role(raw_role, default='manager'):
@@ -932,6 +1185,114 @@ def khonobuzz_jwt_login():
         print(f'Khonobuzz JWT login error: {e}')
         traceback.print_exc()
         return {'detail': str(e)}, 500
+
+
+@bp.post("/auth/sso-login")
+def sso_login():
+    token = _extract_sso_token()
+    if not token:
+        return _error('token is required', 'TOKEN_MISSING', 400)
+    try:
+        upstream_token = _decrypt_if_needed(token)
+        claims = _decode_upstream_sso_token(upstream_token)
+        email = claims.get('email') or claims.get('user_email') or claims.get('email_address')
+        upstream_role = _derive_role_from_claims(claims)
+
+        if not email:
+            return _error('email claim is required', 'CLAIM_EMAIL_MISSING', 400)
+        if not upstream_role:
+            return _error('role claim is required', 'CLAIM_ROLE_MISSING', 400)
+
+        role = _normalize_sso_role(upstream_role)
+        db_user = _upsert_sso_user(email=email, role=role, claims=claims)
+        user_payload = {
+            'id': db_user[0],
+            'username': db_user[1],
+            'email': db_user[2],
+            'name': db_user[3],
+            'role': role,
+            'department': db_user[5],
+        }
+        access_token = _make_app_access_token(user_payload)
+        refresh_token = _make_app_refresh_token(user_payload)
+        return {
+            'access_token': access_token,
+            'refresh_token': refresh_token,
+            'role': role,
+            'dashboard': _resolve_dashboard(role),
+            'user': {
+                'id': user_payload['id'],
+                'email': user_payload['email'],
+                'name': user_payload['name'],
+                'role': role,
+            },
+        }, 200
+    except InvalidTokenError:
+        return _error('invalid or expired token', 'TOKEN_INVALID', 401)
+    except ValueError as exc:
+        return _error(str(exc), 'CONFIG_ERROR', 500)
+    except Exception as exc:
+        print(f'SSO login error: {exc}')
+        traceback.print_exc()
+        return _error('internal error', 'INTERNAL_ERROR', 500)
+
+
+@bp.post("/auth/refresh")
+def refresh_sso_token():
+    data = request.get_json(silent=True) or {}
+    refresh_token = data.get('refresh_token')
+    if not refresh_token:
+        return _error('refresh_token is required', 'TOKEN_MISSING', 400)
+    try:
+        payload = _decode_app_refresh_token(refresh_token)
+        user = _get_sso_user_by_id(payload.get('sub'))
+        if not user:
+            return _error('user not found', 'USER_NOT_FOUND', 401)
+        return {'access_token': _make_app_access_token(user)}, 200
+    except InvalidTokenError:
+        return _error('invalid refresh token', 'TOKEN_INVALID', 401)
+    except ValueError as exc:
+        return _error(str(exc), 'CONFIG_ERROR', 500)
+    except Exception as exc:
+        print(f'Refresh token error: {exc}')
+        traceback.print_exc()
+        return _error('internal error', 'INTERNAL_ERROR', 500)
+
+
+@bp.get("/auth/me")
+def sso_me():
+    token = _get_app_bearer_token()
+    if not token:
+        return _error('authorization token is required', 'TOKEN_MISSING', 401)
+    try:
+        payload = _decode_app_access_token(token)
+        user = _get_sso_user_by_id(payload.get('sub'))
+        if not user:
+            return _error('user not found', 'USER_NOT_FOUND', 404)
+        role = user.get('role', 'manager')
+        return {
+            'user': {
+                'id': user['id'],
+                'email': user['email'],
+                'name': user.get('full_name'),
+                'role': role,
+            },
+            'role': role,
+            'dashboard': _resolve_dashboard(role),
+        }, 200
+    except InvalidTokenError:
+        return _error('invalid or expired token', 'TOKEN_INVALID', 401)
+    except ValueError as exc:
+        return _error(str(exc), 'CONFIG_ERROR', 500)
+    except Exception as exc:
+        print(f'Me token error: {exc}')
+        traceback.print_exc()
+        return _error('internal error', 'INTERNAL_ERROR', 500)
+
+
+@bp.post("/auth/logout")
+def sso_logout():
+    return {'detail': 'logged out'}, 200
 
 @bp.post("/verify-email")
 @bp.get("/verify-email")
