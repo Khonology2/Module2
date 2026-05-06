@@ -334,11 +334,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     return unread;
   }
 
+  int _computeTotalClientNotifications() {
+    final activity = _overview?['activity'];
+    if (activity is! List) return 0;
+    return activity.whereType<Map>().length;
+  }
+
   void _refreshClientNotificationBadge() {
-    final unread = _computeUnreadClientNotifications();
+    final total = _computeTotalClientNotifications();
     if (!mounted) return;
     setState(() {
-      _unreadClientNotifications = unread;
+      _unreadClientNotifications = total;
     });
   }
 
@@ -414,48 +420,106 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                         final created = createdRaw is DateTime
                             ? createdRaw
                             : DateTime.tryParse(createdRaw?.toString() ?? '');
-                        final subtitle =
+                        final timeAgo =
                             created != null ? _timeAgo(created) : '';
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Icon(
-                                _activityIcon(
-                                    (a['event_type'] ?? '').toString()),
-                                color: chrome.textSecondary,
-                                size: 18,
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white.withValues(alpha: 0.03),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFC10D00)
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  Icons.notifications_outlined,
+                                  color: Color(0xFFC10D00),
+                                  size: 20,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _activityLabel(a),
-                                    style: TextStyle(
-                                      color: chrome.textPrimary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  if (subtitle.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Text(
-                                        subtitle,
-                                        style: TextStyle(
-                                          color: chrome.textSecondary,
-                                          fontSize: 12,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            _activityLabel(a),
+                                            style: TextStyle(
+                                              color: chrome.textPrimary,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
                                         ),
+                                        TextButton(
+                                          onPressed: () {},
+                                          style: TextButton.styleFrom(
+                                            padding: EdgeInsets.zero,
+                                            minimumSize: Size.zero,
+                                            tapTargetSize: MaterialTapTargetSize
+                                                .shrinkWrap,
+                                          ),
+                                          child: Text(
+                                            'Mark read',
+                                            style: TextStyle(
+                                              color: chrome.textSecondary,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          onPressed: () {},
+                                          icon: Icon(
+                                            Icons.delete_outline,
+                                            color: const Color(0xFFC10D00)
+                                                .withValues(alpha: 0.8),
+                                            size: 18,
+                                          ),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _activitySubtitle(a),
+                                      style: TextStyle(
+                                        color: chrome.textSecondary,
+                                        fontSize: 12,
+                                        height: 1.4,
                                       ),
                                     ),
-                                ],
+                                    if (timeAgo.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          timeAgo,
+                                          style: TextStyle(
+                                            color: chrome.textSecondary
+                                                .withValues(alpha: 0.6),
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         );
                       },
                     ),
@@ -3701,6 +3765,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
   IconData _activityIcon(String eventType) {
     final e = eventType.toLowerCase().trim();
+    if (e.contains('sent')) return Icons.notifications_outlined;
     if (e.contains('view') || e.contains('open'))
       return Icons.visibility_outlined;
     if (e.contains('sign')) return Icons.check_circle_outline;
@@ -3708,29 +3773,54 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     if (e.contains('comment') || e.contains('change')) {
       return Icons.mode_comment_outlined;
     }
-    return Icons.bolt_outlined;
+    return Icons.notifications_outlined;
   }
 
   String _activityLabel(Map<String, dynamic> a) {
-    final proposalId = a['proposal_id']?.toString();
-    final event = (a['event_type'] ?? '').toString();
-    final ev = event.toLowerCase().trim();
-    String verb;
-    if (ev.contains('view') || ev.contains('open')) {
-      verb = 'viewed';
-    } else if (ev.contains('sign')) {
-      verb = 'signed';
-    } else if (ev.contains('download')) {
-      verb = 'downloaded';
-    } else if (ev.contains('comment')) {
-      verb = 'commented';
-    } else if (ev.contains('change')) {
-      verb = 'requested changes';
-    } else {
-      verb = event.isEmpty ? 'updated' : event;
+    final event = (a['event_type'] ?? '').toString().toLowerCase().trim();
+    if (event.contains('sent')) return 'Proposal Sent';
+    if (event.contains('view') || event.contains('open'))
+      return 'Proposal Viewed';
+    if (event.contains('sign')) return 'Proposal Signed';
+    if (event.contains('download')) return 'Proposal Downloaded';
+    if (event.contains('comment')) return 'New Comment';
+    if (event.contains('change')) return 'Changes Requested';
+    return 'Proposal Updated';
+  }
+
+  String _activitySubtitle(Map<String, dynamic> a) {
+    final metadata = a['metadata'] is Map
+        ? Map<String, dynamic>.from(a['metadata'].cast<String, dynamic>())
+        : <String, dynamic>{};
+    final title = metadata['proposal_title']?.toString() ?? '';
+    final sender = metadata['sender_name']?.toString() ??
+        metadata['sender_username']?.toString() ??
+        '';
+    final event = (a['event_type'] ?? '').toString().toLowerCase();
+    if (event.contains('sent')) {
+      if (title.isNotEmpty && sender.isNotEmpty) {
+        return "Your proposal '$title' has been sent by $sender.";
+      } else if (title.isNotEmpty) {
+        return "Your proposal '$title' has been sent.";
+      }
+      return 'A new proposal has been sent to you.';
     }
-    if (proposalId == null || proposalId.isEmpty) return 'Proposal $verb';
-    return 'Proposal #$proposalId $verb';
+    if (event.contains('view') || event.contains('open')) {
+      return 'Your proposal has been viewed.';
+    }
+    if (event.contains('sign')) {
+      return 'Your proposal has been signed.';
+    }
+    if (event.contains('download')) {
+      return 'Your proposal has been downloaded.';
+    }
+    if (event.contains('comment')) {
+      return 'A new comment has been added to your proposal.';
+    }
+    if (event.contains('change')) {
+      return 'Changes have been requested for your proposal.';
+    }
+    return '';
   }
 
   Widget _sectionCard({required String title, required Widget child}) {
