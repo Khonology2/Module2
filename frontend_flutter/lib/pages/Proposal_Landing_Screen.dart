@@ -41,7 +41,7 @@ class PersonalDevelopmentHubScreen extends StatefulWidget {
 
 class _PersonalDevelopmentHubScreenState
     extends State<PersonalDevelopmentHubScreen> {
-  static const bool _showManualTokenField = true;
+  static const bool _showManualTokenField = false;
   late List<String> inspirationalLines;
   int _currentLineIndex = 0;
   late Timer _timer;
