@@ -1072,6 +1072,7 @@ def send_to_client(username=None, proposal_id=None):
             )
             conn.commit()
 
+            print(f"[SEND_TO_CLIENT] Starting activity logging for proposal {proposal_id}")
             try:
                 cursor.execute(
                     """
@@ -1091,6 +1092,7 @@ def send_to_client(username=None, proposal_id=None):
                     ON proposal_client_activity(client_id, created_at DESC)
                     """
                 )
+                print(f"[SEND_TO_CLIENT] Table ensured for proposal {proposal_id}")
 
                 # Always log proposal_sent activity (client_id can be NULL if no email available)
                 metadata = {
@@ -1104,6 +1106,7 @@ def send_to_client(username=None, proposal_id=None):
 
                 client_email_for_activity = (proposal.get('client_email') or '').strip()
                 client_id_for_activity = None
+                print(f"[SEND_TO_CLIENT] client_email_for_activity='{client_email_for_activity}'")
                 if client_email_for_activity:
                     cursor.execute(
                         """
@@ -1171,6 +1174,7 @@ def send_to_client(username=None, proposal_id=None):
                             )
 
                 # Log activity with or without client_id (client_id is nullable in schema)
+                print(f"[SEND_TO_CLIENT] Inserting activity for proposal {proposal_id}, client_id={client_id_for_activity}")
                 cursor.execute(
                     """
                     INSERT INTO proposal_client_activity
@@ -1185,10 +1189,12 @@ def send_to_client(username=None, proposal_id=None):
                     ),
                 )
                 conn.commit()
+                print(f"[SEND_TO_CLIENT] ✅ Activity logged for proposal {proposal_id}")
             except Exception as activity_err:
                 print(
                     f"⚠️ Failed to log proposal_sent activity for proposal {proposal_id}: {activity_err}"
                 )
+                traceback.print_exc()
 
             log_finance_audit_async(
                 user_id=sender.get('id'),
