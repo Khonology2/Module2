@@ -275,7 +275,7 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
   void _navigateToPage(BuildContext context, String page) {
     switch (page) {
       case 'Dashboard':
-        Navigator.pushReplacementNamed(context, '/creator-dashboard');
+        Navigator.pushReplacementNamed(context, '/creator_dashboard');
         break;
       case 'My Proposals':
       case 'Proposals':
@@ -285,13 +285,13 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
         Navigator.pushReplacementNamed(context, '/templates');
         break;
       case 'Content Library':
-        Navigator.pushReplacementNamed(context, '/content-library');
+        Navigator.pushReplacementNamed(context, '/content_library');
         break;
       case 'Client Management':
-        Navigator.pushReplacementNamed(context, '/client-management');
+        Navigator.pushReplacementNamed(context, '/client_management');
         break;
       case 'Approved Proposals':
-        Navigator.pushReplacementNamed(context, '/approved-proposals');
+        Navigator.pushReplacementNamed(context, '/approved_proposals');
         break;
       case 'Analytics (My Pipeline)':
         Navigator.pushReplacementNamed(context, '/analytics');

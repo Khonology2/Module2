@@ -1347,7 +1347,7 @@ def generate_proposal_pdf(
                     top_y - banner_h,
                     width=page_width,
                     height=banner_h,
-                    preserveAspectRatio=True,
+                    preserveAspectRatio=False,
                     anchor='c',
                 )
                 header_bg_ok = True
