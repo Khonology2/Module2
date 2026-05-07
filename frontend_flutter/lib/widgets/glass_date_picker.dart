@@ -28,12 +28,12 @@ Future<DateTime?> showGlassDatePicker({
       ? const Color(0xD91A1F29)
       : const Color(0xEAF7F9FC);
 
-  MaterialStateProperty<Color?> redInteractiveBg() {
-    return MaterialStateProperty.resolveWith((states) {
-      if (states.contains(MaterialState.selected) ||
-          states.contains(MaterialState.hovered) ||
-          states.contains(MaterialState.pressed) ||
-          states.contains(MaterialState.focused)) {
+  WidgetStateProperty<Color?> redInteractiveBg() {
+    return WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.selected) ||
+          states.contains(WidgetState.hovered) ||
+          states.contains(WidgetState.pressed) ||
+          states.contains(WidgetState.focused)) {
         return _calendarAccentRed;
       }
       return Colors.transparent;
@@ -71,43 +71,43 @@ Future<DateTime?> showGlassDatePicker({
             color: mutedText,
             fontWeight: FontWeight.w600,
           ),
-          dayForegroundColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.disabled)) {
+          dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.disabled)) {
               return textColor.withValues(alpha: 0.35);
             }
-            if (states.contains(MaterialState.selected)) {
+            if (states.contains(WidgetState.selected)) {
               return Colors.white;
             }
             return textColor;
           }),
           dayBackgroundColor: redInteractiveBg(),
-          dayOverlayColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.hovered) ||
-                states.contains(MaterialState.focused) ||
-                states.contains(MaterialState.pressed)) {
+          dayOverlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.focused) ||
+                states.contains(WidgetState.pressed)) {
               return _calendarAccentRed;
             }
             return Colors.transparent;
           }),
-          todayForegroundColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.selected) ||
-                states.contains(MaterialState.hovered) ||
-                states.contains(MaterialState.focused)) {
+          todayForegroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected) ||
+                states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.focused)) {
               return Colors.white;
             }
             return _calendarAccentRed;
           }),
-          todayBackgroundColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.selected) ||
-                states.contains(MaterialState.hovered) ||
-                states.contains(MaterialState.pressed) ||
-                states.contains(MaterialState.focused)) {
+          todayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected) ||
+                states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.pressed) ||
+                states.contains(WidgetState.focused)) {
               return _calendarAccentRed;
             }
             return _calendarAccentRed.withValues(alpha: 0.18);
           }),
-          yearForegroundColor: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.selected)) return Colors.white;
+          yearForegroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) return Colors.white;
             return textColor;
           }),
           yearBackgroundColor: redInteractiveBg(),

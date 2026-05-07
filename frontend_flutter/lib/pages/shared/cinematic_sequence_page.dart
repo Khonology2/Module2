@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../../config/app_constants.dart';
 import '../../services/auth_service.dart';
@@ -19,8 +18,9 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
   bool _isProcessingToken = false;
   String? _urlSsoToken;
   final TextEditingController _tokenController = TextEditingController();
-  static const bool _showTokenField =
-      bool.fromEnvironment('SHOW_SSO_TOKEN_FIELD', defaultValue: true);
+
+  /// Toggle: `false` hides the paste-token field; GET STARTED still reads the token from the URL for SSO.
+  static const bool _showLandingTokenField = false;
 
   static const Color _white = Color(0xFFFFFFFF);
   static const Color _lightText = Color(0xFF090812);
@@ -30,9 +30,8 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _urlSsoToken = _extractTokenFromUrl();
-      // Deployment flow: user clicks GET STARTED to exchange token.
-      // If a token exists in URL, preload it for explicit submit.
-      if (_urlSsoToken != null &&
+      if (_showLandingTokenField &&
+          _urlSsoToken != null &&
           _urlSsoToken!.isNotEmpty &&
           _tokenController.text.trim().isEmpty) {
         _tokenController.text = _urlSsoToken!;
@@ -139,7 +138,10 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
   }
 
   Future<void> _onGetStartedPressed() async {
-    final manualToken = _tokenController.text.trim();
+    _urlSsoToken = _extractTokenFromUrl();
+
+    final manualToken =
+        _showLandingTokenField ? _tokenController.text.trim() : '';
     if (manualToken.isNotEmpty) {
       await _exchangeSsoToken(manualToken);
       return;
@@ -218,7 +220,7 @@ class _CinematicSequencePageState extends State<CinematicSequencePage> {
                         _HeroPanel(
                           isMobile: isMobile,
                           isLightMode: _isLightMode,
-                          showTokenField: _showTokenField,
+                          showTokenField: _showLandingTokenField,
                           tokenController: _tokenController,
                           onGetStartedPressed: _onGetStartedPressed,
                           isProcessingToken: _isProcessingToken,
