@@ -63,6 +63,12 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
   static const String _filterApproved = 'approved';
   static const String _filterDeclined = 'declined';
 
+  static const String _managerSearchIcon =
+      'assets/images/new icons for manager/Search_Seek_Red Badge_White.png';
+
+  static const String _managerFilterIcon =
+      'assets/images/new icons for manager/available_tools.png';
+
   static const Color _adminBlockBase = Color(0xFF252525);
 
   BoxDecoration _adminBlockDecoration(double radius) {
@@ -103,6 +109,44 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
           padding: padding,
           decoration: _adminBlockDecoration(radius),
           child: child,
+        ),
+      ),
+    );
+  }
+
+  static const double _approvalRowActionH = 23;
+  static const double _approvalRowReviewW = 58;
+
+  Widget _buildApprovalRowActionPill({
+    required ManagerChromeTheme chrome,
+    required String label,
+    required VoidCallback? onTap,
+    required double width,
+    required Color backgroundColor,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        width: width,
+        height: _approvalRowActionH,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.12),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+          ),
         ),
       ),
     );
@@ -307,7 +351,7 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
       case _filterReady:
         return PremiumTheme.teal;
       case _filterBlocked:
-        return PremiumTheme.orange;
+        return PremiumTheme.primaryRed;
       case _filterChangesRequested:
         return PremiumTheme.pink;
       case _filterApproved:
@@ -655,9 +699,15 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
             ),
           ],
         ),
-        Row(
-          children: [
-            ClipOval(
+        Tooltip(
+          message: email,
+          child: InkWell(
+            onTap: () {
+              Navigator.pushReplacementNamed(
+                  context, '/manager_account_profile');
+            },
+            borderRadius: BorderRadius.circular(999),
+            child: ClipOval(
               child: Image.asset(
                 'assets/images/User_Profile.png',
                 width: 48,
@@ -665,25 +715,7 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
                 fit: BoxFit.cover,
               ),
             ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  email,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Text(
-                  'Admin',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ],
     );
@@ -976,6 +1008,8 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
   }
 
   Widget _buildApprovalsToolbar() {
+    final chrome = context.watch<ManagerThemeController>().chrome;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -1002,55 +1036,325 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
         ),
         const SizedBox(width: 16),
         SizedBox(
-          width: 260,
-          child: TextField(
-            style: const TextStyle(color: Colors.white, fontSize: 13),
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value.trim();
-              });
-            },
-            decoration: InputDecoration(
-              hintText: 'Search by title, client, or ID',
-              hintStyle: const TextStyle(color: Colors.white54, fontSize: 13),
-              prefixIcon: const Icon(
-                Icons.search,
-                color: Colors.white70,
-                size: 18,
+          width: 320,
+          child: Row(
+            children: [
+              ClipOval(
+                child: SizedBox(
+                  width: 38,
+                  height: 38,
+                  child: AssetService.buildImageWidget(
+                    _managerSearchIcon,
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.04),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.12), width: 1),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 38,
+                  child: TextField(
+                    style: TextStyle(color: chrome.textPrimary, fontSize: 13),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value.trim();
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Search by title, client, or ID',
+                      hintStyle:
+                          TextStyle(color: chrome.textMuted, fontSize: 13),
+                      filled: true,
+                      fillColor: chrome.fieldFill,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        borderSide:
+                            BorderSide(color: chrome.fieldBorder, width: 1),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(999),
+                        borderSide: const BorderSide(
+                            color: PremiumTheme.primaryRed, width: 1.2),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: Color(0xFF3498DB), width: 1.2),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        InkWell(
+          onTap: () => _showFiltersDialog(chrome),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: chrome.fieldFill,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: chrome.fieldBorder),
+            ),
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: AssetService.buildImageWidget(
+                _managerFilterIcon,
+                fit: BoxFit.contain,
               ),
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-          ),
-          child: const Icon(
-            Icons.filter_alt_outlined,
-            color: Colors.white70,
-            size: 20,
-          ),
-        ),
       ],
+    );
+  }
+
+  Future<void> _showFiltersDialog(ManagerChromeTheme chrome) async {
+    final staleController = TextEditingController(
+        text: _staleDays == null ? '' : _staleDays.toString());
+    final riskController = TextEditingController(
+        text: _minRiskScore == null ? '' : _minRiskScore.toString());
+    final pipelineController = TextEditingController(text: _pipelineStage ?? '');
+    final recentController = TextEditingController(
+        text: _recentDays == null ? '' : _recentDays.toString());
+
+    String? localError;
+
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            InputDecoration fieldDecoration(String hint) {
+              return InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(color: chrome.textMuted, fontSize: 12),
+                filled: true,
+                fillColor: chrome.fieldFill,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: chrome.fieldBorder, width: 1),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(
+                      color: PremiumTheme.primaryRed, width: 1.2),
+                ),
+              );
+            }
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+              child: Container(
+                width: 520,
+                padding: const EdgeInsets.all(20),
+                decoration:
+                    chrome.floatingPanelDecoration(radius: 14).copyWith(
+                  color: chrome.dropdownSurface,
+                ),
+                child: DefaultTextStyle(
+                  style: TextStyle(color: chrome.textPrimary),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.filter_alt_outlined,
+                              color: PremiumTheme.primaryRed, size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Filters',
+                              style: TextStyle(
+                                color: chrome.textPrimary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: Icon(Icons.close, color: chrome.textPrimary),
+                          ),
+                        ],
+                      ),
+                      Divider(height: 20, color: chrome.divider),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Stale days',
+                        style: TextStyle(
+                          color: chrome.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: staleController,
+                        keyboardType: TextInputType.number,
+                        style: TextStyle(color: chrome.textPrimary, fontSize: 12),
+                        decoration: fieldDecoration('e.g. 14'),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Minimum risk score',
+                        style: TextStyle(
+                          color: chrome.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: riskController,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        style: TextStyle(color: chrome.textPrimary, fontSize: 12),
+                        decoration: fieldDecoration('e.g. 80'),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Pipeline stage',
+                        style: TextStyle(
+                          color: chrome.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: pipelineController,
+                        style: TextStyle(color: chrome.textPrimary, fontSize: 12),
+                        decoration: fieldDecoration('e.g. discovery'),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Recent activity (days)',
+                        style: TextStyle(
+                          color: chrome.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: recentController,
+                        keyboardType: TextInputType.number,
+                        style: TextStyle(color: chrome.textPrimary, fontSize: 12),
+                        decoration: fieldDecoration('e.g. 30'),
+                      ),
+                      if (localError != null) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          localError!,
+                          style: TextStyle(
+                            color: PremiumTheme.error,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _staleDays = null;
+                                _minRiskScore = null;
+                                _pipelineStage = null;
+                                _recentDays = null;
+                              });
+                              Navigator.of(context).pop();
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: chrome.textSecondary,
+                            ),
+                            child: const Text('Clear'),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: () {
+                              int? stale;
+                              double? risk;
+                              int? recent;
+
+                              final staleText = staleController.text.trim();
+                              if (staleText.isNotEmpty) {
+                                stale = int.tryParse(staleText);
+                                if (stale == null) {
+                                  setModalState(() {
+                                    localError =
+                                        'Stale days must be a whole number.';
+                                  });
+                                  return;
+                                }
+                              }
+
+                              final riskText = riskController.text.trim();
+                              if (riskText.isNotEmpty) {
+                                risk = double.tryParse(riskText);
+                                if (risk == null) {
+                                  setModalState(() {
+                                    localError =
+                                        'Minimum risk score must be a number.';
+                                  });
+                                  return;
+                                }
+                              }
+
+                              final recentText = recentController.text.trim();
+                              if (recentText.isNotEmpty) {
+                                recent = int.tryParse(recentText);
+                                if (recent == null) {
+                                  setModalState(() {
+                                    localError =
+                                        'Recent days must be a whole number.';
+                                  });
+                                  return;
+                                }
+                              }
+
+                              setState(() {
+                                _staleDays = stale;
+                                _minRiskScore = risk;
+                                final p = pipelineController.text
+                                    .trim()
+                                    .toLowerCase();
+                                _pipelineStage = p.isEmpty ? null : p;
+                                _recentDays = recent;
+                              });
+                              Navigator.of(context).pop();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: PremiumTheme.primaryRed,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text('Apply'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1093,25 +1397,23 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
   }
 
   Widget _buildStatusTab(String label, String value, int count) {
+    final chrome = context.watch<ManagerThemeController>().chrome;
     final bool isActive = _activeFilter == value;
 
-    return GestureDetector(
+    return InkWell(
       onTap: () {
         setState(() {
           _activeFilter = value;
         });
       },
+      borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
+          color: isActive ? PremiumTheme.primaryRed : chrome.filterInactiveBg,
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isActive
-                ? const Color(0xFF3498DB)
-                : Colors.white.withValues(alpha: 0.18),
+            color: chrome.filterBorder,
             width: 1,
           ),
         ),
@@ -1121,9 +1423,10 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
             Text(
               label,
               style: TextStyle(
-                color: isActive ? Colors.white : Colors.white70,
-                fontSize: 13,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                color: isActive ? Colors.white : chrome.textPrimary,
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                letterSpacing: 0.3,
               ),
             ),
             const SizedBox(width: 8),
@@ -1131,14 +1434,14 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
               decoration: BoxDecoration(
                 color: isActive
-                    ? const Color(0xFF3498DB).withValues(alpha: 0.25)
-                    : Colors.white.withValues(alpha: 0.08),
+                    ? Colors.white.withValues(alpha: 0.18)
+                    : Colors.white.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 count.toString(),
                 style: TextStyle(
-                  color: isActive ? Colors.white : Colors.white70,
+                  color: isActive ? Colors.white : chrome.textPrimary,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1182,6 +1485,14 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
         final updatedAt = _parseDate(proposal['updated_at'] ?? proposal['updatedAt']);
         if (updatedAt == null) return false;
         if (now.difference(updatedAt).inDays < _staleDays!) return false;
+      }
+
+      if (_recentDays != null && _recentDays! > 0) {
+        final updatedAt = _parseDate(proposal['updated_at'] ?? proposal['updatedAt']);
+        final createdAt = _parseDate(proposal['created_at'] ?? proposal['createdAt']);
+        final effective = updatedAt ?? createdAt;
+        if (effective == null) return false;
+        if (now.difference(effective).inDays > _recentDays!) return false;
       }
 
       return true;
@@ -1279,42 +1590,58 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
   }
 
   Widget _buildTableHeader() {
+    final chrome = context.watch<ManagerThemeController>().chrome;
+    TextStyle headerStyle() {
+      return TextStyle(
+        color: chrome.textMuted,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.3,
+      );
+    }
+
     return Row(
       children: [
         Expanded(
           flex: 1,
           child: Text(
             '#',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.2,
-            ),
+            style: headerStyle(),
+          ),
+        ),
+        Expanded(
+          flex: 4,
+          child: Text(
+            'Proposal',
+            style: headerStyle(),
+          ),
+        ),
+        Expanded(
+          flex: 3,
+          child: Text(
+            'Client',
+            style: headerStyle(),
           ),
         ),
         Expanded(
           flex: 2,
           child: Text(
-            'Decision',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.2,
-            ),
+            'Date',
+            style: headerStyle(),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: Text(
+            'Status',
+            style: headerStyle(),
           ),
         ),
         Expanded(
           flex: 2,
           child: Text(
             'Blockers',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.2,
-            ),
+            style: headerStyle(),
           ),
         ),
         Expanded(
@@ -1323,12 +1650,7 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
             alignment: Alignment.centerRight,
             child: Text(
               'Actions',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.2,
-              ),
+              style: headerStyle(),
             ),
           ),
         ),
@@ -1337,6 +1659,7 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
   }
 
   Widget _buildTableRow(int index, Map<String, dynamic> proposal) {
+    final chrome = context.watch<ManagerThemeController>().chrome;
     final id = proposal['id']?.toString() ?? '—';
     final title = proposal['title']?.toString() ?? 'Untitled Proposal';
     final client =
@@ -1354,35 +1677,91 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
     void showBlockersDialog() {
       showDialog<void>(
         context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.55),
         builder: (_) {
-          return AlertDialog(
-            backgroundColor: const Color(0xFF1F2840),
-            title: const Text('Blockers', style: TextStyle(color: Colors.white)),
-            content: SizedBox(
-              width: 360,
-              child: SingleChildScrollView(
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+            child: Container(
+              width: 460,
+              padding: const EdgeInsets.all(18),
+              decoration: chrome.floatingPanelDecoration(radius: 14).copyWith(
+                color: chrome.dropdownSurface,
+              ),
+              child: DefaultTextStyle(
+                style: TextStyle(color: chrome.textPrimary),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: blockers
-                      .map(
-                        (b) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded,
+                            color: PremiumTheme.primaryRed, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
                           child: Text(
-                            '• $b',
-                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                            'Blockers',
+                            style: TextStyle(
+                              color: chrome.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      )
-                      .toList(),
+                        IconButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: Icon(Icons.close, color: chrome.textPrimary),
+                        ),
+                      ],
+                    ),
+                    Divider(height: 18, color: chrome.divider),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.55,
+                      ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: blockers
+                              .map(
+                                (b) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: Text(
+                                    '- $b',
+                                    style: TextStyle(
+                                      color: chrome.textSecondary,
+                                      fontSize: 13,
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: PremiumTheme.primaryRed,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Close'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
-              ),
-            ],
           );
         },
       );
@@ -1459,14 +1838,9 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Flexible(
-                          child: _buildRiskChip(
+                          child: _buildStatusChip(
                             blockers.first,
-                            blockers.any((b) =>
-                                        b.toLowerCase().contains('missing') ||
-                                        b.toLowerCase().contains('stalled') ||
-                                        b.toLowerCase().contains('high risk'))
-                                ? PremiumTheme.orange
-                                : Colors.white70,
+                            decisionColor,
                           ),
                         ),
                         if (blockers.length > 1) ...[
@@ -1497,17 +1871,12 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
                 runSpacing: 6,
                 alignment: WrapAlignment.end,
                 children: [
-                  TextButton(
-                    onPressed: () => _openReview(proposal),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF3498DB),
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                    child: const Text(
-                      'Review',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
+                  _buildApprovalRowActionPill(
+                    chrome: chrome,
+                    label: 'REVIEW',
+                    onTap: () => _openReview(proposal),
+                    width: _approvalRowReviewW,
+                    backgroundColor: const Color(0xFF7F7F7F),
                   ),
                 ],
               ),
@@ -1791,7 +2160,7 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
       case 'pending':
       case 'pending approval':
       case 'pending ceo approval':
-        return PremiumTheme.orange;
+        return PremiumTheme.primaryRed;
       case 'sent':
       case 'sent to client':
         return PremiumTheme.pink;
@@ -1809,20 +2178,38 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
   }
 
   Widget _buildStatusChip(String label, Color color) {
-    final bgColor = color == Colors.white70
+    final isNeutral = color == Colors.white70;
+    final isBrandRed = color == PremiumTheme.primaryRed;
+
+    final bgColor = isNeutral
         ? Colors.white.withValues(alpha: 0.08)
-        : color.withValues(alpha: 0.2);
+        : isBrandRed
+            ? PremiumTheme.primaryRed.withValues(alpha: 0.16)
+            : color.withValues(alpha: 0.18);
+
+    final borderColor = isNeutral
+        ? Colors.white.withValues(alpha: 0.10)
+        : isBrandRed
+            ? PremiumTheme.primaryRed.withValues(alpha: 0.55)
+            : color.withValues(alpha: 0.35);
+
+    final textColor = isNeutral
+        ? Colors.white70
+        : isBrandRed
+            ? Colors.white
+            : color;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: color,
+          color: textColor,
           fontSize: 11,
           fontWeight: FontWeight.w500,
         ),
@@ -1852,7 +2239,7 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
       if (score >= 70) {
         return PremiumTheme.error;
       } else if (score >= 40) {
-        return PremiumTheme.orange;
+        return PremiumTheme.pink;
       } else {
         return PremiumTheme.teal;
       }
