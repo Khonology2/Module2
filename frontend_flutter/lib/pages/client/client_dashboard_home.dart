@@ -1262,8 +1262,12 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     final isSigned = statusLower.contains('client signed') ||
         (statusLower.contains('signed') && !statusLower.contains('sent'));
 
+    final signedUrl =
+        '$baseUrl/api/client/proposals/$id/signed-document?token=${Uri.encodeComponent(_accessToken!)}'
+        '${_deviceId != null && _deviceId!.isNotEmpty ? '&device_id=${Uri.encodeComponent(_deviceId!)}' : ''}'
+        '${_clientSessionToken != null && _clientSessionToken!.isNotEmpty ? '&session_token=${Uri.encodeComponent(_clientSessionToken!)}' : ''}';
     final url = isSigned
-        ? '$baseUrl/api/client/proposals/$id/signed-document?token=${Uri.encodeComponent(_accessToken!)}'
+        ? signedUrl
         : '$baseUrl/api/client/proposals/$id/export/pdf?token=${Uri.encodeComponent(_accessToken!)}&download=1';
     web.window.open(url, '_blank');
   }

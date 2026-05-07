@@ -127,7 +127,6 @@ class _AppSideNavState extends State<AppSideNav> {
       decoration: BoxDecoration(
         color: chrome.sidebarBackground,
         border: Border(
-          left: const BorderSide(color: AppSideNav.leftAccentColor, width: 3),
           right: BorderSide(color: chrome.sidebarRightBorder, width: 1),
         ),
       ),
