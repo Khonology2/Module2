@@ -30,6 +30,7 @@ dependencies:
   jwt_decode: ^0.3.1
   flutter_quill: ^11.5.0
   shared_preferences: ^2.3.3
+  pointer_interceptor: ^0.10.1+2
 
 dev_dependencies:
   flutter_test:

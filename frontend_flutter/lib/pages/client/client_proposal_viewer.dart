@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
 // ignore: avoid_web_libraries_in_flutter
@@ -7,11 +8,18 @@ import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:web/web.dart' as web;
+import 'package:pointer_interceptor/pointer_interceptor.dart';
+import 'package:signature/signature.dart';
 import '../../api.dart';
+import '../../theme/premium_theme.dart';
+import '../../theme/manager_theme_controller.dart';
+import '../../widgets/app_side_nav.dart';
+import '../../widgets/client_proposal_document_preview.dart';
 
 class ClientProposalViewer extends StatefulWidget {
   final int proposalId;
@@ -30,6 +38,23 @@ class ClientProposalViewer extends StatefulWidget {
 }
 
 class _ClientProposalViewerState extends State<ClientProposalViewer> {
+  static const List<Map<String, String>> _clientAppSideNavItems = [
+    {
+      'label': 'Dashboard',
+      'icon':
+          'assets/images/Creator_Dashboard/Project Launch_Start_White Badge_Blue.png',
+    },
+    {
+      'label': 'Proposals',
+      'icon':
+          'assets/images/Creator_Dashboard/Networking_Collaboration_White Badge__Blue.png',
+    },
+    {
+      'label': 'Documents',
+      'icon': 'assets/images/client_icons/Data Approval_White Badge_Blue.png',
+    },
+  ];
+
   bool _isLoading = true;
   String? _error;
   Map<String, dynamic>? _proposalData;
@@ -47,6 +72,9 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
 
   int _selectedTab = 0; // 0: Content, 1: Comments
 
+  late final SignatureController _signatureController;
+  final TextEditingController _signerNameController = TextEditingController();
+
   String? _pdfObjectUrl;
   bool _isPdfLoading = false;
   String? _pdfError;
@@ -54,8 +82,21 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
   bool _pdfViewRegistered = false;
   html.IFrameElement? _pdfIframe;
   bool _pdfIframeListenersAttached = false;
+  bool _isSidebarCollapsed = false;
+  final GlobalKey<ScaffoldState> _portalScaffoldKey = GlobalKey<ScaffoldState>();
+  final ScrollController _proposalScrollController = ScrollController();
+  final ScrollController _commentsScrollController = ScrollController();
 
   static const Duration _networkTimeout = Duration(seconds: 20);
+
+  bool _canSignInApp() {
+    final p = _proposalData;
+    if (p == null) return false;
+    final st = (_signatureStatus ?? '').toLowerCase();
+    if (st.contains('completed')) return false;
+    final hash = p['signing_payload_hash']?.toString() ?? '';
+    return hash.isNotEmpty;
+  }
 
   Map<String, String> _clientDeviceHeaders() {
     final headers = <String, String>{};
@@ -80,10 +121,14 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
   @override
   void initState() {
     super.initState();
+    _signatureController = SignatureController(
+      penStrokeWidth: 2.5,
+      penColor: Colors.black87,
+      exportBackgroundColor: Colors.white,
+    );
     _selectedTab = widget.initialTab;
     _pdfViewType = 'pdf-preview-${DateTime.now().microsecondsSinceEpoch}';
     _initPdfView();
-    _checkIfReturnedFromSigning();
     _loadProposal();
     _startSession();
     _logEvent('open');
@@ -205,31 +250,13 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
     });
   }
 
-  void _checkIfReturnedFromSigning() {
-    // Check if we're returning from DocuSign signing
-    if (kIsWeb) {
-      final currentUrl = web.window.location.href;
-      final uri = Uri.parse(currentUrl);
-
-      // Check for signed=true in query params or hash
-      final signedParam = uri.queryParameters['signed'];
-      final hash = uri.fragment;
-      final hasSignedInHash = hash.contains('signed=true');
-
-      if (signedParam == 'true' || hasSignedInHash) {
-        print('✅ Detected return from DocuSign signing');
-        // Reload proposal after a short delay to ensure backend has updated
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            _loadProposal();
-          }
-        });
-      }
-    }
-  }
-
   @override
   void dispose() {
+    _signatureController.dispose();
+    _signerNameController.dispose();
+    _commentController.dispose();
+    _proposalScrollController.dispose();
+    _commentsScrollController.dispose();
     _logCurrentSectionView();
     _endSession();
     _logEvent('close');
@@ -658,6 +685,141 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
     }
   }
 
+  void _showSignedSubmissionPreview({
+    required String signedPdfUrl,
+    String? signatureImageUrl,
+    required String signerName,
+  }) {
+    final chrome = context.read<ManagerThemeController>().chrome;
+    final h = MediaQuery.sizeOf(context).height;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) {
+        final maxW = math.min(
+          920.0,
+          MediaQuery.sizeOf(dialogCtx).width - 32,
+        );
+        return Dialog(
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          backgroundColor: Colors.transparent,
+          child: GlassContainer(
+            borderRadius: 14,
+            padding: const EdgeInsets.all(18),
+            child: SizedBox(
+              width: maxW,
+              height: h * 0.86,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.fact_check_outlined,
+                          color: chrome.textPrimary, size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Submission preview',
+                          style: TextStyle(
+                            color: chrome.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.pop(dialogCtx),
+                        icon: Icon(Icons.close, color: chrome.textPrimary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'This is the merged PDF and signature record returned to your provider.',
+                    style: TextStyle(
+                      color: chrome.textSecondary,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Signer: $signerName',
+                    style: TextStyle(
+                      color: chrome.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (signatureImageUrl != null &&
+                      signatureImageUrl.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          signatureImageUrl,
+                          height: 72,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const SizedBox.shrink(),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: kIsWeb
+                          ? _SignedPdfHtmlEmbed(url: signedPdfUrl)
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Open the signed PDF on this device to review.',
+                                  textAlign: TextAlign.center,
+                                  style:
+                                      TextStyle(color: chrome.textSecondary),
+                                ),
+                                const SizedBox(height: 12),
+                                FilledButton(
+                                  onPressed: () =>
+                                      launchUrlString(signedPdfUrl),
+                                  child: const Text('Open signed PDF'),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        if (kIsWeb) {
+                          web.window.open(signedPdfUrl, '_blank');
+                        } else {
+                          launchUrlString(signedPdfUrl);
+                        }
+                      },
+                      icon: const Icon(Icons.open_in_new, size: 18),
+                      label: const Text('Open in new tab'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showRejectDialog() {
     showDialog(
       context: context,
@@ -688,10 +850,11 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
 
   @override
   Widget build(BuildContext context) {
+    final pageBg = const Color(0xFFF3F5F8);
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF5F7F9),
-        body: Center(
+      return _buildPortalShell(
+        pageBg: pageBg,
+        child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: const [
@@ -705,13 +868,9 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
     }
 
     if (_error != null) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF5F7F9),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF2C3E50),
-          title: const Text('Error'),
-        ),
-        body: Center(
+      return _buildPortalShell(
+        pageBg: pageBg,
+        child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -742,90 +901,354 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
     // Show action bar if not signed and not declined, or if signature status is unknown
     final canTakeAction = !isSigned && !isDeclined;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F9),
-      body: Column(
-        children: [
-          // Header
-          _buildHeader(proposal, status),
+    return _buildPortalShell(
+      pageBg: pageBg,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1380),
+          child: Column(
+            children: [
+              // Header
+              _buildHeader(proposal, status),
 
-          _buildSignaturePanel(),
+              _buildSignaturePanel(),
 
-          // Action Buttons - Always show if proposal is not signed
-          if (canTakeAction && !kIsWeb) _buildActionBar(),
+              // Sign / reject — available on web and mobile (first-party flow).
+              if (canTakeAction) _buildActionBar(),
 
-          // Content
-          Expanded(
-            child: _selectedTab == 0
-                ? _buildProposalContent(proposal)
-                : _buildCommentsSection(),
+              // Content
+              Expanded(
+                child: _selectedTab == 0
+                    ? _buildProposalContent(proposal)
+                    : _buildCommentsSection(),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
+  Widget _buildPortalShell({
+    required Color pageBg,
+    required Widget child,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useDrawer = constraints.maxWidth < 950;
+        final chrome = context.watch<ManagerThemeController>().chrome;
+
+        return Scaffold(
+          key: _portalScaffoldKey,
+          backgroundColor: Colors.transparent,
+          drawer: useDrawer
+              ? Drawer(
+                  backgroundColor: chrome.sidebarBackground,
+                  child: SafeArea(
+                    child: PointerInterceptor(
+                      child: AppSideNav(
+                        isCollapsed: false,
+                        currentLabel: 'Proposals',
+                        onSelect: (label) => _handleClientSideNavSelect(
+                          label,
+                          closeDrawer: true,
+                        ),
+                        onToggle: () {},
+                        isAdmin: false,
+                        showCollapseToggle: true,
+                        items: _clientAppSideNavItems,
+                        collapsedWidthOverride: 76,
+                        expandedWidthOverride: 220,
+                      ),
+                    ),
+                  ),
+                )
+              : null,
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: Image.asset(
+                  chrome.backgroundAsset,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: chrome.isDark
+                      ? LinearGradient(
+                          colors: [
+                            Colors.black.withValues(alpha: 0.65),
+                            Colors.black.withValues(alpha: 0.35),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        )
+                      : LinearGradient(
+                          colors: [
+                            Colors.white.withValues(alpha: 0.50),
+                            Colors.white.withValues(alpha: 0.15),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                ),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!useDrawer)
+                    PointerInterceptor(
+                      child: AppSideNav(
+                        isCollapsed: _isSidebarCollapsed,
+                        currentLabel: 'Proposals',
+                        onSelect: (label) => _handleClientSideNavSelect(
+                          label,
+                          closeDrawer: false,
+                        ),
+                        onToggle: () => setState(
+                          () => _isSidebarCollapsed = !_isSidebarCollapsed,
+                        ),
+                        isAdmin: false,
+                        showCollapseToggle: true,
+                        items: _clientAppSideNavItems,
+                        collapsedWidthOverride: 76,
+                        expandedWidthOverride: 220,
+                      ),
+                    ),
+                  Expanded(
+                    child: SafeArea(
+                      left: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (useDrawer)
+                            PointerInterceptor(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(8, 6, 16, 4),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: IconButton(
+                                    tooltip: 'Navigation menu',
+                                    icon: Icon(
+                                      Icons.menu,
+                                      color: chrome.textPrimary,
+                                    ),
+                                    onPressed: () => _portalScaffoldKey
+                                        .currentState
+                                        ?.openDrawer(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          Expanded(child: child),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _navigateClient(String route) {
+    final suffix = widget.accessToken.trim().isNotEmpty
+        ? '?token=${Uri.encodeComponent(widget.accessToken)}'
+        : '';
+    Navigator.pushReplacementNamed(context, '$route$suffix');
+  }
+
+  void _handleClientSideNavSelect(String label, {required bool closeDrawer}) {
+    if (closeDrawer && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+    if (label == 'Dashboard') {
+      _navigateClient('/client/dashboard');
+      return;
+    }
+    if (label == 'Proposals' || label == 'Documents') {
+      _navigateClient('/client/proposals');
+      return;
+    }
+  }
+
+  /// Matches client dashboard "Project Chat" / right-panel card sizing and finish.
   Widget _buildHeader(Map<String, dynamic> proposal, String status) {
+    final chrome = context.watch<ManagerThemeController>().chrome;
+    final title = (proposal['title'] ?? 'Untitled Proposal').toString();
+
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: Color(0xFF2C3E50),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  proposal['title'] ?? 'Untitled Proposal',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Proposal #${proposal['id']} • v${proposal['version_number'] ?? 1} • ${_formatDate(proposal['version_created_at'] ?? proposal['updated_at'])}',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Opp ${proposal['opportunity_id'] ?? '—'} • Stage: ${proposal['engagement_stage'] ?? 'N/A'} • Owner: ${proposal['owner_name'] ?? 'Unknown'}',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      height: 184,
+      child: Container(
+        width: double.infinity,
+        clipBehavior: Clip.antiAlias,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: chrome.floatingFill,
+          borderRadius: BorderRadius.circular(5.32),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              offset: const Offset(0, 3.55),
+              blurRadius: 3.55,
+              spreadRadius: 0,
             ),
-          ),
-          _buildStatusBadge(status),
-          const SizedBox(width: 12),
-          if (_selectedTab == 0)
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
             IconButton(
-              tooltip: 'Refresh Preview',
-              onPressed: _loadPdfPreview,
-              icon: const Icon(Icons.refresh, color: Colors.white),
+              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              icon: Icon(Icons.arrow_back, color: chrome.textPrimary, size: 22),
+              onPressed: () => Navigator.pop(context),
             ),
-        ],
+            const SizedBox(width: 4),
+            SizedBox(
+              width: 64,
+              height: 64,
+              child: Image.asset(
+                'assets/images/finance_manager_new_icons/Audit_sidebar.png',
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => Icon(
+                  Icons.fact_check_outlined,
+                  size: 40,
+                  color: chrome.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: chrome.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Proposal #${proposal['id']} • v${proposal['version_number'] ?? 1} • ${_formatDate(proposal['version_created_at'] ?? proposal['updated_at'])}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: chrome.textSecondary,
+                      fontSize: 12,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Opp ${proposal['opportunity_id'] ?? '—'} • Stage: ${proposal['engagement_stage'] ?? 'N/A'} • Owner: ${proposal['owner_name'] ?? 'Unknown'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: chrome.textSecondary,
+                      fontSize: 11,
+                      height: 1.15,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _buildProposalStatusChip(status, chrome),
+            const SizedBox(width: 4),
+            if (_selectedTab == 0)
+              IconButton(
+                tooltip: 'Refresh preview',
+                onPressed: _loadPdfPreview,
+                icon: Icon(Icons.refresh, color: chrome.textPrimary),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _normalizeClientProposalStatus(String rawStatus) {
+    final lower = rawStatus.toLowerCase().trim();
+    if (lower.isEmpty) return 'Unknown';
+    if (lower.contains('signed') || lower.contains('approved')) return 'Signed';
+    if (lower.contains('declined') || lower.contains('rejected')) {
+      return 'Declined';
+    }
+    if (lower.contains('sent for signature')) return 'Sent for Signature';
+    if (lower.contains('sent to client') || lower.contains('released')) {
+      return 'Released';
+    }
+    if (lower.contains('review')) return 'In Review';
+    if (lower.contains('pending')) return 'Pending';
+    if (lower.contains('draft')) return 'Draft';
+    return rawStatus.trim();
+  }
+
+  Widget _buildProposalStatusChip(String rawStatus, ManagerChromeTheme chrome) {
+    final label = _normalizeClientProposalStatus(rawStatus);
+    final lower = label.toLowerCase();
+    Color bg = chrome.isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.08);
+    Color fg = chrome.textPrimary;
+
+    if (lower.contains('signed')) {
+      bg = const Color(0xFF6CA510);
+      fg = Colors.white;
+    } else if (lower.contains('declined') || lower.contains('rejected')) {
+      bg = const Color(0xFFE74C3C);
+      fg = Colors.white;
+    } else if (lower.contains('pending') ||
+        lower.contains('released') ||
+        lower.contains('signature') ||
+        lower.contains('sent') ||
+        lower.contains('review')) {
+      bg = const Color(0xFFEA990C);
+      fg = Colors.white;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 148),
+        child: SizedBox(
+          height: 26,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(26),
+            ),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -846,31 +1269,27 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
     if (signedAt.trim().isNotEmpty) {
       subtitle = '$status • $signedAt';
     }
+    final isUnknown = status.trim().toLowerCase() == 'unknown';
+    final hasUsefulState = !isUnknown || signedUrl.trim().isNotEmpty;
+    if (!hasUsefulState) {
+      return const SizedBox.shrink();
+    }
 
+    final chrome = context.watch<ManagerThemeController>().chrome;
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: GlassContainer(
+        borderRadius: 12,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
         children: [
-          const Icon(Icons.verified_outlined,
-              size: 18, color: Color(0xFF2C3E50)),
+          Icon(Icons.verified_outlined, size: 18, color: chrome.textPrimary),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               subtitle,
               style: TextStyle(
-                  color: Colors.grey[800], fontWeight: FontWeight.w600),
+                  color: chrome.textPrimary, fontWeight: FontWeight.w600),
             ),
           ),
           if (signedUrl.trim().isNotEmpty)
@@ -887,14 +1306,15 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
             ),
         ],
       ),
+      ),
     );
   }
 
   Widget _buildFloatingActionToolbar() {
+    final chrome = context.watch<ManagerThemeController>().chrome;
     final sig = _signatureData;
     final signedUrl = (sig?['signed_document_url'] ?? '').toString();
-    final signingUrl = (sig?['signing_url'] ?? _signingUrl ?? '').toString();
-    final canSign = signingUrl.trim().isNotEmpty;
+    final canSign = _canSignInApp();
 
     Widget _toolButton({
       required IconData icon,
@@ -902,8 +1322,12 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
       required VoidCallback onPressed,
       bool primary = false,
     }) {
-      final bg = primary ? const Color(0xFF2D9CDB) : Colors.white;
-      final fg = primary ? Colors.white : const Color(0xFF2C3E50);
+      final bg = primary
+          ? const Color(0xFF2D9CDB)
+          : (chrome.isDark
+              ? Colors.white.withValues(alpha: 0.10)
+              : Colors.white.withValues(alpha: 0.45));
+      final fg = primary ? Colors.white : chrome.textPrimary;
       return Tooltip(
         message: tooltip,
         child: Material(
@@ -924,361 +1348,545 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
       );
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _toolButton(
-          icon: Icons.picture_as_pdf,
-          tooltip: 'Export PDF',
-          onPressed: _exportPdf,
-        ),
-        const SizedBox(height: 10),
-        _toolButton(
-          icon: Icons.description,
-          tooltip: 'Export Word',
-          onPressed: _exportWord,
-        ),
-        const SizedBox(height: 10),
-        _toolButton(
-          icon: Icons.document_scanner,
-          tooltip: 'Scan (Phone Camera)',
-          onPressed: _scanSignedDocument,
-        ),
-        const SizedBox(height: 10),
-        _toolButton(
-          icon: Icons.upload_file,
-          tooltip: 'Upload Signed',
-          onPressed: _uploadSignedDocument,
-        ),
-        if (signedUrl.trim().isNotEmpty) ...[
+    return GlassContainer(
+      borderRadius: 14,
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _toolButton(
+            icon: Icons.picture_as_pdf,
+            tooltip: 'Export PDF',
+            onPressed: _exportPdf,
+          ),
           const SizedBox(height: 10),
           _toolButton(
-            icon: Icons.open_in_new,
-            tooltip: 'View Signed',
-            onPressed: () {
-              if (kIsWeb) {
-                web.window.open(signedUrl, '_blank');
-                return;
-              }
-              launchUrlString(signedUrl);
-            },
+            icon: Icons.description,
+            tooltip: 'Export Word',
+            onPressed: _exportWord,
           ),
-        ],
-        if (canSign) ...[
           const SizedBox(height: 10),
           _toolButton(
-            icon: Icons.draw,
-            tooltip: 'Sign with DocuSign',
-            onPressed: _openSigningModal,
-            primary: true,
+            icon: Icons.document_scanner,
+            tooltip: 'Scan (Phone Camera)',
+            onPressed: _scanSignedDocument,
           ),
+          const SizedBox(height: 10),
+          _toolButton(
+            icon: Icons.upload_file,
+            tooltip: 'Upload Signed',
+            onPressed: _uploadSignedDocument,
+          ),
+          if (signedUrl.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _toolButton(
+              icon: Icons.open_in_new,
+              tooltip: 'View Signed',
+              onPressed: () {
+                if (kIsWeb) {
+                  web.window.open(signedUrl, '_blank');
+                  return;
+                }
+                launchUrlString(signedUrl);
+              },
+            ),
+          ],
+          if (canSign) ...[
+            const SizedBox(height: 10),
+            _toolButton(
+              icon: Icons.draw,
+              tooltip: 'Sign in app',
+              onPressed: _openSigningModal,
+              primary: true,
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 
   Widget _buildActionBar() {
     final signatureStatus = (_signatureStatus ?? '').toLowerCase();
     final isSigned = signatureStatus.contains('completed');
-    final isDeclined = signatureStatus.contains('declined');
-    final hasSigningUrl = _signingUrl != null && _signingUrl!.isNotEmpty;
-    final statusColor = isSigned
-        ? Colors.green
-        : isDeclined
-            ? Colors.red
-            : Colors.blue;
-    final statusIcon = isSigned
-        ? Icons.verified
-        : isDeclined
-            ? Icons.cancel
-            : Icons.info_outline;
-    final message = isSigned
-        ? 'This proposal has been signed. Thank you for completing the process.'
-        : isDeclined
-            ? 'You previously declined this proposal. Contact your Khonology partner for assistance.'
-            : hasSigningUrl
-                ? 'Please review the proposal and sign using the secure DocuSign link.'
-                : 'This proposal is ready for review.';
-
+    final canInApp = _canSignInApp();
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(statusIcon, color: statusColor, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+          if (!isSigned)
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: ElevatedButton.icon(
+                  onPressed: _showRejectDialog,
+                  icon: const Icon(Icons.cancel, size: 18),
+                  label: const Text('Reject'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFC10D00),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 22, vertical: 12),
+                    shape: const StadiumBorder(),
+                  ),
+                ),
               ),
+            ),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: (!isSigned && canInApp)
+                  ? ElevatedButton.icon(
+                      onPressed: () {
+                        _logEvent('sign',
+                            metadata: {'action': 'sign_button_clicked'});
+                        _openSigningModal();
+                      },
+                      icon: const Icon(Icons.draw, size: 18),
+                      label: const Text('Sign Proposal'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF7F7F7F),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 22, vertical: 12),
+                        shape: const StadiumBorder(),
+                      ),
+                    )
+                  : (!isSigned && !canInApp)
+                      ? ElevatedButton.icon(
+                          onPressed: _showApproveDialog,
+                          icon: const Icon(Icons.check_circle, size: 18),
+                          label: const Text('Approve'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF7F7F7F),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 22, vertical: 12),
+                            shape: const StadiumBorder(),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
             ),
           ),
-          if (!isSigned)
-            OutlinedButton.icon(
-              onPressed: _showRejectDialog,
-              icon: const Icon(Icons.cancel, size: 18),
-              label: const Text('Reject'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-            ),
-          if (!isSigned && hasSigningUrl) ...[
-            const SizedBox(width: 12),
-            ElevatedButton.icon(
-              onPressed: () {
-                _logEvent('sign', metadata: {'action': 'sign_button_clicked'});
-
-                if (_signingUrl == null || _signingUrl!.isEmpty) {
-                  _openSigningModal();
-                  return;
-                }
-
-                // Open DocuSign in the same tab (redirect mode - works on HTTP)
-                final url = _signingUrl!;
-
-                try {
-                  // Use replace() to navigate to external URL (bypasses Flutter routing)
-                  // This prevents Flutter from intercepting the external DocuSign URL
-                  web.window.location.replace(url);
-                  // Note: We don't show a SnackBar here because the page will navigate immediately
-                  // The navigation happens synchronously, so any mounted check would be unreliable
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error opening DocuSign: $e'),
-                        backgroundColor: Colors.red,
-                        duration: const Duration(seconds: 10),
-                      ),
-                    );
-                  }
-                }
-              },
-              icon: const Icon(Icons.draw, size: 18),
-              label: const Text('Sign Proposal'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1A73E8),
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-            ),
-          ] else if (!isSigned && !hasSigningUrl) ...[
-            const SizedBox(width: 12),
-            ElevatedButton.icon(
-              onPressed: _showApproveDialog,
-              icon: const Icon(Icons.check_circle, size: 18),
-              label: const Text('Approve'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF27AE60),
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
-            ),
-            const SizedBox(width: 12),
-            TextButton(
-              onPressed: _loadProposal,
-              child: const Text('Refresh'),
-            )
-          ]
         ],
       ),
     );
   }
 
   Future<void> _openSigningModal() async {
-    _logEvent('sign', metadata: {'action': 'signing_modal_opened'});
-
-    // If no signing URL, try to get/create one
-    if (_signingUrl == null || _signingUrl!.isEmpty) {
+    _logEvent('sign', metadata: {'action': 'in_app_sign_modal'});
+    final hash = _proposalData?['signing_payload_hash']?.toString() ?? '';
+    if (hash.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Creating signing link...'),
-            backgroundColor: Colors.blue,
+            content: Text(
+                'Loading signing data… Refresh and try again if this persists.'),
+            backgroundColor: Colors.orange,
           ),
         );
       }
-
-      try {
-        final response = await http.post(
-          Uri.parse(
-              '$baseUrl/api/client/proposals/${widget.proposalId}/get_signing_url'),
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode({
-            'token': widget.accessToken,
-          }),
-        );
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final signingUrl = data['signing_url']?.toString();
-          if (signingUrl != null && signingUrl.isNotEmpty) {
-            setState(() {
-              _signingUrl = signingUrl;
-            });
-            // Continue to open modal with the new URL
-          } else {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                      'Failed to create signing link. Please try again later.'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-            return;
-          }
-        } else {
-          final error = jsonDecode(response.body);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content:
-                    Text(error['detail'] ?? 'Failed to create signing link'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          return;
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-    }
-
-    if (!kIsWeb) {
-      await launchUrlString(_signingUrl!, mode: LaunchMode.externalApplication);
+      await _loadProposal();
       return;
     }
 
-    // Use redirect mode - navigate to DocuSign in the same tab (works on HTTP)
-    final urlToOpen = _signingUrl!;
+    _signatureController.clear();
+    _signerNameController.text =
+        (_proposalData?['client_name'] ?? '').toString().trim();
 
-    try {
-      if (kIsWeb) {
-        // Navigate to DocuSign in the same tab (redirect mode)
-        // Use replace() to navigate to external URL (bypasses Flutter routing)
-        web.window.location.replace(urlToOpen);
-      } else {
-        // For mobile, use external launcher
-        await launchUrlString(
-          urlToOpen,
-          mode: LaunchMode.externalApplication,
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        var step = 0;
+        var consent = false;
+        var busy = false;
+        return StatefulBuilder(
+          builder: (ctx, setModal) {
+            Future<void> submit() async {
+              final name = _signerNameController.text.trim();
+              if (!consent) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Please acknowledge before signing.')),
+                );
+                return;
+              }
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Enter your full name.')),
+                );
+                return;
+              }
+              if (_signatureController.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please draw your signature.')),
+                );
+                return;
+              }
+
+              setModal(() => busy = true);
+              try {
+                final png = await _signatureController.toPngBytes();
+                if (png == null || png.isEmpty) {
+                  throw Exception('Could not export signature');
+                }
+                final b64 = base64Encode(png);
+                final headers = <String, String>{
+                  'Content-Type': 'application/json',
+                  ..._clientDeviceHeaders(),
+                };
+                final resp = await http
+                    .post(
+                      Uri.parse(
+                        '$baseUrl/api/client/proposals/${widget.proposalId}/sign',
+                      ),
+                      headers: headers,
+                      body: jsonEncode({
+                        'token': widget.accessToken,
+                        'signing_payload_hash': hash,
+                        'signer_name': name,
+                        'consent_acknowledged': true,
+                        'consent_version': 'v1',
+                        'signature_png_base64': b64,
+                      }),
+                    )
+                    .timeout(const Duration(seconds: 90));
+
+                if (!dialogCtx.mounted) return;
+
+                if (resp.statusCode >= 200 && resp.statusCode < 300) {
+                  Map<String, dynamic>? okBody;
+                  try {
+                    final d = jsonDecode(resp.body);
+                    if (d is Map<String, dynamic>) okBody = d;
+                  } catch (_) {}
+                  final signedPdfUrl =
+                      (okBody?['signed_document_url'] ?? '').toString().trim();
+                  final sigImgUrl =
+                      (okBody?['signature_image_url'] ?? '').toString().trim();
+
+                  Navigator.pop(dialogCtx);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Signed successfully.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  await _loadProposal();
+                  if (!mounted) return;
+                  if (signedPdfUrl.isNotEmpty) {
+                    _showSignedSubmissionPreview(
+                      signedPdfUrl: signedPdfUrl,
+                      signatureImageUrl:
+                          sigImgUrl.isNotEmpty ? sigImgUrl : null,
+                      signerName: name,
+                    );
+                  }
+                  return;
+                }
+
+                Map<String, dynamic>? err;
+                try {
+                  final d = jsonDecode(resp.body);
+                  if (d is Map<String, dynamic>) err = d;
+                } catch (_) {}
+                final detail = err?['detail']?.toString() ?? resp.body;
+                if (resp.statusCode == 409) {
+                  await _loadProposal();
+                }
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(detail),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Sign failed: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } finally {
+                if (dialogCtx.mounted) {
+                  setModal(() => busy = false);
+                }
+              }
+            }
+
+            void goNext() {
+              if (step == 0) {
+                if (!consent) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          'Confirm that you have reviewed and agree to sign.'),
+                    ),
+                  );
+                  return;
+                }
+                setModal(() => step = 1);
+                return;
+              }
+              if (step == 1) {
+                final name = _signerNameController.text.trim();
+                if (name.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Enter your full name.')),
+                  );
+                  return;
+                }
+                if (_signatureController.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please draw your signature.')),
+                  );
+                  return;
+                }
+                setModal(() => step = 2);
+              }
+            }
+
+            void goBack() {
+              if (step <= 0) return;
+              setModal(() => step = step - 1);
+            }
+
+            Widget stepBody() {
+              switch (step) {
+                case 0:
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Review the proposal on the Proposal tab, then confirm you are ready to sign.',
+                        style: TextStyle(fontSize: 14, height: 1.45),
+                      ),
+                      const SizedBox(height: 16),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'I have read this proposal and agree to sign electronically.',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        value: consent,
+                        onChanged: busy
+                            ? null
+                            : (v) => setModal(() => consent = v ?? false),
+                      ),
+                    ],
+                  );
+                case 1:
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _signerNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Full name (as signature)',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Draw your signature',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 200,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Signature(
+                            controller: _signatureController,
+                            backgroundColor: Colors.grey.shade200,
+                          ),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: busy
+                              ? null
+                              : () =>
+                                  setModal(() => _signatureController.clear()),
+                          child: const Text('Clear signature'),
+                        ),
+                      ),
+                    ],
+                  );
+                default:
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Submitting creates a legally binding electronic signature record stored with your proposal.',
+                        style: TextStyle(fontSize: 14, height: 1.45),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Signer: ${_signerNameController.text.trim()}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  );
+              }
+            }
+
+            final titles = ['Acknowledge', 'Sign', 'Confirm'];
+            return AlertDialog(
+              title: Text('Sign proposal — ${titles[step.clamp(0, 2)]}'),
+              content: SizedBox(
+                width: 440,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: List.generate(3, (i) {
+                          final active = step == i;
+                          return Expanded(
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 2),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: active
+                                      ? const Color(0xFF2D9CDB)
+                                          .withValues(alpha: 0.15)
+                                      : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '${i + 1}. ${titles[i]}',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: active
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 20),
+                      stepBody(),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: busy
+                      ? null
+                      : () {
+                          if (step == 0) {
+                            Navigator.pop(dialogCtx);
+                          } else {
+                            goBack();
+                          }
+                        },
+                  child: Text(step == 0 ? 'Cancel' : 'Back'),
+                ),
+                if (step < 2)
+                  ElevatedButton(
+                    onPressed: busy ? null : goNext,
+                    child: const Text('Next'),
+                  )
+                else
+                  ElevatedButton(
+                    onPressed: busy ? null : submit,
+                    child: busy
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Sign & submit'),
+                  ),
+              ],
+            );
+          },
         );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error opening DocuSign: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+      },
+    );
   }
 
   Widget _buildProposalContent(Map<String, dynamic> proposal) {
+    final parsed = ClientProposalDocumentPreview.parseDocumentData(proposal);
+    final hasStructuredSections = parsed != null &&
+        parsed['sections'] is List &&
+        (parsed['sections'] as List).isNotEmpty;
+
+    Widget shell(Widget child) {
+      return RawScrollbar(
+        controller: _proposalScrollController,
+        thumbVisibility: true,
+        trackVisibility: true,
+        interactive: true,
+        thickness: 12,
+        radius: const Radius.circular(10),
+        thumbColor: const Color(0xFFC10D00),
+        trackColor: Colors.black.withValues(alpha: 0.25),
+        trackBorderColor: Colors.white.withValues(alpha: 0.25),
+        child: SingleChildScrollView(
+          controller: _proposalScrollController,
+          padding: const EdgeInsets.all(24),
+          child: child,
+        ),
+      );
+    }
+
+    if (hasStructuredSections) {
+      return shell(
+        ClientProposalDocumentPreview(proposal: proposal),
+      );
+    }
+
     if (!kIsWeb) {
       final content = proposal['content']?.toString() ?? '';
-      return SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Container(
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: SelectableText(
-            content.isNotEmpty ? content : 'No proposal content available.',
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.8,
-              color: Color(0xFF34495E),
-            ),
+      return shell(
+        SelectableText(
+          content.isNotEmpty ? content : 'No proposal content available.',
+          style: const TextStyle(
+            fontSize: 15,
+            height: 1.8,
+            color: Color(0xFF34495E),
           ),
         ),
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Container(
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+    return shell(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            proposal['title'] ?? 'Untitled',
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2C3E50),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title
-            Text(
-              proposal['title'] ?? 'Untitled',
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2C3E50),
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Shared by ${proposal['owner_name'] ?? 'Unknown'}',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Shared by ${proposal['owner_name'] ?? 'Unknown'}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
-
-            const Divider(height: 40),
-
-            // Content
-            _buildContentSections(proposal['content']),
-          ],
-        ),
+          ),
+          const Divider(height: 40),
+          _buildContentSections(proposal['content']),
+        ],
       ),
     );
   }
@@ -1501,54 +2109,51 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
 
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.78,
+        child: Stack(
+          children: [
+            GlassContainer(
+              borderRadius: 12,
+              padding: const EdgeInsets.all(0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox.expand(
+                  child: HtmlElementView(viewType: _pdfViewType),
                 ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: SizedBox.expand(
-                child: HtmlElementView(viewType: _pdfViewType),
               ),
             ),
-          ),
-          Positioned(
-            right: 14,
-            top: 20,
-            child: _buildFloatingActionToolbar(),
-          ),
-        ],
+            Positioned(
+              right: 14,
+              top: 20,
+              child: PointerInterceptor(
+                child: _buildFloatingActionToolbar(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildCommentsSection() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Container(
+    return RawScrollbar(
+      controller: _commentsScrollController,
+      thumbVisibility: true,
+      trackVisibility: true,
+      interactive: true,
+      thickness: 12,
+      radius: const Radius.circular(10),
+      thumbColor: const Color(0xFFC10D00),
+      trackColor: Colors.black.withValues(alpha: 0.25),
+      trackBorderColor: Colors.white.withValues(alpha: 0.25),
+      child: SingleChildScrollView(
+        controller: _commentsScrollController,
         padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
+        child: GlassContainer(
+          borderRadius: 12,
+          padding: const EdgeInsets.all(24),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
@@ -1629,6 +2234,7 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
                   .map((comment) => _buildCommentItem(comment))
                   .toList(),
           ],
+          ),
         ),
       ),
     );
@@ -1702,52 +2308,6 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
-    Color color;
-    IconData icon;
-
-    final statusLower = status.toLowerCase();
-    if (statusLower.contains('pending') ||
-        statusLower.contains('sent to client')) {
-      color = Colors.orange;
-      icon = Icons.pending;
-    } else if (statusLower.contains('approved') ||
-        statusLower.contains('signed')) {
-      color = Colors.green;
-      icon = Icons.check_circle;
-    } else if (statusLower.contains('declined') ||
-        statusLower.contains('rejected')) {
-      color = Colors.red;
-      icon = Icons.cancel;
-    } else {
-      color = Colors.blue;
-      icon = Icons.info;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
-          Text(
-            status,
-            style: TextStyle(
-              color: color,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _formatDate(dynamic date) {
     if (date == null) return 'N/A';
     try {
@@ -1800,6 +2360,39 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
 }
 
 // Reject Dialog
+/// One-off iframe factory per dialog instance (Flutter web PDF preview).
+class _SignedPdfHtmlEmbed extends StatefulWidget {
+  const _SignedPdfHtmlEmbed({required this.url});
+
+  final String url;
+
+  @override
+  State<_SignedPdfHtmlEmbed> createState() => _SignedPdfHtmlEmbedState();
+}
+
+class _SignedPdfHtmlEmbedState extends State<_SignedPdfHtmlEmbed> {
+  late final String _viewType;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewType =
+        'signed-pdf-preview-${DateTime.now().microsecondsSinceEpoch}';
+    // ignore: undefined_prefixed_name
+    ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
+      return html.IFrameElement()
+        ..style.border = 'none'
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..src = widget.url
+        ..allow = 'fullscreen';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => HtmlElementView(viewType: _viewType);
+}
+
 class RejectDialog extends StatefulWidget {
   final int proposalId;
   final String accessToken;
@@ -2042,25 +2635,16 @@ class _ApproveDialogState extends State<ApproveDialog> {
       }
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final signingUrl = data['signing_url']?.toString();
-
         if (mounted) {
           Navigator.pop(context); // Close approve dialog
-
-          if (signingUrl != null && signingUrl.isNotEmpty) {
-            // Open DocuSign signing modal
-            _openDocuSignSigning(signingUrl);
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content:
-                    Text('Proposal approved, but signing URL not available'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-            widget.onSuccess();
-          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Use Sign on the toolbar to complete first-party electronic signing.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          widget.onSuccess();
         }
       } else {
         String detail = 'Failed to approve';
@@ -2106,40 +2690,6 @@ class _ApproveDialogState extends State<ApproveDialog> {
         setState(() {
           _isSubmitting = false;
         });
-      }
-    }
-  }
-
-  Future<void> _openDocuSignSigning(String signingUrl) async {
-    // Open DocuSign in the same tab
-    print(
-        '🔐 ApproveDialog: Opening DocuSign URL in same tab: ${signingUrl.substring(0, signingUrl.length > 100 ? 100 : signingUrl.length)}...');
-
-    try {
-      // Navigate to DocuSign in the same tab (redirect mode - works on HTTP)
-      print('🔐 ApproveDialog: Navigating to DocuSign (redirect mode)...');
-      // Use replace() to navigate to external URL (bypasses Flutter routing)
-      web.window.location.replace(signingUrl);
-      print(
-          '✅ Navigation initiated to DocuSign from ApproveDialog using location.replace()');
-
-      // Reload proposal after a delay to check for signature completion
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          print(
-              '🔄 ApproveDialog: Reloading proposal to check signature status...');
-          widget.onSuccess(); // Reload to check if signed
-        }
-      });
-    } catch (e) {
-      print('❌ ApproveDialog: Error opening DocuSign: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error opening DocuSign: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
   }

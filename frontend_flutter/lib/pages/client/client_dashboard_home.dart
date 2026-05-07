@@ -463,14 +463,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           sessionToken != null &&
           sessionToken.trim().isNotEmpty) {
         _persistClientSessionToken(sessionToken);
-        await _loadClientProposals();
-
-        if (!mounted) return;
-        if (widget.showSummary) {
-          setState(() => _selectedNavIndex = 0);
-        } else {
-          _navigateClient('/client/dashboard');
-        }
+        // Caller will retry proposals fetch once session token is available.
         return;
       }
 
@@ -489,12 +482,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       // If verification succeeded, a session token should now be available.
       if (!mounted) return;
       if ((_clientSessionToken ?? '').trim().isNotEmpty) {
-        if (widget.showSummary) {
-          setState(() => _selectedNavIndex = 0);
-        } else {
-          _navigateClient('/client/dashboard');
-          return;
-        }
+        // Keep the user on the current client route; caller retries data fetch.
+        return;
       }
 
       if (!mounted) return;
@@ -1007,99 +996,14 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         (statusLower.contains('signed') && !statusLower.contains('sent'));
 
     final url = isSigned
-        ? '$baseUrl/api/client/proposals/$id/docusign/signed-pdf?token=${Uri.encodeComponent(_accessToken!)}'
+        ? '$baseUrl/api/client/proposals/$id/signed-document?token=${Uri.encodeComponent(_accessToken!)}'
         : '$baseUrl/api/client/proposals/$id/export/pdf?token=${Uri.encodeComponent(_accessToken!)}&download=1';
     web.window.open(url, '_blank');
   }
 
+  /// Opens the same in-app viewer as View — signing is handled inside [ClientProposalViewer].
   Future<void> _openSigningUrl(Map<String, dynamic> doc) async {
-    final rawId = doc['id'];
-    final proposalId =
-        rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
-    if (proposalId == null || _accessToken == null || _accessToken!.isEmpty) {
-      return;
-    }
-
-    try {
-      final uri = Uri.parse(
-          '$baseUrl/api/client/proposals/$proposalId/docusign/signing-url');
-      final resp = await http
-          .post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'token': _accessToken,
-          'signer_name':
-              (doc['client_name']?.toString().trim().isNotEmpty ?? false)
-                  ? doc['client_name']?.toString().trim()
-                  : (_clientEmail ?? '').trim(),
-        }),
-      )
-          .timeout(
-        const Duration(seconds: 45),
-        onTimeout: () {
-          throw TimeoutException('Signing URL request timed out');
-        },
-      );
-
-      Map<String, dynamic>? decoded;
-      try {
-        final body = jsonDecode(resp.body);
-        if (body is Map) {
-          decoded = Map<String, dynamic>.from(body);
-        }
-      } catch (_) {}
-
-      if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        final fresh = decoded?['signing_url']?.toString() ?? '';
-        if (fresh.trim().isNotEmpty) {
-          if (kIsWeb) {
-            web.window.location.href = fresh;
-          } else {
-            await launchUrlString(fresh, mode: LaunchMode.externalApplication);
-          }
-          return;
-        }
-      }
-
-      final fallbackSigningUrl = doc['signing_url']?.toString() ?? '';
-      if (fallbackSigningUrl.trim().isNotEmpty) {
-        if (kIsWeb) {
-          web.window.location.href = fallbackSigningUrl;
-        } else {
-          await launchUrlString(fallbackSigningUrl,
-              mode: LaunchMode.externalApplication);
-        }
-        return;
-      }
-
-      if (mounted) {
-        final msg = decoded?['detail']?.toString() ??
-            'Unable to open DocuSign (HTTP ${resp.statusCode}).';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: Colors.red),
-        );
-      }
-    } catch (e) {
-      final fallbackSigningUrl = doc['signing_url']?.toString() ?? '';
-      if (fallbackSigningUrl.trim().isNotEmpty) {
-        if (kIsWeb) {
-          web.window.location.href = fallbackSigningUrl;
-        } else {
-          await launchUrlString(fallbackSigningUrl,
-              mode: LaunchMode.externalApplication);
-        }
-        return;
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Unable to open DocuSign: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+    await _openProposal(doc);
   }
 
   Future<void> _showFallbackSignModal(Map<String, dynamic> doc) async {
@@ -3301,7 +3205,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           if (!mounted) return;
           if ((_clientSessionToken ?? '').trim().isEmpty) {
             setState(() {
-              _error = 'Device verification required. Please retry.';
+              // User may have dismissed OTP; avoid flashing a blocking error.
+              _error = null;
               _isLoading = false;
             });
             return;
@@ -4073,103 +3978,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       return;
     }
 
-    final statusLower = (proposal['status'] ?? '').toString().toLowerCase();
-    final isSigned = statusLower.contains('client signed') ||
-        (statusLower.contains('signed') && !statusLower.contains('sent'));
-
-    if (!isSigned) {
-      try {
-        final uri = Uri.parse(
-            '$baseUrl/api/client/proposals/$proposalId/docusign/signing-url');
-        final resp = await http
-            .post(
-          uri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'token': _accessToken,
-            'signer_name':
-                (proposal['client_name']?.toString().trim().isNotEmpty ?? false)
-                    ? proposal['client_name']?.toString().trim()
-                    : (_clientEmail ?? '').trim(),
-          }),
-        )
-            .timeout(
-          const Duration(seconds: 12),
-          onTimeout: () {
-            throw TimeoutException('Signing URL request timed out');
-          },
-        );
-
-        Map<String, dynamic>? decoded;
-        try {
-          final body = jsonDecode(resp.body);
-          if (body is Map) {
-            decoded = Map<String, dynamic>.from(body);
-          }
-        } catch (_) {}
-
-        if (resp.statusCode >= 200 && resp.statusCode < 300) {
-          final fresh = decoded?['signing_url']?.toString() ?? '';
-          if (fresh.trim().isNotEmpty) {
-            final uri = Uri.tryParse(fresh);
-            if (uri != null) {
-              if (kIsWeb) {
-                web.window.location.href = fresh;
-              } else {
-                await launchUrlString(fresh,
-                    mode: LaunchMode.externalApplication);
-              }
-            }
-            return;
-          }
-        }
-
-        final fallbackSigningUrl = proposal['signing_url']?.toString() ?? '';
-        if (fallbackSigningUrl.trim().isNotEmpty) {
-          final uri = Uri.tryParse(fallbackSigningUrl);
-          if (uri != null) {
-            if (kIsWeb) {
-              web.window.location.href = fallbackSigningUrl;
-            } else {
-              await launchUrlString(fallbackSigningUrl,
-                  mode: LaunchMode.externalApplication);
-            }
-          }
-          return;
-        }
-
-        if (mounted) {
-          final msg = decoded?['detail']?.toString() ??
-              'Unable to open DocuSign (HTTP ${resp.statusCode}).';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), backgroundColor: Colors.red),
-          );
-        }
-      } catch (e) {
-        final fallbackSigningUrl = proposal['signing_url']?.toString() ?? '';
-        if (fallbackSigningUrl.trim().isNotEmpty) {
-          final uri = Uri.tryParse(fallbackSigningUrl);
-          if (uri != null) {
-            if (kIsWeb) {
-              web.window.location.href = fallbackSigningUrl;
-            } else {
-              await launchUrlString(fallbackSigningUrl,
-                  mode: LaunchMode.externalApplication);
-            }
-          }
-          return;
-        }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Unable to open DocuSign: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-
+    // First-party signing: always open in-app viewer (no DocuSign redirect).
     print('[ClientDashboardHome] Opening proposal in app: id=$proposalId');
 
     Navigator.push(
