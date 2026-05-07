@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../services/asset_service.dart';
 import '../theme/app_colors.dart';
+import '../theme/manager_theme_controller.dart';
 
 class CreatorDashboardSidebar extends StatelessWidget {
   const CreatorDashboardSidebar({
@@ -62,14 +64,19 @@ class CreatorDashboardSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveCollapsed = showCollapseToggle ? isCollapsed : false;
-    return AnimatedContainer(
-      duration: AppColors.animationDuration,
+    final effectiveCollapsed = showCollapseToggle
+        ? isCollapsed
+        : false;
+    
+    // Use ManagerThemeController for consistent theming
+    final chrome = context.watch<ManagerThemeController>().chrome;
+
+    return Container(
       width: effectiveCollapsed ? collapsedWidth : expandedWidth,
-      decoration: const BoxDecoration(
-        color: AppColors.backgroundColor,
+      decoration: BoxDecoration(
+        color: chrome.sidebarBackground,
         border: Border(
-          right: BorderSide(color: AppColors.borderColor, width: 1),
+          right: BorderSide(color: chrome.sidebarRightBorder, width: 1),
         ),
       ),
       child: SafeArea(
@@ -116,13 +123,13 @@ class CreatorDashboardSidebar extends StatelessWidget {
                     onTap: () => onSelect('Account Profile'),
                   ),
                   if (!effectiveCollapsed)
-                    const Padding(
+                    Padding(
                       padding:
                           EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                       child: Divider(
                         height: 1,
                         thickness: 1,
-                        color: Color(0xFFFFFFFF),
+                        color: chrome.divider,
                       ),
                     ),
                   _SidebarRow(
@@ -157,6 +164,8 @@ class _SidebarHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chrome = context.watch<ManagerThemeController>().chrome;
+    
     if (isCollapsed) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
@@ -166,14 +175,14 @@ class _SidebarHeader extends StatelessWidget {
           child: Container(
             height: 36,
             decoration: BoxDecoration(
-              color: AppColors.hoverColor,
+              color: chrome.sidebarHoverFill,
               borderRadius: BorderRadius.circular(10),
             ),
             alignment: Alignment.center,
             child: showCollapseToggle
-                ? const Icon(
+                ? Icon(
                     Icons.keyboard_arrow_right,
-                    color: AppColors.textPrimary,
+                    color: chrome.textPrimary,
                     size: 20,
                   )
                 : const SizedBox.shrink(),
@@ -197,13 +206,13 @@ class _SidebarHeader extends StatelessWidget {
                   width: 28,
                   height: 28,
                   decoration: BoxDecoration(
-                    color: AppColors.hoverColor,
+                    color: chrome.sidebarHoverFill,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   alignment: Alignment.center,
-                  child: const Icon(
+                  child: Icon(
                     Icons.keyboard_arrow_left,
-                    color: AppColors.textPrimary,
+                    color: chrome.textPrimary,
                     size: 18,
                   ),
                 ),
@@ -218,21 +227,21 @@ class _SidebarHeader extends StatelessWidget {
                 fit: BoxFit.contain,
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Welcome to',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppColors.textSecondary,
+                  color: chrome.textSecondary,
                   fontSize: 10.5,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(height: 2),
-              const Text(
+              Text(
                 'Proposal & SOW Builder',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppColors.textPrimary,
+                  color: chrome.textPrimary,
                   fontSize: 12.8,
                   fontWeight: FontWeight.w700,
                 ),
@@ -240,7 +249,7 @@ class _SidebarHeader extends StatelessWidget {
               const SizedBox(height: 12),
               Container(
                 height: 1,
-                color: AppColors.borderColor,
+                color: chrome.divider,
               ),
             ],
           ),
@@ -269,6 +278,7 @@ class _SidebarRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chrome = context.watch<ManagerThemeController>().chrome;
     final iconSize = isBottomItem ? 31.0 : 34.0;
     final fontSize = isBottomItem ? 11.2 : 11.8;
 
@@ -286,7 +296,7 @@ class _SidebarRow extends StatelessWidget {
           decoration: BoxDecoration(
             color: isCollapsed
                 ? Colors.transparent
-                : (isSelected ? AppColors.activeColor : Colors.transparent),
+                : (isSelected ? ManagerChromeTheme.accentRed : Colors.transparent),
             borderRadius: BorderRadius.circular(10),
           ),
           child: isCollapsed
@@ -318,8 +328,8 @@ class _SidebarRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: isSelected
-                              ? AppColors.textPrimary
-                              : AppColors.textSecondary,
+                              ? chrome.textPrimary
+                              : chrome.textSecondary,
                           fontSize: fontSize,
                           fontWeight:
                               isSelected ? FontWeight.w600 : FontWeight.w500,

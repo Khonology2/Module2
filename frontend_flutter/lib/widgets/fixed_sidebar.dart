@@ -1,7 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/asset_service.dart';
 import '../theme/app_colors.dart';
+import '../theme/manager_theme_controller.dart';
 
 class FixedSidebar extends StatefulWidget {
   final String currentPage;
@@ -35,6 +37,9 @@ class _FixedSidebarState extends State<FixedSidebar> {
     final effectiveCollapsed = widget.showCollapseToggle
         ? (isSmall ? true : widget.isCollapsed)
         : false;
+    
+    // Use ManagerThemeController for consistent theming
+    final chrome = context.watch<ManagerThemeController>().chrome;
 
     return AnimatedContainer(
       duration: AppColors.animationDuration,
@@ -45,11 +50,10 @@ class _FixedSidebarState extends State<FixedSidebar> {
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           decoration: BoxDecoration(
-            color: AppColors.backgroundColor
-                .withValues(alpha: AppColors.backgroundOpacity),
+            color: chrome.sidebarBackground,
             border: Border(
               right: BorderSide(
-                color: Colors.white.withValues(alpha: 0.1),
+                color: chrome.sidebarRightBorder,
                 width: 1,
               ),
             ),
@@ -73,7 +77,7 @@ class _FixedSidebarState extends State<FixedSidebar> {
                     child: Container(
                       height: AppColors.itemHeight,
                       decoration: BoxDecoration(
-                        color: AppColors.hoverColor,
+                        color: chrome.sidebarHoverFill,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -84,7 +88,7 @@ class _FixedSidebarState extends State<FixedSidebar> {
                               effectiveCollapsed
                                   ? Icons.keyboard_arrow_right
                                   : Icons.keyboard_arrow_left,
-                              color: AppColors.textPrimary,
+                              color: chrome.textPrimary,
                               size: 20,
                             ),
                         ],
@@ -166,7 +170,7 @@ class _FixedSidebarState extends State<FixedSidebar> {
                         Container(
                           margin: const EdgeInsets.symmetric(horizontal: 16),
                           height: 1,
-                          color: AppColors.borderColor,
+                          color: chrome.divider,
                         ),
                       const SizedBox(height: 12),
 
@@ -203,6 +207,8 @@ class _FixedSidebarState extends State<FixedSidebar> {
 
     return StatefulBuilder(
       builder: (context, setState) {
+        final chrome = context.watch<ManagerThemeController>().chrome;
+        
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           child: MouseRegion(
@@ -215,14 +221,14 @@ class _FixedSidebarState extends State<FixedSidebar> {
                 duration: AppColors.animationDuration,
                 height: AppColors.itemHeight,
                 decoration: BoxDecoration(
-                  color: _getItemColor(isSelected, hovering, isCollapsed),
+                  color: _getItemColor(isSelected, hovering, isCollapsed, chrome),
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: _getItemShadow(isSelected, hovering, isCollapsed),
+                  boxShadow: _getItemShadow(isSelected, hovering, isCollapsed, chrome),
                 ),
                 child: isCollapsed
                     ? _buildCollapsedItem(
-                        assetPath, isSelected, showProfileIndicator)
-                    : _buildExpandedItem(label, assetPath, isSelected),
+                        assetPath, isSelected, showProfileIndicator, chrome)
+                    : _buildExpandedItem(label, assetPath, isSelected, chrome),
               ),
             ),
           ),
@@ -232,7 +238,7 @@ class _FixedSidebarState extends State<FixedSidebar> {
   }
 
   Widget _buildCollapsedItem(
-      String assetPath, bool isSelected, bool showProfileIndicator) {
+      String assetPath, bool isSelected, bool showProfileIndicator, ManagerChromeTheme chrome) {
     return Center(
       child: Stack(
         children: [
@@ -272,7 +278,7 @@ class _FixedSidebarState extends State<FixedSidebar> {
     );
   }
 
-  Widget _buildExpandedItem(String label, String assetPath, bool isSelected) {
+  Widget _buildExpandedItem(String label, String assetPath, bool isSelected, ManagerChromeTheme chrome) {
     return Padding(
       padding: AppSpacing.sidebarItemPadding,
       child: Row(
@@ -297,42 +303,42 @@ class _FixedSidebarState extends State<FixedSidebar> {
               label,
               style: TextStyle(
                 color: isSelected
-                    ? AppColors.textPrimary
-                    : AppColors.textSecondary,
+                    ? chrome.textPrimary
+                    : chrome.textSecondary,
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
           ),
           if (isSelected)
-            const Icon(
+            Icon(
               Icons.arrow_forward_ios,
               size: 12,
-              color: AppColors.textPrimary,
+              color: chrome.textPrimary,
             ),
         ],
       ),
     );
   }
 
-  Color _getItemColor(bool isSelected, bool hovering, bool isCollapsed) {
+  Color _getItemColor(bool isSelected, bool hovering, bool isCollapsed, ManagerChromeTheme chrome) {
     if (isCollapsed) {
       return Colors.transparent; // All items transparent when collapsed
     }
 
     if (isSelected) {
-      return AppColors.activeColor;
+      return ManagerChromeTheme.accentRed;
     }
 
     if (hovering) {
-      return AppColors.hoverColor;
+      return chrome.sidebarHoverFill;
     }
 
     return Colors.transparent;
   }
 
   List<BoxShadow> _getItemShadow(
-      bool isSelected, bool hovering, bool isCollapsed) {
+      bool isSelected, bool hovering, bool isCollapsed, ManagerChromeTheme chrome) {
     if (isCollapsed) {
       return []; // No shadow when collapsed
     }
@@ -340,7 +346,7 @@ class _FixedSidebarState extends State<FixedSidebar> {
     if (isSelected) {
       return [
         BoxShadow(
-          color: AppColors.activeShadowColor,
+          color: Colors.transparent,
           blurRadius: 10,
           offset: const Offset(0, 2),
         ),
@@ -350,7 +356,7 @@ class _FixedSidebarState extends State<FixedSidebar> {
     if (hovering) {
       return [
         BoxShadow(
-          color: AppColors.hoverShadowColor,
+          color: Colors.transparent,
           blurRadius: 10,
           offset: const Offset(0, 2),
         ),

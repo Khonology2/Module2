@@ -110,9 +110,14 @@ class _AnalyticsPageState extends State<AnalyticsPage>
 
   String _selectedPeriod = 'Last 30 Days';
   String _cycleTimeScope = 'team';
-  bool _cycleTimeAutoRefresh = true;
+  // Disabled by default — every tick rebuilds every panel keyed off
+  // `_cycleTimeRefreshTick` (Risk Gate, Cycle Time, Collaboration Load,
+  // Client Engagement, AI Usage), which makes their values blank out and
+  // re-populate. Users can flip the "Auto" switch to opt in.
+  bool _cycleTimeAutoRefresh = false;
   int _cycleTimeRefreshTick = 0;
   Timer? _cycleTimeRefreshTimer;
+  bool _isRefreshing = false;
   String? _pipelineStageFilter;
   final TextEditingController _cycleTimeOwnerCtrl = TextEditingController();
   final TextEditingController _cycleTimeProposalTypeCtrl =
@@ -193,6 +198,52 @@ class _AnalyticsPageState extends State<AnalyticsPage>
       if (attempt < maxAttempts) {
         await Future<void>.delayed(initialDelay * attempt);
       }
+    }
+  }
+
+  /// Handler for the header "REFRESH" button. Refetches proposals (with
+  /// retry), refreshes the notification bell, and force-rebuilds every
+  /// FutureBuilder keyed off `_cycleTimeRefreshTick` (risk gate, cycle time,
+  /// collaboration load, client engagement, AI usage). Provides explicit
+  /// loading state + SnackBar feedback so the user can see it actually ran.
+  Future<void> _runManualRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    final app = context.read<AppState>();
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await Future.wait<void>([
+        _ensureProposalsLoaded(),
+        app.fetchNotifications().catchError((_) {}),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _cycleTimeRefreshTick++;
+      });
+      messenger.showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF111827),
+          content: Text(
+            app.proposals.isEmpty
+                ? 'Refreshed — backend returned 0 proposals.'
+                : 'Refreshed ${app.proposals.length} proposals.',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 3),
+          backgroundColor: const Color(0xFFB91C1C),
+          content: Text('Refresh failed: $e',
+              style: const TextStyle(color: Colors.white)),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
     }
   }
 
@@ -2557,15 +2608,10 @@ class _AnalyticsPageState extends State<AnalyticsPage>
                     children: [
                       _buildGlassDropdown(),
                       _figmaPrimaryButton(
-                        'Refresh',
+                        _isRefreshing ? 'Refreshing' : 'Refresh',
                         Icons.refresh,
-                        () async {
-                          await context.read<AppState>().fetchProposals();
-                          if (!mounted) return;
-                          setState(() {
-                            _cycleTimeRefreshTick++;
-                          });
-                        },
+                        _runManualRefresh,
+                        loading: _isRefreshing,
                       ),
                       _figmaSecondaryButton(
                         'Export Data',
@@ -3094,43 +3140,62 @@ class _AnalyticsPageState extends State<AnalyticsPage>
   }
 
   /// Solid red action button used in the Figma header (Refresh).
+  /// When `loading` is true the icon is replaced by a spinner and taps
+  /// are ignored to prevent overlapping refresh calls.
   Widget _figmaPrimaryButton(
-      String label, IconData icon, VoidCallback onPressed) {
+    String label,
+    IconData icon,
+    VoidCallback onPressed, {
+    bool loading = false,
+  }) {
     return InkWell(
-      onTap: onPressed,
+      onTap: loading ? null : onPressed,
       borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFEF4444), Color(0xFFB91C1C)],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-          borderRadius: BorderRadius.circular(999),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFEF4444).withValues(alpha: 0.35),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+      child: Opacity(
+        opacity: loading ? 0.85 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFEF4444), Color(0xFFB91C1C)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
             ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.white, size: 16),
-            const SizedBox(width: 8),
-            Text(
-              label.toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              loading
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Icon(icon, color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                label.toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
