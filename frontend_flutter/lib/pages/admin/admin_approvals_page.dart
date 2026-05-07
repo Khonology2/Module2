@@ -114,6 +114,37 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
     );
   }
 
+  Widget _buildAdminPanelWhiteIconRing({
+    required ManagerChromeTheme chrome,
+    required Widget child,
+    double diameter = 52,
+  }) {
+    final pad = diameter * 0.07;
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: chrome.isDark
+              ? Colors.white.withValues(alpha: 0.22)
+              : Colors.black.withValues(alpha: 0.08),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: chrome.isDark ? 0.32 : 0.10),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(pad),
+      child: child,
+    );
+  }
+
   static const double _approvalRowActionH = 23;
   static const double _approvalRowReviewW = 58;
 
@@ -1015,21 +1046,43 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                'Approvals Inbox',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
+            children: [
+              _buildAdminPanelWhiteIconRing(
+                chrome: chrome,
+                diameter: 54,
+                child: Image.asset(
+                  'assets/images/Admin_new_icons/Recent_Proposals.png',
+                  fit: BoxFit.contain,
                 ),
               ),
-              SizedBox(height: 4),
-              Text(
-                'Review, approve, or reject proposals awaiting your decision',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Approvals Inbox',
+                      style: TextStyle(
+                        color: chrome.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Review, approve, or reject proposals awaiting your decision',
+                      style: TextStyle(
+                        color: chrome.textMuted,
+                        fontSize: 11,
+                        height: 1.35,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
