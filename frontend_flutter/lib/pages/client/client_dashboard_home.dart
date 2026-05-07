@@ -66,6 +66,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   };
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _proposalsScrollController = ScrollController();
+  bool _dashboardOpenLogged = false;
 
   static const List<Map<String, dynamic>> _clientNavItems = [
     {
@@ -156,6 +157,28 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     if (remaining.isNegative) return;
 
     await Future.delayed(remaining);
+  }
+
+  Future<void> _logClientActivity({
+    required String token,
+    required String proposalId,
+    required String eventType,
+    Map<String, dynamic>? metadata,
+  }) async {
+    try {
+      await http
+          .post(
+            Uri.parse('$baseUrl/api/client/activity'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'token': token,
+              'proposal_id': proposalId,
+              'event_type': eventType,
+              'metadata': metadata ?? {},
+            }),
+          )
+          .timeout(const Duration(seconds: 12));
+    } catch (_) {}
   }
 
   Widget _filterChip(String label, String value) {
@@ -3532,6 +3555,23 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
           _isLoading = false;
         });
+
+        if (!_dashboardOpenLogged && (_accessToken ?? '').trim().isNotEmpty) {
+          final firstId = parsedProposals.isNotEmpty
+              ? parsedProposals.first['id']?.toString()
+              : null;
+          if (firstId != null && firstId.trim().isNotEmpty) {
+            _dashboardOpenLogged = true;
+            await _logClientActivity(
+              token: token,
+              proposalId: firstId,
+              eventType: 'dashboard_open',
+              metadata: {
+                'screen': 'client_dashboard',
+              },
+            );
+          }
+        }
 
         if (_isOverviewDashboard) {
           await _loadDashboardOverview();
