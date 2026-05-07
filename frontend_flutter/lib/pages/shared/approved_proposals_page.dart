@@ -724,12 +724,25 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Text(
-                              client,
-                              style: TextStyle(
-                                color: chrome.textSecondary,
-                                fontSize: 14,
-                              ),
+                            Row(
+                              children: [
+                                Text(
+                                  client,
+                                  style: TextStyle(
+                                    color: chrome.textSecondary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Value: ${_currencyFormatter.format(double.tryParse(budget.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0)}',
+                                  style: TextStyle(
+                                    color: chrome.textSecondary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -757,15 +770,8 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
             ),
             const SizedBox(height: 12),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text(
-                  'Value: ${_currencyFormatter.format(double.tryParse(budget.replaceAll(RegExp(r'[^\d.]'), '')) ?? 0)}',
-                  style: TextStyle(
-                    color: chrome.textSecondary,
-                    fontSize: 14,
-                  ),
-                ),
                 Text(
                   date != null
                       ? _formatDate(DateTime.tryParse(date))
