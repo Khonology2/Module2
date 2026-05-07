@@ -381,12 +381,7 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
   }
 
   Widget _buildHeader(AppState app, ManagerChromeTheme chrome) {
-    final user = AuthService.currentUser ?? app.currentUser ?? {};
-    final email = user['email']?.toString() ?? 'user@example.com';
-    final backendRole = user['role']?.toString().toLowerCase() ?? 'manager';
-    final displayRole =
-        backendRole == 'admin' || backendRole == 'ceo' ? 'Admin' : 'Manager';
-
+    
     return Container(
       height: 96,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -425,31 +420,20 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
           ),
           Row(
             children: [
-              ClipOval(
-                child: Image.asset(
-                  'assets/images/User_Profile.png',
-                  width: 48,
-                  height: 48,
-                  fit: BoxFit.cover,
-                ),
+              _buildIconButton(
+                chrome: chrome,
+                assetPath: 'assets/images/Creator_Dashboard/email_blue.png',
+                onTap: () {
+                  // Handle email icon press (e.g., navigate to messages)
+                },
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    email,
-                    style: TextStyle(
-                      color: chrome.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    displayRole,
-                    style: TextStyle(color: chrome.textSecondary, fontSize: 12),
-                  ),
-                ],
+              const SizedBox(width: 8),
+              _buildIconButton(
+                chrome: chrome,
+                assetPath: 'assets/images/Creator_Dashboard/notification_blue.png',
+                onTap: () {
+                  // Handle bell icon press (e.g., navigate to notifications)
+                },
               ),
             ],
           ),
@@ -807,6 +791,48 @@ class _ApprovedProposalsPageState extends State<ApprovedProposalsPage>
     } else {
       return 'Just now';
     }
+  }
+
+  Widget _buildIconButton({
+    required ManagerChromeTheme chrome,
+    required String assetPath,
+    required VoidCallback onTap,
+    int? badge,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            width: 44.87,
+            height: 44.87,
+            child: Image.asset(assetPath, fit: BoxFit.contain),
+          ),
+        ),
+        if (badge != null && badge > 0)
+          Positioned(
+            right: 4,
+            top: 4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                badge.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   Future<void> _exportApprovedProposals() async {
