@@ -70,3 +70,6 @@ docusign_public.key
 backend/docusign_private.key
 backend/docusign_public.key
 
+# Local debug helpers (do not commit)
+backend/debug_*.py
+
