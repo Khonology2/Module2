@@ -128,15 +128,15 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
         shape: BoxShape.circle,
         border: Border.all(
           color: chrome.isDark
-              ? Colors.white.withValues(alpha: 0.22)
-              : Colors.black.withValues(alpha: 0.08),
+              ? Colors.white.withValues(alpha: 0.14)
+              : Colors.black.withValues(alpha: 0.06),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: chrome.isDark ? 0.32 : 0.10),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: chrome.isDark ? 0.18 : 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
