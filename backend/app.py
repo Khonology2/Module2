@@ -68,7 +68,7 @@ except ImportError:
     # DocuSign SDK missing: warn user (emoji-friendly message)
     print("⚠️ DocuSign SDK not installed. Run: pip install docusign-esign")
 from cryptography.fernet import Fernet
-from flask import Flask, request, jsonify, send_file, Response, send_from_directory, has_request_context, render_template, redirect, url_for, session
+from flask import Flask, request, jsonify, send_file, Response, send_from_directory, has_request_context, render_template, redirect, url_for, session, make_response
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -333,6 +333,10 @@ CORS(
         "Content-Type",
         "Authorization",
         "X-Requested-With",
+        "X-AI-Provider",
+        "X-AI-Model",
+        "X-Provider-Api-Key",
+        "X-AI-Request-ID",
         "X-Client-Device-Id",
         "X-Client-Session-Token",
         "x-client-device-id",
@@ -404,6 +408,7 @@ def handle_options_preflight(remaining=None):
     resp.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, POST, OPTIONS, PUT, PATCH, DELETE'
     resp.headers['Access-Control-Allow-Headers'] = (
         'Content-Type, Authorization, X-Requested-With, Accept, X-AI-Request-ID, '
+        'X-AI-Provider, X-AI-Model, X-Provider-Api-Key, '
         'X-Client-Device-Id, X-Client-Session-Token, X-Device-Id'
     )
     resp.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -420,6 +425,7 @@ def _add_cors_headers(resp):
         resp.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, POST, OPTIONS, PUT, PATCH, DELETE'
         resp.headers['Access-Control-Allow-Headers'] = (
             'Content-Type, Authorization, X-Requested-With, Accept, X-AI-Request-ID, '
+            'X-AI-Provider, X-AI-Model, X-Provider-Api-Key, '
             'X-Client-Device-Id, X-Client-Session-Token, X-Device-Id'
         )
     return resp

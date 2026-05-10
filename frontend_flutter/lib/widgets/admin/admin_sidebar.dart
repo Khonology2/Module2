@@ -60,6 +60,11 @@ class AdminSidebar extends StatelessWidget {
       assetPath:
           'assets/images/admin_side bar/Admin_sidebar_content_library.png',
     ),
+    _AdminNavItem(
+      pageLabel: 'AI Configuration',
+      displayLabel: 'AI Configuration',
+      assetPath: 'assets/images/finance_manager_new_icons/AI_Usage.png',
+    ),
   ];
 
   Color _sidebarBg(ManagerChromeTheme? c) => c?.sidebarBackground ?? _adminBase;
@@ -205,6 +210,7 @@ class AdminSidebar extends StatelessWidget {
                             _AdminSidebarNavItem(
                               label: item.displayLabel,
                               assetPath: item.assetPath,
+                              iconData: item.iconData,
                               isActive: currentPage == item.pageLabel,
                               isCollapsed: effectiveCollapsed,
                               onTap: () => onSelect(item.pageLabel),
@@ -261,13 +267,18 @@ class AdminSidebar extends StatelessWidget {
 class _AdminNavItem {
   final String pageLabel;
   final String displayLabel;
-  final String assetPath;
+  final String? assetPath;
+  final IconData? iconData;
 
   const _AdminNavItem({
     required this.pageLabel,
     required this.displayLabel,
-    required this.assetPath,
-  });
+    this.assetPath,
+    this.iconData,
+  }) : assert(
+          assetPath != null || iconData != null,
+          'Admin nav item needs assetPath or iconData',
+        );
 }
 
 class _AdminSidebarNavItem extends StatelessWidget {

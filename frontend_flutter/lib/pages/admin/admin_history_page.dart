@@ -1104,6 +1104,16 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
                   managerChrome: chrome,
                   onToggle: app.toggleAdminSidebar,
                   onSelect: (label) {
+                    if (label == 'AI Configuration') {
+                      final previous = _currentPage;
+                      setState(() => _currentPage = 'AI Configuration');
+                      Navigator.pushNamed(context, '/ai-configuration').then((_) {
+                        if (mounted) {
+                          setState(() => _currentPage = previous);
+                        }
+                      });
+                      return;
+                    }
                     setState(() => _currentPage = label);
                     _navigateToPage(label);
                   },

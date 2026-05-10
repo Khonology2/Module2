@@ -583,6 +583,16 @@ class _AdminApprovalsPageState extends State<AdminApprovalsPage>
                   managerChrome: chrome,
                   onToggle: _toggleSidebar,
                   onSelect: (label) {
+                    if (label == 'AI Configuration') {
+                      final previous = _currentPage;
+                      setState(() => _currentPage = 'AI Configuration');
+                      Navigator.pushNamed(context, '/ai-configuration').then((_) {
+                        if (mounted) {
+                          setState(() => _currentPage = previous);
+                        }
+                      });
+                      return;
+                    }
                     setState(() => _currentPage = label);
                     _navigateToPage(label);
                   },

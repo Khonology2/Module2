@@ -3071,6 +3071,10 @@ class _AnalyticsPageState extends State<AnalyticsPage>
             managerChrome: chrome,
             onToggle: app.toggleAdminSidebar,
             onSelect: (label) {
+              if (label == 'AI Configuration') {
+                Navigator.pushNamed(context, '/ai-configuration');
+                return;
+              }
               app.setAdminNavLabel(label);
               _navigatePage(label);
             },

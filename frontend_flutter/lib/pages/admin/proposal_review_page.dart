@@ -1863,6 +1863,10 @@ class _ProposalReviewPageState extends State<ProposalReviewPage> {
                   managerChrome: chrome,
                   onToggle: () => appState.toggleAdminSidebar(),
                   onSelect: (label) {
+                    if (label == 'AI Configuration') {
+                      Navigator.pushNamed(context, '/ai-configuration');
+                      return;
+                    }
                     if (label != 'Sign Out') setState(() => _currentPage = label);
                     _navigateAdminToPage(context, label);
                   },

@@ -389,6 +389,17 @@ class _ApproverDashboardPageState extends State<ApproverDashboardPage>
                 managerChrome: chrome,
                 onToggle: () => context.read<AppState>().toggleAdminSidebar(),
                 onSelect: (label) {
+                  if (label == 'AI Configuration') {
+                    final previous = _currentPage;
+                    setState(() => _currentPage = 'AI Configuration');
+                    Navigator.pushNamed(context, '/ai-configuration')
+                        .then((_) {
+                      if (mounted) {
+                        setState(() => _currentPage = previous);
+                      }
+                    });
+                    return;
+                  }
                   setState(() => _currentPage = label);
                   _navigateToPage(label);
                 },
