@@ -110,8 +110,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       '$_financeIconDir/Top clients by rev_intab.png';
   static const String _recentSignedInTabIcon =
       '$_financeIconDir/Recent_signed_deals_intab.png';
-  static const double _adminLikeIconDiameter = 80.0;
-  static const double _adminLikeIconPadding = 14.0;
+  static const double _adminLikeIconDiameter = 52.0;
 
   BoxDecoration _panelDecoration() => BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -120,24 +119,9 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
       );
 
   Widget _panelIcon(String path, {double size = _adminLikeIconDiameter}) {
-    return Container(
+    return SizedBox(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        border:
-            Border.all(color: Colors.white.withValues(alpha: 0.22), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.28),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      padding: EdgeInsets.all(
-          size == _adminLikeIconDiameter ? _adminLikeIconPadding : 6),
       child: Image.asset(
         path,
         fit: BoxFit.contain,
@@ -466,42 +450,61 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     required String subtitle,
   }) {
     return Container(
-      height: 112,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      height: 132,
+      padding: const EdgeInsets.all(16),
       decoration: _panelDecoration(),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          _panelIcon(iconPath),
-          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   label,
-                  style:
-                      PremiumTheme.labelMedium.copyWith(color: Colors.white70),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: PremiumTheme.bodySmall.copyWith(color: Colors.white54),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.visible,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  value,
-                  style: PremiumTheme.titleMedium
-                      .copyWith(fontWeight: FontWeight.w800),
+                  subtitle,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    height: 1.3,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 6),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      height: 1,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.visible,
+                    softWrap: false,
+                  ),
+                ),
               ],
             ),
+          ),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 2, top: 20),
+            child: _panelIcon(iconPath),
           ),
         ],
       ),
@@ -624,7 +627,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             children: [
               Icon(
                 checked ? Icons.check_box : Icons.check_box_outline_blank,
-                color: checked ? const Color(0xFFE11D48) : Colors.white70,
+                color: checked ? const Color(0xFFC10D00) : Colors.white70,
                 size: 14,
               ),
               const SizedBox(width: 10),
@@ -678,12 +681,18 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Financial Alerts',
-                            style: PremiumTheme.titleMedium),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            )),
                         const SizedBox(height: 4),
                         Text(
                           'Items requiring financial attention.',
-                          style: PremiumTheme.bodyMedium
-                              .copyWith(color: Colors.white70),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -789,13 +798,25 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
             children: [
               _panelIcon(iconPath),
               const SizedBox(width: 10),
-              Expanded(child: Text(title, style: PremiumTheme.titleMedium)),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             subtitle,
-            style: PremiumTheme.bodyMedium.copyWith(color: Colors.white70),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+            ),
           ),
           const SizedBox(height: 14),
           SizedBox(height: 240, child: child),
@@ -1063,59 +1084,53 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
     required String title,
     required String subtitle,
     required String iconPath,
-    String? actionLabel,
-    VoidCallback? onAction,
     required Widget child,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _panelDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bounded = constraints.maxHeight.isFinite;
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: _panelDecoration(),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _panelIcon(iconPath),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: PremiumTheme.titleMedium),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       subtitle,
-                      style: PremiumTheme.bodyMedium
-                          .copyWith(color: Colors.white70),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
                     ),
+                    const SizedBox(height: 12),
+                    if (bounded)
+                      Expanded(
+                        child: SingleChildScrollView(child: child),
+                      )
+                    else
+                      child,
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
-              _panelIcon(iconPath),
-              if (actionLabel != null)
-                TextButton(
-                  onPressed: onAction,
-                  style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFFC10D00),
-                    foregroundColor: Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  ),
-                  child: Text(
-                    actionLabel,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
             ],
           ),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1260,7 +1275,9 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                       const SizedBox(height: 6),
                       Text(
                         'Include Data',
-                        style: PremiumTheme.titleMedium.copyWith(
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -1422,9 +1439,11 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                       children: [
                         Text(
                           (items[i]['client'] ?? '').toString(),
-                          style: PremiumTheme.bodyMedium.copyWith(
-                            color: const Color(0xFFE11D48),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
+                            height: 1.35,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1436,9 +1455,11 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                               : double.tryParse(
                                       items[i]['revenue']?.toString() ?? '') ??
                                   0.0),
-                          style: PremiumTheme.bodyMedium.copyWith(
-                            color: const Color(0xFFE11D48),
+                          style: const TextStyle(
+                            color: Color(0xFFC10D00),
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
+                            height: 1.35,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1521,9 +1542,11 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                       children: [
                         Text(
                           (items[i]['proposal'] ?? '').toString(),
-                          style: PremiumTheme.bodyMedium.copyWith(
-                            color: const Color(0xFFE11D48),
+                          style: const TextStyle(
+                            color: Color(0xFFC10D00),
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
+                            height: 1.35,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1531,8 +1554,13 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                         const SizedBox(height: 2),
                         Text(
                           (items[i]['client'] ?? '').toString(),
-                          style: PremiumTheme.labelMedium
-                              .copyWith(color: Colors.white70),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            fontStyle: FontStyle.italic,
+                            height: 1.35,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -4017,7 +4045,11 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   Text(
                     _currentTab == 'proposals'
                         ? 'Finance Proposal Management'
-                        : 'Finance Dashboard',
+                        : (_currentTab == 'clients'
+                            ? 'Finance Client Management'
+                            : (_currentTab == 'audit'
+                                ? 'Finance Audit Trail'
+                                : 'Finance Dashboard')),
                     style: TextStyle(
                       color: chrome.textPrimary,
                       fontSize: 20,
@@ -4030,15 +4062,25 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                   const SizedBox(width: 14),
                   if (!isMobile)
                     Flexible(
-                      child: Text(
-                        'Hello, ${userName.toString()}',
-                        style: TextStyle(
-                          color: chrome.textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                        ),
+                      child: RichText(
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        text: TextSpan(
+                          style: TextStyle(
+                            color: chrome.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          children: [
+                            const TextSpan(text: 'Hello, '),
+                            TextSpan(
+                              text: userName.toString(),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                 ],
@@ -4277,7 +4319,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
         children: [
           Icon(
             Icons.check_box,
-            color: const Color(0xFFE11D48).withValues(alpha: 0.9),
+            color: const Color(0xFFC10D00).withValues(alpha: 0.9),
             size: 14,
           ),
           const SizedBox(width: 10),
@@ -4350,12 +4392,21 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Requires Attention', style: PremiumTheme.titleMedium),
+                    const Text(
+                      'Requires Attention',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       'Proposals Awaiting Review or Action',
-                      style: PremiumTheme.bodyMedium
-                          .copyWith(color: Colors.white70),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),

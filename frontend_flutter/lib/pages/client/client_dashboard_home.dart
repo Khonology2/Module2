@@ -7,7 +7,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import 'package:web/web.dart' as web;
 import 'dart:async';
-import 'package:url_launcher/url_launcher_string.dart';
 import 'client_proposal_viewer.dart';
 import '../../api.dart';
 import '../../theme/premium_theme.dart';
@@ -58,6 +57,31 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   String _dashboardDocFilter = 'all';
   int _unreadClientNotifications = 0;
   DateTime? _clientNotificationsLastSeenAt;
+  bool _dashboardOpenLogged = false;
+
+  bool _shouldLogDashboardOpenOncePerWindow(String token, Duration window) {
+    if (!kIsWeb) return true;
+    final clean = token.trim();
+    if (clean.isEmpty) return true;
+    try {
+      final key = 'lukens_client_dashboard_open_logged_at_$clean';
+      final raw = web.window.localStorage[key];
+      if (raw != null && raw.trim().isNotEmpty) {
+        final dt = DateTime.tryParse(raw.trim());
+        if (dt != null) {
+          final diff = DateTime.now().difference(dt);
+          if (diff >= Duration.zero && diff < window) {
+            return false;
+          }
+        }
+      }
+      web.window.localStorage[key] = DateTime.now().toIso8601String();
+    } catch (_) {
+      return true;
+    }
+    return true;
+  }
+
   Map<String, int> _statusCounts = {
     'pending': 0,
     'approved': 0,
@@ -156,6 +180,28 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     if (remaining.isNegative) return;
 
     await Future.delayed(remaining);
+  }
+
+  Future<void> _logClientActivity({
+    required String token,
+    required String proposalId,
+    required String eventType,
+    Map<String, dynamic>? metadata,
+  }) async {
+    try {
+      await http
+          .post(
+            Uri.parse('$baseUrl/api/client/activity'),
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'token': token,
+              'proposal_id': proposalId,
+              'event_type': eventType,
+              'metadata': metadata ?? {},
+            }),
+          )
+          .timeout(const Duration(seconds: 12));
+    } catch (_) {}
   }
 
   Widget _filterChip(String label, String value) {
@@ -334,11 +380,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     return unread;
   }
 
+  int _computeTotalClientNotifications() {
+    final activity = _overview?['activity'];
+    if (activity is! List) return 0;
+    return activity.whereType<Map>().length;
+  }
+
   void _refreshClientNotificationBadge() {
-    final unread = _computeUnreadClientNotifications();
+    final total = _computeTotalClientNotifications();
     if (!mounted) return;
     setState(() {
-      _unreadClientNotifications = unread;
+      _unreadClientNotifications = total;
     });
   }
 
@@ -414,48 +466,106 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
                         final created = createdRaw is DateTime
                             ? createdRaw
                             : DateTime.tryParse(createdRaw?.toString() ?? '');
-                        final subtitle =
+                        final timeAgo =
                             created != null ? _timeAgo(created) : '';
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: Icon(
-                                _activityIcon(
-                                    (a['event_type'] ?? '').toString()),
-                                color: chrome.textSecondary,
-                                size: 18,
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white.withValues(alpha: 0.03),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFC10D00)
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  Icons.notifications_outlined,
+                                  color: Color(0xFFC10D00),
+                                  size: 20,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _activityLabel(a),
-                                    style: TextStyle(
-                                      color: chrome.textPrimary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  if (subtitle.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Text(
-                                        subtitle,
-                                        style: TextStyle(
-                                          color: chrome.textSecondary,
-                                          fontSize: 12,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            _activityLabel(a),
+                                            style: TextStyle(
+                                              color: chrome.textPrimary,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
                                         ),
+                                        TextButton(
+                                          onPressed: () {},
+                                          style: TextButton.styleFrom(
+                                            padding: EdgeInsets.zero,
+                                            minimumSize: Size.zero,
+                                            tapTargetSize: MaterialTapTargetSize
+                                                .shrinkWrap,
+                                          ),
+                                          child: Text(
+                                            'Mark read',
+                                            style: TextStyle(
+                                              color: chrome.textSecondary,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          onPressed: () {},
+                                          icon: Icon(
+                                            Icons.delete_outline,
+                                            color: const Color(0xFFC10D00)
+                                                .withValues(alpha: 0.8),
+                                            size: 18,
+                                          ),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _activitySubtitle(a),
+                                      style: TextStyle(
+                                        color: chrome.textSecondary,
+                                        fontSize: 12,
+                                        height: 1.4,
                                       ),
                                     ),
-                                ],
+                                    if (timeAgo.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          timeAgo,
+                                          style: TextStyle(
+                                            color: chrome.textSecondary
+                                                .withValues(alpha: 0.6),
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         );
                       },
                     ),
@@ -643,14 +753,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           sessionToken != null &&
           sessionToken.trim().isNotEmpty) {
         _persistClientSessionToken(sessionToken);
-        await _loadClientProposals();
-
-        if (!mounted) return;
-        if (widget.showSummary) {
-          setState(() => _selectedNavIndex = 0);
-        } else {
-          _navigateClient('/client/dashboard');
-        }
+        // Caller will retry proposals fetch once session token is available.
         return;
       }
 
@@ -669,12 +772,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       // If verification succeeded, a session token should now be available.
       if (!mounted) return;
       if ((_clientSessionToken ?? '').trim().isNotEmpty) {
-        if (widget.showSummary) {
-          setState(() => _selectedNavIndex = 0);
-        } else {
-          _navigateClient('/client/dashboard');
-          return;
-        }
+        // Keep the user on the current client route; caller retries data fetch.
+        return;
       }
 
       if (!mounted) return;
@@ -1186,100 +1285,19 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     final isSigned = statusLower.contains('client signed') ||
         (statusLower.contains('signed') && !statusLower.contains('sent'));
 
+    final signedUrl =
+        '$baseUrl/api/client/proposals/$id/signed-document?token=${Uri.encodeComponent(_accessToken!)}'
+        '${_deviceId != null && _deviceId!.isNotEmpty ? '&device_id=${Uri.encodeComponent(_deviceId!)}' : ''}'
+        '${_clientSessionToken != null && _clientSessionToken!.isNotEmpty ? '&session_token=${Uri.encodeComponent(_clientSessionToken!)}' : ''}';
     final url = isSigned
-        ? '$baseUrl/api/client/proposals/$id/docusign/signed-pdf?token=${Uri.encodeComponent(_accessToken!)}'
+        ? signedUrl
         : '$baseUrl/api/client/proposals/$id/export/pdf?token=${Uri.encodeComponent(_accessToken!)}&download=1';
     web.window.open(url, '_blank');
   }
 
+  /// Opens the same in-app viewer as View — signing is handled inside [ClientProposalViewer].
   Future<void> _openSigningUrl(Map<String, dynamic> doc) async {
-    final rawId = doc['id'];
-    final proposalId =
-        rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
-    if (proposalId == null || _accessToken == null || _accessToken!.isEmpty) {
-      return;
-    }
-
-    try {
-      final uri = Uri.parse(
-          '$baseUrl/api/client/proposals/$proposalId/docusign/signing-url');
-      final resp = await http
-          .post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'token': _accessToken,
-          'signer_name':
-              (doc['client_name']?.toString().trim().isNotEmpty ?? false)
-                  ? doc['client_name']?.toString().trim()
-                  : (_clientEmail ?? '').trim(),
-        }),
-      )
-          .timeout(
-        const Duration(seconds: 45),
-        onTimeout: () {
-          throw TimeoutException('Signing URL request timed out');
-        },
-      );
-
-      Map<String, dynamic>? decoded;
-      try {
-        final body = jsonDecode(resp.body);
-        if (body is Map) {
-          decoded = Map<String, dynamic>.from(body);
-        }
-      } catch (_) {}
-
-      if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        final fresh = decoded?['signing_url']?.toString() ?? '';
-        if (fresh.trim().isNotEmpty) {
-          if (kIsWeb) {
-            web.window.location.href = fresh;
-          } else {
-            await launchUrlString(fresh, mode: LaunchMode.externalApplication);
-          }
-          return;
-        }
-      }
-
-      final fallbackSigningUrl = doc['signing_url']?.toString() ?? '';
-      if (fallbackSigningUrl.trim().isNotEmpty) {
-        if (kIsWeb) {
-          web.window.location.href = fallbackSigningUrl;
-        } else {
-          await launchUrlString(fallbackSigningUrl,
-              mode: LaunchMode.externalApplication);
-        }
-        return;
-      }
-
-      if (mounted) {
-        final msg = decoded?['detail']?.toString() ??
-            'Unable to open DocuSign (HTTP ${resp.statusCode}).';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: Colors.red),
-        );
-      }
-    } catch (e) {
-      final fallbackSigningUrl = doc['signing_url']?.toString() ?? '';
-      if (fallbackSigningUrl.trim().isNotEmpty) {
-        if (kIsWeb) {
-          web.window.location.href = fallbackSigningUrl;
-        } else {
-          await launchUrlString(fallbackSigningUrl,
-              mode: LaunchMode.externalApplication);
-        }
-        return;
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Unable to open DocuSign: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+    await _openProposal(doc);
   }
 
   Future<void> _showFallbackSignModal(Map<String, dynamic> doc) async {
@@ -1920,6 +1938,14 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               child: Image.asset(
                 iconAssetPath,
                 fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  debugPrint('Failed to load asset: $iconAssetPath ($error)');
+                  return const Icon(
+                    Icons.image_not_supported_outlined,
+                    color: Colors.white70,
+                    size: 28,
+                  );
+                },
               ),
             ),
           ],
@@ -2023,7 +2049,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         : isProposalsTab
             ? 'Awaiting Signature'
             : 'Recent Documents';
-    const recentDocsWidth = 580.0;
+    final recentDocsWidth =
+        (MediaQuery.sizeOf(context).width * 0.55).clamp(580.0, 760.0);
     const recentDocsHeight = 370.0;
     final panelWidth = width ?? recentDocsWidth;
     final panelHeight = height ?? recentDocsHeight;
@@ -3469,6 +3496,27 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           _isLoading = false;
         });
 
+        if (!_dashboardOpenLogged && (_accessToken ?? '').trim().isNotEmpty) {
+          final firstId = parsedProposals.isNotEmpty
+              ? parsedProposals.first['id']?.toString()
+              : null;
+          if (firstId != null && firstId.trim().isNotEmpty) {
+            final shouldLog = _shouldLogDashboardOpenOncePerWindow(
+                token, const Duration(minutes: 30));
+            _dashboardOpenLogged = true;
+            if (shouldLog) {
+              await _logClientActivity(
+                token: token,
+                proposalId: firstId,
+                eventType: 'dashboard_open',
+                metadata: {
+                  'screen': 'client_dashboard',
+                },
+              );
+            }
+          }
+        }
+
         if (_isOverviewDashboard) {
           await _loadDashboardOverview();
         }
@@ -3501,10 +3549,17 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
           if (!mounted) return;
           if ((_clientSessionToken ?? '').trim().isEmpty) {
             setState(() {
-              _error = 'Device verification required. Please retry.';
+              // User may have dismissed OTP; avoid flashing a blocking error.
+              _error = null;
               _isLoading = false;
             });
             return;
+          }
+
+          if (_selectedNavIndex == 1) {
+            setState(() {
+              _selectedNavIndex = 0;
+            });
           }
 
           // Verification succeeded; retry proposals fetch now that we have a session token.
@@ -3701,6 +3756,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
 
   IconData _activityIcon(String eventType) {
     final e = eventType.toLowerCase().trim();
+    if (e.contains('sent')) return Icons.notifications_outlined;
     if (e.contains('view') || e.contains('open'))
       return Icons.visibility_outlined;
     if (e.contains('sign')) return Icons.check_circle_outline;
@@ -3708,29 +3764,54 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
     if (e.contains('comment') || e.contains('change')) {
       return Icons.mode_comment_outlined;
     }
-    return Icons.bolt_outlined;
+    return Icons.notifications_outlined;
   }
 
   String _activityLabel(Map<String, dynamic> a) {
-    final proposalId = a['proposal_id']?.toString();
-    final event = (a['event_type'] ?? '').toString();
-    final ev = event.toLowerCase().trim();
-    String verb;
-    if (ev.contains('view') || ev.contains('open')) {
-      verb = 'viewed';
-    } else if (ev.contains('sign')) {
-      verb = 'signed';
-    } else if (ev.contains('download')) {
-      verb = 'downloaded';
-    } else if (ev.contains('comment')) {
-      verb = 'commented';
-    } else if (ev.contains('change')) {
-      verb = 'requested changes';
-    } else {
-      verb = event.isEmpty ? 'updated' : event;
+    final event = (a['event_type'] ?? '').toString().toLowerCase().trim();
+    if (event.contains('sent')) return 'Proposal Sent';
+    if (event.contains('view') || event.contains('open'))
+      return 'Proposal Viewed';
+    if (event.contains('sign')) return 'Proposal Signed';
+    if (event.contains('download')) return 'Proposal Downloaded';
+    if (event.contains('comment')) return 'New Comment';
+    if (event.contains('change')) return 'Changes Requested';
+    return 'Proposal Updated';
+  }
+
+  String _activitySubtitle(Map<String, dynamic> a) {
+    final metadata = a['metadata'] is Map
+        ? Map<String, dynamic>.from(a['metadata'].cast<String, dynamic>())
+        : <String, dynamic>{};
+    final title = metadata['proposal_title']?.toString() ?? '';
+    final sender = metadata['sender_name']?.toString() ??
+        metadata['sender_username']?.toString() ??
+        '';
+    final event = (a['event_type'] ?? '').toString().toLowerCase();
+    if (event.contains('sent')) {
+      if (title.isNotEmpty && sender.isNotEmpty) {
+        return "Your proposal '$title' has been sent by $sender.";
+      } else if (title.isNotEmpty) {
+        return "Your proposal '$title' has been sent.";
+      }
+      return 'A new proposal has been sent to you.';
     }
-    if (proposalId == null || proposalId.isEmpty) return 'Proposal $verb';
-    return 'Proposal #$proposalId $verb';
+    if (event.contains('view') || event.contains('open')) {
+      return 'Your proposal has been viewed.';
+    }
+    if (event.contains('sign')) {
+      return 'Your proposal has been signed.';
+    }
+    if (event.contains('download')) {
+      return 'Your proposal has been downloaded.';
+    }
+    if (event.contains('comment')) {
+      return 'A new comment has been added to your proposal.';
+    }
+    if (event.contains('change')) {
+      return 'Changes have been requested for your proposal.';
+    }
+    return '';
   }
 
   Widget _sectionCard({required String title, required Widget child}) {
@@ -4275,103 +4356,7 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
       return;
     }
 
-    final statusLower = (proposal['status'] ?? '').toString().toLowerCase();
-    final isSigned = statusLower.contains('client signed') ||
-        (statusLower.contains('signed') && !statusLower.contains('sent'));
-
-    if (!isSigned) {
-      try {
-        final uri = Uri.parse(
-            '$baseUrl/api/client/proposals/$proposalId/docusign/signing-url');
-        final resp = await http
-            .post(
-          uri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'token': _accessToken,
-            'signer_name':
-                (proposal['client_name']?.toString().trim().isNotEmpty ?? false)
-                    ? proposal['client_name']?.toString().trim()
-                    : (_clientEmail ?? '').trim(),
-          }),
-        )
-            .timeout(
-          const Duration(seconds: 12),
-          onTimeout: () {
-            throw TimeoutException('Signing URL request timed out');
-          },
-        );
-
-        Map<String, dynamic>? decoded;
-        try {
-          final body = jsonDecode(resp.body);
-          if (body is Map) {
-            decoded = Map<String, dynamic>.from(body);
-          }
-        } catch (_) {}
-
-        if (resp.statusCode >= 200 && resp.statusCode < 300) {
-          final fresh = decoded?['signing_url']?.toString() ?? '';
-          if (fresh.trim().isNotEmpty) {
-            final uri = Uri.tryParse(fresh);
-            if (uri != null) {
-              if (kIsWeb) {
-                web.window.location.href = fresh;
-              } else {
-                await launchUrlString(fresh,
-                    mode: LaunchMode.externalApplication);
-              }
-            }
-            return;
-          }
-        }
-
-        final fallbackSigningUrl = proposal['signing_url']?.toString() ?? '';
-        if (fallbackSigningUrl.trim().isNotEmpty) {
-          final uri = Uri.tryParse(fallbackSigningUrl);
-          if (uri != null) {
-            if (kIsWeb) {
-              web.window.location.href = fallbackSigningUrl;
-            } else {
-              await launchUrlString(fallbackSigningUrl,
-                  mode: LaunchMode.externalApplication);
-            }
-          }
-          return;
-        }
-
-        if (mounted) {
-          final msg = decoded?['detail']?.toString() ??
-              'Unable to open DocuSign (HTTP ${resp.statusCode}).';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), backgroundColor: Colors.red),
-          );
-        }
-      } catch (e) {
-        final fallbackSigningUrl = proposal['signing_url']?.toString() ?? '';
-        if (fallbackSigningUrl.trim().isNotEmpty) {
-          final uri = Uri.tryParse(fallbackSigningUrl);
-          if (uri != null) {
-            if (kIsWeb) {
-              web.window.location.href = fallbackSigningUrl;
-            } else {
-              await launchUrlString(fallbackSigningUrl,
-                  mode: LaunchMode.externalApplication);
-            }
-          }
-          return;
-        }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Unable to open DocuSign: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-
+    // First-party signing: always open in-app viewer (no DocuSign redirect).
     print('[ClientDashboardHome] Opening proposal in app: id=$proposalId');
 
     Navigator.push(

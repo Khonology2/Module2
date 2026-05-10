@@ -49,6 +49,7 @@ import 'api.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme/manager_theme_controller.dart';
 import 'config/app_constants.dart';
+import 'widgets/manager_theme_fab_wrapper.dart';
 
 const String _buildSha =
     String.fromEnvironment('BUILD_SHA', defaultValue: 'dev');
@@ -77,6 +78,11 @@ String? _extractTokenLoose(String input) {
   } catch (_) {
     return null;
   }
+}
+
+/// Helper function to wrap manager screens with the red theme FAB
+Widget _wrapManagerScreen(Widget child) {
+  return ManagerThemeFabWrapper(child: child);
 }
 
 Future<void> main() async {
@@ -563,10 +569,10 @@ class MyApp extends StatelessWidget {
             }
             return EmailVerificationPage(token: token);
           },
-          '/home': (context) => const DashboardPage(),
-          '/dashboard': (context) => const DashboardPage(),
-          '/creator_dashboard': (context) => const DashboardPage(),
-          '/proposals': (context) => ProposalsPage(),
+          '/home': (context) => _wrapManagerScreen(const DashboardPage()),
+          '/dashboard': (context) => _wrapManagerScreen(const DashboardPage()),
+          '/creator_dashboard': (context) => _wrapManagerScreen(const DashboardPage()),
+          '/proposals': (context) => _wrapManagerScreen(ProposalsPage()),
           '/compose': (context) {
             final dynamic rawArgs = ModalRoute.of(context)?.settings.arguments;
             Map<String, dynamic>? args;
@@ -649,23 +655,23 @@ class MyApp extends StatelessWidget {
           },
           '/govern': (context) => const GovernPage(),
           '/preview': (context) => const PreviewPage(),
-          '/content_library': (context) => const ContentLibraryPage(),
+          '/content_library': (context) => _wrapManagerScreen(const ContentLibraryPage()),
           '/content': (context) =>
-              const ContentLibraryPage(), // Add missing route
-          '/templates': (context) => const TemplatesPage(),
+              _wrapManagerScreen(const ContentLibraryPage()), // Add missing route
+          '/templates': (context) => _wrapManagerScreen(const TemplatesPage()),
           '/template-builder': (context) {
             final args = ModalRoute.of(context)?.settings.arguments
                 as Map<String, dynamic>?;
             return TemplateBuilder(templateId: args?['templateId']);
           },
-          '/approvals': (context) => const ApproverDashboardPage(),
-          '/approver_dashboard': (context) => const ApproverDashboardPage(),
-          '/finance_dashboard': (context) => const FinanceDashboardV2Page(),
+          '/approvals': (context) => _wrapManagerScreen(const ApproverDashboardPage()),
+          '/approver_dashboard': (context) => _wrapManagerScreen(const ApproverDashboardPage()),
+          '/finance_dashboard': (context) => _wrapManagerScreen(const FinanceDashboardV2Page()),
           '/finance/onboarding': (context) => const FinanceOnboardingPage(),
           '/finance/clients': (context) => const FinanceClientManagementPage(),
           '/finance/clients/add': (context) => const FinanceAddClientPage(),
-          '/approved_proposals': (context) => const ApprovedProposalsPage(),
-          '/admin_approvals': (context) => const AdminApprovalsPage(),
+          '/approved_proposals': (context) => _wrapManagerScreen(const ApprovedProposalsPage()),
+          '/admin_approvals': (context) => _wrapManagerScreen(const AdminApprovalsPage()),
           '/proposal_review': (context) {
             final args = ModalRoute.of(context)?.settings.arguments
                 as Map<String, dynamic>?;
@@ -674,11 +680,11 @@ class MyApp extends StatelessWidget {
               proposalTitle: args?['title']?.toString(),
             );
           },
-          '/admin_dashboard': (context) => const ApproverDashboardPage(),
+          '/admin_dashboard': (context) => _wrapManagerScreen(const ApproverDashboardPage()),
           '/cinematic': (context) => const CinematicSequencePage(),
-          '/client_management': (context) => const ClientManagementPage(),
+          '/client_management': (context) => _wrapManagerScreen(const ClientManagementPage()),
           '/manager_account_profile': (context) =>
-              const ManagerAccountProfilePage(),
+              _wrapManagerScreen(const ManagerAccountProfilePage()),
           '/collaboration': (context) =>
               const ClientManagementPage(), // Redirected to Client Management
           // '/collaborate' is handled by onGenerateRoute to extract token
@@ -694,20 +700,20 @@ class MyApp extends StatelessWidget {
                 roleKey == 'finance manager';
             final isAdmin = roleKey == 'admin' || roleKey == 'ceo';
             if (isFinance) {
-              return const FinanceAnalyticsPage();
+              return _wrapManagerScreen(const FinanceAnalyticsPage());
             }
             if (isAdmin) {
-              return const admin.AnalyticsPage(
-                  mode: admin.AnalyticsPageMode.admin);
+              return _wrapManagerScreen(const admin.AnalyticsPage(
+                  mode: admin.AnalyticsPageMode.admin));
             }
-            return const admin.AnalyticsPage(
-                mode: admin.AnalyticsPageMode.creator);
+            return _wrapManagerScreen(const admin.AnalyticsPage(
+                mode: admin.AnalyticsPageMode.creator));
           },
           '/admin_analytics': (context) {
-            return const admin.AnalyticsPage(
-                mode: admin.AnalyticsPageMode.admin);
+            return _wrapManagerScreen(const admin.AnalyticsPage(
+                mode: admin.AnalyticsPageMode.admin));
           },
-          '/admin_history': (context) => const AdminHistoryPage(),
+          '/admin_history': (context) => _wrapManagerScreen(const AdminHistoryPage()),
           '/approved-proposals': (context) => const ApprovedProposalsPage(),
           '/ai-configuration': (context) => const AIConfigurationPage(),
           '/settings': (context) => const SettingsPage(),

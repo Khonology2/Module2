@@ -20,7 +20,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import psycopg2
 import psycopg2.extras
-from psycopg2.extras import Json
 from flask import Blueprint, jsonify, request
 
 from api.utils.database import get_db_connection

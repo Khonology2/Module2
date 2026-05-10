@@ -1045,162 +1045,165 @@ class _DashboardPageState extends State<DashboardPage>
               ),
               child: Column(
                 children: [
-              // Header Section
-              SizedBox(
-                height: headerHeight,
-                child: Padding(
-                  padding: headerPadding,
-                  child: InkWell(
-                    onTap: () {
-                      setState(() => _isSidebarCollapsed = !_isSidebarCollapsed);
-                    },
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      height: toggleHeight,
-                      decoration: BoxDecoration(
-                        color: AppColors.hoverColor,
+                  // Header Section
+                  SizedBox(
+                    height: headerHeight,
+                    child: Padding(
+                      padding: headerPadding,
+                      child: InkWell(
+                        onTap: () {
+                          setState(
+                              () => _isSidebarCollapsed = !_isSidebarCollapsed);
+                        },
                         borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: effectiveCollapsed
-                            ? MainAxisAlignment.center
-                            : MainAxisAlignment.spaceBetween,
-                        children: [
-                          if (!effectiveCollapsed)
-                            Expanded(
-                              child: Text(
-                                'Navigation',
-                                style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: navTitleSize,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          Icon(
-                            effectiveCollapsed
-                                ? Icons.keyboard_arrow_right
-                                : Icons.keyboard_arrow_left,
-                            color: AppColors.textPrimary,
-                            size: navArrowSize,
+                        child: Container(
+                          height: toggleHeight,
+                          decoration: BoxDecoration(
+                            color: AppColors.hoverColor,
+                            borderRadius: BorderRadius.circular(10),
                           ),
+                          child: Row(
+                            mainAxisAlignment: effectiveCollapsed
+                                ? MainAxisAlignment.center
+                                : MainAxisAlignment.spaceBetween,
+                            children: [
+                              if (!effectiveCollapsed)
+                                Expanded(
+                                  child: Text(
+                                    'Navigation',
+                                    style: TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: navTitleSize,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              Icon(
+                                effectiveCollapsed
+                                    ? Icons.keyboard_arrow_right
+                                    : Icons.keyboard_arrow_left,
+                                color: AppColors.textPrimary,
+                                size: navArrowSize,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Navigation Items
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          SizedBox(height: navTopGap),
+                          _buildSidebarNavItem(
+                            label: 'Dashboard',
+                            assetPath: 'assets/images/Dahboard.png',
+                            isSelected: _currentPage == 'Dashboard',
+                            isCollapsed: effectiveCollapsed,
+                            isCompact: isCompact,
+                            isUltraCompact: isUltraCompact,
+                            onTap: () => _navigateToPage(context, 'Dashboard'),
+                          ),
+                          _buildSidebarNavItem(
+                            label: 'My Proposals',
+                            assetPath: 'assets/images/My_Proposals.png',
+                            isSelected: _currentPage == 'My Proposals',
+                            isCollapsed: effectiveCollapsed,
+                            isCompact: isCompact,
+                            isUltraCompact: isUltraCompact,
+                            onTap: () =>
+                                _navigateToPage(context, 'My Proposals'),
+                          ),
+                          _buildSidebarNavItem(
+                            label: 'Templates',
+                            assetPath: 'assets/images/content_library.png',
+                            isSelected: _currentPage == 'Templates',
+                            isCollapsed: effectiveCollapsed,
+                            isCompact: isCompact,
+                            isUltraCompact: isUltraCompact,
+                            onTap: () => _navigateToPage(context, 'Templates'),
+                          ),
+                          _buildSidebarNavItem(
+                            label: 'Content Library',
+                            assetPath: 'assets/images/content_library.png',
+                            isSelected: _currentPage == 'Content Library',
+                            isCollapsed: effectiveCollapsed,
+                            isCompact: isCompact,
+                            isUltraCompact: isUltraCompact,
+                            onTap: () =>
+                                _navigateToPage(context, 'Content Library'),
+                          ),
+                          _buildSidebarNavItem(
+                            label: 'Client Management',
+                            assetPath: 'assets/images/collaborations.png',
+                            isSelected: _currentPage == 'Client Management',
+                            isCollapsed: effectiveCollapsed,
+                            isCompact: isCompact,
+                            isUltraCompact: isUltraCompact,
+                            onTap: () =>
+                                _navigateToPage(context, 'Client Management'),
+                          ),
+                          _buildSidebarNavItem(
+                            label: 'Approved Proposals',
+                            assetPath:
+                                'assets/images/Time Allocation_Approval_Blue.png',
+                            isSelected: _currentPage == 'Approved Proposals',
+                            isCollapsed: effectiveCollapsed,
+                            isCompact: isCompact,
+                            isUltraCompact: isUltraCompact,
+                            onTap: () =>
+                                _navigateToPage(context, 'Approved Proposals'),
+                          ),
+                          _buildSidebarNavItem(
+                            label: 'Analytics (My Pipeline)',
+                            assetPath: 'assets/images/analytics.png',
+                            isSelected:
+                                _currentPage == 'Analytics (My Pipeline)',
+                            isCollapsed: effectiveCollapsed,
+                            isCompact: isCompact,
+                            isUltraCompact: isUltraCompact,
+                            onTap: () => _navigateToPage(
+                                context, 'Analytics (My Pipeline)'),
+                          ),
+                          // This trailing gap ensures visible separation from bottom actions
+                          // even when content fits without scrolling.
+                          const SizedBox(height: 32),
                         ],
                       ),
                     ),
                   ),
-                ),
-              ),
 
-              // Navigation Items
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      SizedBox(height: navTopGap),
-                      _buildSidebarNavItem(
-                        label: 'Dashboard',
-                        assetPath: 'assets/images/Dahboard.png',
-                        isSelected: _currentPage == 'Dashboard',
-                        isCollapsed: effectiveCollapsed,
-                        isCompact: isCompact,
-                        isUltraCompact: isUltraCompact,
-                        onTap: () => _navigateToPage(context, 'Dashboard'),
-                      ),
-                      _buildSidebarNavItem(
-                        label: 'My Proposals',
-                        assetPath: 'assets/images/My_Proposals.png',
-                        isSelected: _currentPage == 'My Proposals',
-                        isCollapsed: effectiveCollapsed,
-                        isCompact: isCompact,
-                        isUltraCompact: isUltraCompact,
-                        onTap: () => _navigateToPage(context, 'My Proposals'),
-                      ),
-                      _buildSidebarNavItem(
-                        label: 'Templates',
-                        assetPath: 'assets/images/content_library.png',
-                        isSelected: _currentPage == 'Templates',
-                        isCollapsed: effectiveCollapsed,
-                        isCompact: isCompact,
-                        isUltraCompact: isUltraCompact,
-                        onTap: () => _navigateToPage(context, 'Templates'),
-                      ),
-                      _buildSidebarNavItem(
-                        label: 'Content Library',
-                        assetPath: 'assets/images/content_library.png',
-                        isSelected: _currentPage == 'Content Library',
-                        isCollapsed: effectiveCollapsed,
-                        isCompact: isCompact,
-                        isUltraCompact: isUltraCompact,
-                        onTap: () =>
-                            _navigateToPage(context, 'Content Library'),
-                      ),
-                      _buildSidebarNavItem(
-                        label: 'Client Management',
-                        assetPath: 'assets/images/collaborations.png',
-                        isSelected: _currentPage == 'Client Management',
-                        isCollapsed: effectiveCollapsed,
-                        isCompact: isCompact,
-                        isUltraCompact: isUltraCompact,
-                        onTap: () =>
-                            _navigateToPage(context, 'Client Management'),
-                      ),
-                      _buildSidebarNavItem(
-                        label: 'Approved Proposals',
-                        assetPath:
-                            'assets/images/Time Allocation_Approval_Blue.png',
-                        isSelected: _currentPage == 'Approved Proposals',
-                        isCollapsed: effectiveCollapsed,
-                        isCompact: isCompact,
-                        isUltraCompact: isUltraCompact,
-                        onTap: () =>
-                            _navigateToPage(context, 'Approved Proposals'),
-                      ),
-                      _buildSidebarNavItem(
-                        label: 'Analytics (My Pipeline)',
-                        assetPath: 'assets/images/analytics.png',
-                        isSelected: _currentPage == 'Analytics (My Pipeline)',
-                        isCollapsed: effectiveCollapsed,
-                        isCompact: isCompact,
-                        isUltraCompact: isUltraCompact,
-                        onTap: () =>
-                            _navigateToPage(context, 'Analytics (My Pipeline)'),
-                      ),
-                      // This trailing gap ensures visible separation from bottom actions
-                      // even when content fits without scrolling.
-                      const SizedBox(height: 32),
-                    ],
+                  // Bottom fixed actions
+                  if (!effectiveCollapsed)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      height: 1,
+                      color: AppColors.borderColor,
+                    ),
+                  SizedBox(height: dividerGap),
+                  _buildSidebarNavItem(
+                    label: 'Account Profile',
+                    assetPath: 'assets/images/User_Profile.png',
+                    isSelected: _currentPage == 'Account Profile',
+                    isCollapsed: effectiveCollapsed,
+                    isCompact: isCompact,
+                    isUltraCompact: isUltraCompact,
+                    onTap: () => _navigateToPage(context, 'Account Profile'),
                   ),
-                ),
-              ),
-
-              // Bottom fixed actions
-              if (!effectiveCollapsed)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  height: 1,
-                  color: AppColors.borderColor,
-                ),
-              SizedBox(height: dividerGap),
-              _buildSidebarNavItem(
-                label: 'Account Profile',
-                assetPath: 'assets/images/User_Profile.png',
-                isSelected: _currentPage == 'Account Profile',
-                isCollapsed: effectiveCollapsed,
-                isCompact: isCompact,
-                isUltraCompact: isUltraCompact,
-                onTap: () => _navigateToPage(context, 'Account Profile'),
-              ),
-              _buildSidebarNavItem(
-                label: 'Logout',
-                assetPath: 'assets/images/Logout_KhonoBuzz.png',
-                isSelected: false,
-                isCollapsed: effectiveCollapsed,
-                isCompact: isCompact,
-                isUltraCompact: isUltraCompact,
-                onTap: () => _handleLogout(context),
-              ),
-              SizedBox(height: midGap),
-            ],
+                  _buildSidebarNavItem(
+                    label: 'Logout',
+                    assetPath: 'assets/images/Logout_KhonoBuzz.png',
+                    isSelected: false,
+                    isCollapsed: effectiveCollapsed,
+                    isCompact: isCompact,
+                    isUltraCompact: isUltraCompact,
+                    onTap: () => _handleLogout(context),
+                  ),
+                  SizedBox(height: midGap),
+                ],
               ),
             ),
           ),
@@ -2406,7 +2409,11 @@ class _DashboardPageState extends State<DashboardPage>
     final title = (proposal['title'] ?? 'Untitled').toString();
     final clientName =
         (proposal['client_name'] ?? proposal['client'] ?? '').toString().trim();
-    final isSentToClient = status.toLowerCase() == 'sent to client';
+    final statusLower = status.toLowerCase();
+    final showInsights = statusLower == 'sent to client' ||
+        statusLower.contains('client signed') ||
+        statusLower.contains('signed') ||
+        statusLower.contains('approved');
     final proposalId = proposal['id']?.toString();
     final selected =
         proposalId != null && _selectedRecentProposalIds.contains(proposalId);
@@ -2539,7 +2546,7 @@ class _DashboardPageState extends State<DashboardPage>
               ),
             ),
           ),
-          if (isSentToClient) ...[
+          if (showInsights) ...[
             const SizedBox(width: 6),
             InkWell(
               onTap: () => _showInsightsModal(proposal),
@@ -2969,8 +2976,7 @@ class _DashboardPageState extends State<DashboardPage>
                   const SizedBox(height: 16),
                   _buildDashboardSection(
                     chrome: chrome,
-                    iconAsset:
-                        'assets/images/Creator_Dashboard/Group 418.png',
+                    iconAsset: 'assets/images/Creator_Dashboard/Group 418.png',
                     title: 'Available Tools',
                     subtitle:
                         'Additional description can be included if required.',

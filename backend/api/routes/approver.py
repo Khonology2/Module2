@@ -7,6 +7,8 @@ import traceback
 import secrets
 import html
 import psycopg2.extras
+import json
+import uuid
 from datetime import datetime, timedelta
 
 from api.utils.database import get_db_connection
@@ -42,17 +44,6 @@ def get_pending_approvals(username=None, user_id=None, email=None):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-            def _risk_level_from_status(status_val):
-                key = (status_val or '')
-                key = key.strip().upper() if isinstance(key, str) else ''
-                if key == 'BLOCK':
-                    return 'critical'
-                if key == 'REVIEW':
-                    return 'high'
-                if key == 'PASS':
-                    return 'low'
-                return ''
 
             def _get_table_columns(table_name: str):
                 cursor.execute(
@@ -134,44 +125,30 @@ def get_pending_approvals(username=None, user_id=None, email=None):
             # exceed typical client timeouts; review pages load full content by id.
             query = f'''
                 SELECT 
-                    p.id,
-                    p.title,
+                    id,
+                    title,
                     NULL::text AS content,
                     {client_expr} AS client,
                     {client_email_expr} AS client_email,
                     {owner_expr} AS user_id,
-                    p.status,
-                    p.created_at,
-                    p.updated_at,
-                    {budget_expr} AS budget,
-                    rr.status AS risk_status,
-                    rr.risk_score AS risk_score,
-                    rr.overridden AS risk_overridden,
-                    rr.created_at AS risk_run_created_at
-                FROM proposals p
-                LEFT JOIN LATERAL (
-                    SELECT status, risk_score, overridden, created_at
-                    FROM risk_gate_runs
-                    WHERE proposal_id = p.id
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                ) rr ON TRUE
-                WHERE LOWER(COALESCE(p.status, '')) IN (
+                    status,
+                    created_at,
+                    updated_at,
+                    {budget_expr} AS budget
+                FROM proposals
+                WHERE LOWER(COALESCE(status, '')) IN (
                     'pending ceo approval',
                     'pending approval',
                     'in review',
                     'submitted'
                 )
-                ORDER BY p.updated_at DESC, p.created_at DESC
+                ORDER BY updated_at DESC, created_at DESC
             '''
 
             cursor.execute(query)
             rows = cursor.fetchall()
             proposals = []
             for row in rows:
-                risk_status = row.get('risk_status')
-                risk_score = row.get('risk_score')
-                risk_level = _risk_level_from_status(risk_status)
                 proposals.append({
                     'id': row['id'],
                     'title': row['title'],
@@ -184,16 +161,6 @@ def get_pending_approvals(username=None, user_id=None, email=None):
                     'budget': row.get('budget'),
                     'created_at': row['created_at'].isoformat() if row['created_at'] else None,
                     'updated_at': row['updated_at'].isoformat() if row['updated_at'] else None,
-                    'risk_status': risk_status,
-                    'risk_score': risk_score,
-                    'risk_level': risk_level,
-                    'risk_overridden': row.get('risk_overridden'),
-                    'risk_run_created_at': row.get('risk_run_created_at').isoformat() if row.get('risk_run_created_at') else None,
-                    'risk_gate': {
-                        'status': risk_status,
-                        'risk_score': risk_score,
-                        'risk_level': risk_level,
-                    },
                 })
             return {'proposals': proposals}, 200
     except Exception as e:
@@ -210,17 +177,6 @@ def get_all_proposals_for_admin(username=None, user_id=None, email=None):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-            def _risk_level_from_status(status_val):
-                key = (status_val or '')
-                key = key.strip().upper() if isinstance(key, str) else ''
-                if key == 'BLOCK':
-                    return 'critical'
-                if key == 'REVIEW':
-                    return 'high'
-                if key == 'PASS':
-                    return 'low'
-                return ''
 
             resolved_user_id = user_id
             if not resolved_user_id:
@@ -277,38 +233,24 @@ def get_all_proposals_for_admin(username=None, user_id=None, email=None):
 
             query = f'''
                 SELECT
-                    p.id,
-                    p.title,
-                    p.content,
+                    id,
+                    title,
+                    content,
                     {client_expr} AS client,
                     {client_email_expr} AS client_email,
                     {owner_expr} AS user_id,
-                    p.status,
-                    p.created_at,
-                    p.updated_at,
-                    {budget_expr} AS budget,
-                    rr.status AS risk_status,
-                    rr.risk_score AS risk_score,
-                    rr.overridden AS risk_overridden,
-                    rr.created_at AS risk_run_created_at
-                FROM proposals p
-                LEFT JOIN LATERAL (
-                    SELECT status, risk_score, overridden, created_at
-                    FROM risk_gate_runs
-                    WHERE proposal_id = p.id
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                ) rr ON TRUE
-                ORDER BY p.updated_at DESC NULLS LAST, p.created_at DESC NULLS LAST
+                    status,
+                    created_at,
+                    updated_at,
+                    {budget_expr} AS budget
+                FROM proposals
+                ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
             '''
 
             cursor.execute(query)
             rows = cursor.fetchall() or []
             proposals = []
             for row in rows:
-                risk_status = row.get('risk_status')
-                risk_score = row.get('risk_score')
-                risk_level = _risk_level_from_status(risk_status)
                 proposals.append({
                     'id': row.get('id'),
                     'title': row.get('title'),
@@ -320,16 +262,6 @@ def get_all_proposals_for_admin(username=None, user_id=None, email=None):
                     'user_id': row.get('user_id'),
                     'status': row.get('status'),
                     'budget': row.get('budget'),
-                    'risk_score': risk_score,
-                    'risk_status': risk_status,
-                    'risk_level': risk_level,
-                    'risk_overridden': row.get('risk_overridden'),
-                    'risk_run_created_at': row.get('risk_run_created_at').isoformat() if row.get('risk_run_created_at') else None,
-                    'risk_gate': {
-                        'status': risk_status,
-                        'risk_score': risk_score,
-                        'risk_level': risk_level,
-                    },
                     'created_at': row.get('created_at').isoformat() if row.get('created_at') else None,
                     'updated_at': row.get('updated_at').isoformat() if row.get('updated_at') else None,
                     'updatedAt': row.get('updated_at').isoformat() if row.get('updated_at') else None,
@@ -600,6 +532,83 @@ def approve_proposal(username=None, proposal_id=None):
                 new_status = status_row['status']
                 print(f"[SUCCESS] Proposal {proposal_id} '{title}' approved and status updated")
 
+                # Log proposal_sent activity for client notifications
+                try:
+                    cursor.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS proposal_client_activity (
+                            id SERIAL PRIMARY KEY,
+                            proposal_id INTEGER REFERENCES proposals(id) ON DELETE CASCADE,
+                            client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+                            event_type VARCHAR(50) NOT NULL,
+                            metadata JSONB,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                    cursor.execute(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_activity_client_created
+                        ON proposal_client_activity(client_id, created_at DESC)
+                        """
+                    )
+
+                    activity_metadata = {
+                        'proposal_id': proposal_id,
+                        'proposal_title': title,
+                        'sender_username': username,
+                        'sender_name': approver_name,
+                        'source': 'finance_approval',
+                    }
+
+                    client_id_for_activity = None
+                    if client_email and '@' in client_email:
+                        cursor.execute(
+                            """
+                            INSERT INTO clients (email, name, company_name, contact_person, token)
+                            VALUES (%s, %s, %s, %s, %s)
+                            ON CONFLICT (email) DO UPDATE SET
+                                name = COALESCE(EXCLUDED.name, clients.name),
+                                company_name = COALESCE(EXCLUDED.company_name, clients.company_name),
+                                contact_person = COALESCE(EXCLUDED.contact_person, clients.contact_person)
+                            RETURNING id
+                            """,
+                            (client_email, client_name or client_email or 'Client', client_name or client_email, client_name or '', str(uuid.uuid4())),
+                        )
+                        row = cursor.fetchone()
+                        if row and (row.get('id') if isinstance(row, dict) else row[0]) is not None:
+                            client_id_for_activity = row.get('id') if isinstance(row, dict) else row[0]
+                        else:
+                            cursor.execute(
+                                "SELECT id FROM clients WHERE lower(email) = lower(%s) LIMIT 1",
+                                (client_email,),
+                            )
+                            c_row = cursor.fetchone()
+                            if c_row:
+                                client_id_for_activity = c_row.get('id') if isinstance(c_row, dict) else c_row[0]
+
+                    cursor.execute(
+                        """
+                        INSERT INTO proposal_client_activity
+                        (proposal_id, client_id, event_type, metadata, created_at)
+                        VALUES (%s, %s, %s, %s::jsonb, NOW())
+                        """,
+                        (
+                            proposal_id,
+                            client_id_for_activity,
+                            'proposal_sent',
+                            json.dumps(activity_metadata),
+                        ),
+                    )
+                    conn.commit()
+                    print(f"[APPROVER_ACTIVITY] Logged proposal_sent for proposal {proposal_id}, client_id={client_id_for_activity}")
+                except Exception as activity_err:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"⚠️ [APPROVER] Failed to log proposal_sent activity for proposal {proposal_id}: {activity_err}")
+
                 log_finance_audit_async(
                     user_id=approver_user_id,
                     username=username,
@@ -763,7 +772,7 @@ def approve_proposal(username=None, proposal_id=None):
                             print(f"⚠️ Failed to insert collaboration invitation: {inv_insert_err}")
                             traceback.print_exc()
 
-                        client_link = f"{frontend_url}/#/client/proposals?token={access_token}"
+                        client_link = f"{frontend_url}/?token={access_token}#/client/proposals"
 
                         sendgrid_configured = bool(
                             (os.getenv('SENDGRID_API_KEY') or '').strip()

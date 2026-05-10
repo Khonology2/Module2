@@ -12,6 +12,7 @@ import '../../services/asset_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/manager_theme_controller.dart';
 import '../../widgets/app_side_nav.dart';
+import '../../widgets/custom_scrollbar.dart';
 import '../../widgets/manager_page_background.dart';
 import '../../utils/manager_session_actions.dart';
 
@@ -34,6 +35,7 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
   String _currentNavLabel = 'Templates';
   String _currentPage = 'Templates';
   late AnimationController _animationController;
+  final ScrollController _scrollController = ScrollController();
 
   List<Template> _templates = [];
   List<Template> _filteredTemplates = [];
@@ -90,6 +92,7 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
   void dispose() {
     _animationController.dispose();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -896,67 +899,79 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
 
   @override
   Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final chrome = context.watch<ManagerThemeController>().chrome;
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: ManagerPageBackground(
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: PremiumTheme.teal))
-            : Row(
-                children: [
-                  // Consistent Sidebar using AppSideNav
-                  Consumer<AppState>(
-                    builder: (context, app, child) {
-                      final role = (app.currentUser?['role'] ?? '')
-                          .toString()
-                          .toLowerCase()
-                          .trim();
-                      final isAdmin = role == 'admin' || role == 'ceo';
-                      return AppSideNav(
-                        isCollapsed: _isSidebarCollapsed,
-                        currentLabel: _currentNavLabel,
-                        isAdmin: isAdmin,
-                        onToggle: () => setState(
-                          () => _isSidebarCollapsed = !_isSidebarCollapsed,
-                        ),
-                        onSelect: (label) {
-                          setState(() {
-                            _currentNavLabel = label;
-                            _currentPage = label;
-                          });
-                          _navigateToPage(context, label);
-                        },
-                      );
-                    },
-                  ),
-
-                  // Main Content Area
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
+      body: SafeArea(
+        bottom: false,
+        child: ManagerPageBackground(
+          child: _isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(color: PremiumTheme.teal),
+                )
+              : Row(
+                  children: [
+                    Consumer<AppState>(
+                      builder: (context, app, child) {
+                        final role = (app.currentUser?['role'] ?? '')
+                            .toString()
+                            .toLowerCase()
+                            .trim();
+                        final isAdmin = role == 'admin' || role == 'ceo';
+                        return AppSideNav(
+                          isCollapsed: _isSidebarCollapsed,
+                          currentLabel: _currentNavLabel,
+                          onSelect: (label) {
+                            setState(() {
+                              _currentNavLabel = label;
+                              _currentPage = label;
+                            });
+                            _navigateToPage(context, label);
+                          },
+                          onToggle: () => setState(
+                            () => _isSidebarCollapsed = !_isSidebarCollapsed,
+                          ),
+                          isAdmin: isAdmin,
+                        );
+                      },
+                    ),
+                    Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Header
-                          _buildHeader(),
-                          const SizedBox(height: 24),
-
-                          // Filters
-                          _buildFilters(),
-                          const SizedBox(height: 24),
-
-                          // Public Templates
-                          _buildPublicTemplates(),
-                          const SizedBox(height: 24),
-
-                          // My Templates
-                          _buildMyTemplates(),
+                          _buildHeaderBar(app, chrome),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+                              child: CustomScrollbar(
+                                controller: _scrollController,
+                                thumbColor: chrome.scrollbarThumb,
+                                trackColor: chrome.scrollbarTrack,
+                                trackBorderColor: chrome.divider,
+                                child: SingleChildScrollView(
+                                  controller: _scrollController,
+                                  padding: const EdgeInsets.only(bottom: 24),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _buildFilters(),
+                                      const SizedBox(height: 24),
+                                      _buildPublicTemplates(),
+                                      const SizedBox(height: 24),
+                                      _buildMyTemplates(),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -967,9 +982,360 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
           );
         },
         child: const Icon(Icons.add, color: Colors.white),
-        backgroundColor: PremiumTheme.teal,
+        backgroundColor: ManagerChromeTheme.accentRed,
       ),
     );
+  }
+
+  Widget _buildHeaderBar(AppState app, ManagerChromeTheme chrome) {
+    return Container(
+      height: 96,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: const BoxDecoration(
+        color: Colors.transparent,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            'Manager Template Library',
+            style: TextStyle(
+              color: chrome.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: RichText(
+              text: TextSpan(
+                text: 'Hello, ',
+                style: TextStyle(
+                  color: chrome.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                ),
+                children: [
+                  TextSpan(
+                    text: _getUserName(app.currentUser),
+                    style: TextStyle(
+                      color: chrome.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          _buildHeaderIconButton(
+            chrome: chrome,
+            assetPath: 'assets/images/new icons for manager/messages.png',
+            onTap: () async {
+              await app.fetchNotifications();
+              if (!mounted) return;
+              _showNotificationsSheet(app, messagesOnly: true);
+            },
+            badge: _unreadNotificationCount(app, messagesOnly: true) > 0
+                ? _unreadNotificationCount(app, messagesOnly: true)
+                : null,
+          ),
+          const SizedBox(width: 8),
+          _buildHeaderIconButton(
+            chrome: chrome,
+            assetPath: 'assets/images/new icons for manager/notifications.png',
+            onTap: () async {
+              await app.fetchNotifications();
+              if (!mounted) return;
+              _showNotificationsSheet(app, messagesOnly: false);
+            },
+            badge: _unreadNotificationCount(app, messagesOnly: false) > 0
+                ? _unreadNotificationCount(app, messagesOnly: false)
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderIconButton({
+    required ManagerChromeTheme chrome,
+    required String assetPath,
+    required VoidCallback onTap,
+    int? badge,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            width: 44.86898422241211,
+            height: 44.86898422241211,
+            child: Image.asset(assetPath, fit: BoxFit.contain),
+          ),
+        ),
+        if (badge != null && badge > 0)
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: const BoxDecoration(
+                color: Color(0xFFC10D00),
+                borderRadius: BorderRadius.all(Radius.circular(10)),
+              ),
+              child: Text(
+                badge > 99 ? '99+' : badge.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  static bool _notificationIsCommentMessage(Map<String, dynamic> n) {
+    final t =
+        (n['notification_type'] ?? n['type'] ?? '').toString().toLowerCase();
+    return t.contains('comment') || t == 'mentioned' || t.contains('mention');
+  }
+
+  static Map<String, dynamic> _asNotificationMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      try {
+        return raw.cast<String, dynamic>();
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }
+    return <String, dynamic>{};
+  }
+
+  int _unreadNotificationCount(AppState app, {required bool messagesOnly}) {
+    var n = 0;
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      final isComment = _notificationIsCommentMessage(item);
+      if (messagesOnly != isComment) continue;
+      if (item['is_read'] != true) n++;
+    }
+    return n;
+  }
+
+  List<Map<String, dynamic>> _notificationsFiltered(
+    AppState app, {
+    required bool messagesOnly,
+  }) {
+    final out = <Map<String, dynamic>>[];
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      if (messagesOnly != _notificationIsCommentMessage(item)) continue;
+      out.add(item);
+    }
+    return out;
+  }
+
+  void _showNotificationsSheet(AppState app, {bool messagesOnly = false}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              final chrome = context.watch<ManagerThemeController>().chrome;
+              final notifications =
+                  _notificationsFiltered(app, messagesOnly: messagesOnly);
+              final unreadCount =
+                  _unreadNotificationCount(app, messagesOnly: messagesOnly);
+
+              Future<void> markAllInSheet() async {
+                for (final n
+                    in List<Map<String, dynamic>>.from(notifications)) {
+                  if (n['is_read'] == true) continue;
+                  final idRaw = n['id'];
+                  final id = idRaw is int
+                      ? idRaw
+                      : int.tryParse(idRaw?.toString() ?? '');
+                  if (id != null) await app.markNotificationRead(id);
+                }
+                await app.fetchNotifications();
+                if (context.mounted) setModalState(() {});
+              }
+
+              Future<void> deleteAllInSheet() async {
+                for (final n
+                    in List<Map<String, dynamic>>.from(notifications)) {
+                  final idRaw = n['id'];
+                  final id = idRaw is int
+                      ? idRaw
+                      : int.tryParse(idRaw?.toString() ?? '');
+                  if (id != null) await app.deleteNotification(id);
+                }
+                await app.fetchNotifications();
+                if (context.mounted) setModalState(() {});
+              }
+
+              return Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.7,
+                ),
+                decoration: chrome.floatingPanelDecoration(radius: 14),
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            messagesOnly ? 'Messages' : 'Notifications',
+                            style: TextStyle(
+                              color: chrome.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (unreadCount > 0)
+                          TextButton(
+                            onPressed: markAllInSheet,
+                            style: TextButton.styleFrom(
+                              foregroundColor: ManagerChromeTheme.accentRed,
+                            ),
+                            child: const Text('Mark all read'),
+                          ),
+                        if (notifications.isNotEmpty)
+                          TextButton(
+                            onPressed: deleteAllInSheet,
+                            style: TextButton.styleFrom(
+                              foregroundColor: ManagerChromeTheme.accentRed,
+                            ),
+                            child: const Text('Clear'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: notifications.isEmpty
+                          ? Center(
+                              child: Text(
+                                messagesOnly
+                                    ? 'No messages'
+                                    : 'No notifications',
+                                style: TextStyle(color: chrome.textSecondary),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: notifications.length,
+                              separatorBuilder: (_, __) => Divider(
+                                color: chrome.divider,
+                                height: 12,
+                              ),
+                              itemBuilder: (context, index) {
+                                final n = notifications[index];
+                                final title = (n['title'] ??
+                                        n['subject'] ??
+                                        n['notification_type'] ??
+                                        'Notification')
+                                    .toString();
+                                final body = (n['message'] ??
+                                        n['body'] ??
+                                        n['content'] ??
+                                        '')
+                                    .toString();
+                                final isRead = n['is_read'] == true;
+                                return InkWell(
+                                  onTap: () async {
+                                    final idRaw = n['id'];
+                                    final id = idRaw is int
+                                        ? idRaw
+                                        : int.tryParse(idRaw?.toString() ?? '');
+                                    if (!isRead && id != null) {
+                                      await app.markNotificationRead(id);
+                                      await app.fetchNotifications();
+                                      if (context.mounted) {
+                                        setModalState(() {});
+                                      }
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: chrome.fieldFill,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: chrome.divider),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: chrome.textPrimary,
+                                            fontWeight: isRead
+                                                ? FontWeight.w500
+                                                : FontWeight.w700,
+                                          ),
+                                        ),
+                                        if (body.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            body,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: chrome.textSecondary,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  String _getUserName(Map<String, dynamic>? user) {
+    if (user == null) return 'User';
+    final String? name = user['full_name'] ??
+        user['first_name'] ??
+        user['name'] ??
+        user['email']?.split('@')[0];
+    return name ?? 'User';
   }
 
   Widget _buildHeader() {
@@ -1005,9 +1371,8 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
     final panelDecoration = chrome.isDark
         ? PremiumTheme.glassCard(borderRadius: 16)
         : chrome.floatingPanelDecoration(radius: 10);
-    final fieldFill = chrome.isDark ? PremiumTheme.darkBg2 : chrome.fieldFill;
-    final fieldBorder =
-        chrome.isDark ? Colors.white.withOpacity(0.1) : chrome.fieldBorder;
+    final fieldFill = chrome.fieldFill;
+    final fieldBorder = chrome.fieldBorder;
 
     return Container(
       decoration: panelDecoration,
@@ -1035,8 +1400,10 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      const BorderSide(color: PremiumTheme.teal, width: 2),
+                  borderSide: const BorderSide(
+                    color: ManagerChromeTheme.accentRed,
+                    width: 2,
+                  ),
                 ),
               ),
               onChanged: (value) {
@@ -1305,20 +1672,8 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
   Widget _buildTemplateCard(Template template, {bool isMyTemplate = false}) {
     final chrome = context.watch<ManagerThemeController>().chrome;
     final statusConfig = _statusConfig[template.approvalStatus]!;
-    final isSOW = template.templateType.toLowerCase() == 'sow';
-    final isProposal = template.templateType.toLowerCase() == 'proposal';
-    final cardColor = isSOW
-        ? PremiumTheme.success
-        : isProposal
-            ? PremiumTheme.info
-            : PremiumTheme.purple;
-
     final cardDecoration = chrome.isDark
-        ? PremiumTheme.glassCard(
-            borderRadius: 16,
-            gradientStart: cardColor.withOpacity(0.1),
-            gradientEnd: cardColor.withOpacity(0.05),
-          )
+        ? PremiumTheme.glassCard(borderRadius: 16)
         : chrome.floatingPanelDecoration(radius: 10);
 
     return Container(
@@ -1381,21 +1736,30 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: statusConfig.color.withOpacity(0.2),
+                            color: chrome.isDark
+                                ? PremiumTheme.darkBg3
+                                : chrome.fieldFill,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: statusConfig.color.withOpacity(0.3)),
+                              color: chrome.isDark
+                                  ? Colors.white.withOpacity(0.1)
+                                  : chrome.fieldBorder,
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(statusConfig.icon,
-                                  size: 12, color: statusConfig.textColor),
+                              Icon(
+                                statusConfig.icon,
+                                size: 12,
+                                color: chrome.textSecondary,
+                              ),
                               const SizedBox(width: 4),
                               Text(statusConfig.label,
                                   style: TextStyle(
-                                      fontSize: 10,
-                                      color: statusConfig.textColor)),
+                                    fontSize: 10,
+                                    color: chrome.textSecondary,
+                                  )),
                             ],
                           ),
                         ),
@@ -1404,17 +1768,23 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: PremiumTheme.purple.withOpacity(0.2),
+                              color: chrome.isDark
+                                  ? PremiumTheme.darkBg3
+                                  : chrome.fieldFill,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                  color: PremiumTheme.purple.withOpacity(0.3)),
+                                color: chrome.isDark
+                                    ? Colors.white.withOpacity(0.1)
+                                    : chrome.fieldBorder,
+                              ),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Public',
                               style: TextStyle(
-                                  fontSize: 10,
-                                  color: PremiumTheme.purple,
-                                  fontWeight: FontWeight.w600),
+                                fontSize: 10,
+                                color: chrome.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                       ],
@@ -1435,15 +1805,18 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
+                child: ElevatedButton.icon(
                   onPressed: () => _showPreviewDialog(template),
-                  icon: const Icon(Icons.visibility,
-                      size: 16, color: PremiumTheme.teal),
-                  label: const Text('Preview',
-                      style: TextStyle(color: PremiumTheme.teal)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: PremiumTheme.teal),
+                  icon: const Icon(Icons.visibility, size: 16),
+                  label: const Text('Preview'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ManagerChromeTheme.accentRed,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 10),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
@@ -1530,7 +1903,7 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
               label: const Text('Create Your First Template',
                   style: TextStyle(color: Colors.white)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: PremiumTheme.teal,
+                backgroundColor: ManagerChromeTheme.accentRed,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
@@ -1589,11 +1962,11 @@ class _TemplateLibraryPageState extends State<TemplateLibraryPage>
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: PremiumTheme.teal.withOpacity(0.2),
+                      color: ManagerChromeTheme.accentRed.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(Icons.preview,
-                        color: PremiumTheme.teal, size: 24),
+                        color: ManagerChromeTheme.accentRed, size: 24),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

@@ -14,6 +14,7 @@ import cloudinary.uploader
 import psycopg2.extras
 from datetime import datetime
 import requests
+import uuid
 
 try:
     from PyPDF2 import PdfReader
@@ -1072,6 +1073,7 @@ def send_to_client(username=None, proposal_id=None):
             )
             conn.commit()
 
+            print(f"[SEND_TO_CLIENT] Starting activity logging for proposal {proposal_id}")
             try:
                 cursor.execute(
                     """
@@ -1091,9 +1093,21 @@ def send_to_client(username=None, proposal_id=None):
                     ON proposal_client_activity(client_id, created_at DESC)
                     """
                 )
+                print(f"[SEND_TO_CLIENT] Table ensured for proposal {proposal_id}")
+
+                # Always log proposal_sent activity (client_id can be NULL if no email available)
+                metadata = {
+                    'proposal_id': proposal_id,
+                    'proposal_title': proposal.get('title'),
+                    'sender_username': username,
+                    'sender_name': sender.get('full_name')
+                    or sender.get('username')
+                    or username,
+                }
 
                 client_email_for_activity = (proposal.get('client_email') or '').strip()
                 client_id_for_activity = None
+                print(f"[SEND_TO_CLIENT] client_email_for_activity='{client_email_for_activity}'")
                 if client_email_for_activity:
                     cursor.execute(
                         """
@@ -1112,6 +1126,15 @@ def send_to_client(username=None, proposal_id=None):
 
                     insert_cols = ['email']
                     insert_vals = [client_email_for_activity]
+
+                    # name is required NOT NULL
+                    insert_cols.append('name')
+                    insert_vals.append((proposal.get('client_name') or proposal.get('client') or client_email_for_activity).strip() or 'Client')
+
+                    # token is required NOT NULL
+                    insert_cols.append('token')
+                    insert_vals.append(str(uuid.uuid4()))
+
                     if company_col:
                         insert_cols.append(company_col)
                         insert_vals.append((proposal.get('client_name') or proposal.get('client') or client_email_for_activity).strip())
@@ -1121,30 +1144,22 @@ def send_to_client(username=None, proposal_id=None):
 
                     cols_sql = ', '.join(insert_cols)
                     placeholders = ', '.join(['%s'] * len(insert_cols))
-                    update_sql = None
+                    update_parts = ['name = COALESCE(EXCLUDED.name, clients.name)']
                     if company_col:
-                        update_sql = f"{company_col} = COALESCE(EXCLUDED.{company_col}, clients.{company_col})"
+                        update_parts.append(f"{company_col} = COALESCE(EXCLUDED.{company_col}, clients.{company_col})")
+                    if contact_col:
+                        update_parts.append(f"{contact_col} = COALESCE(EXCLUDED.{contact_col}, clients.{contact_col})")
+                    update_sql = ', '.join(update_parts)
 
-                    if update_sql:
-                        cursor.execute(
-                            f"""
-                            INSERT INTO clients ({cols_sql})
-                            VALUES ({placeholders})
-                            ON CONFLICT (email) DO UPDATE SET {update_sql}
-                            RETURNING id
-                            """,
-                            tuple(insert_vals),
-                        )
-                    else:
-                        cursor.execute(
-                            f"""
-                            INSERT INTO clients ({cols_sql})
-                            VALUES ({placeholders})
-                            ON CONFLICT (email) DO NOTHING
-                            RETURNING id
-                            """,
-                            tuple(insert_vals),
-                        )
+                    cursor.execute(
+                        f"""
+                        INSERT INTO clients ({cols_sql})
+                        VALUES ({placeholders})
+                        ON CONFLICT (email) DO UPDATE SET {update_sql}
+                        RETURNING id
+                        """,
+                        tuple(insert_vals),
+                    )
 
                     row = cursor.fetchone()
                     if row and (row.get('id') if isinstance(row, dict) else row[0]) is not None:
@@ -1160,33 +1175,32 @@ def send_to_client(username=None, proposal_id=None):
                                 c_row.get('id') if isinstance(c_row, dict) else c_row[0]
                             )
 
-                if client_id_for_activity:
-                    metadata = {
-                        'proposal_id': proposal_id,
-                        'proposal_title': proposal.get('title'),
-                        'sender_username': username,
-                        'sender_name': sender.get('full_name')
-                        or sender.get('username')
-                        or username,
-                    }
-                    cursor.execute(
-                        """
-                        INSERT INTO proposal_client_activity
-                        (proposal_id, client_id, event_type, metadata, created_at)
-                        VALUES (%s, %s, %s, %s::jsonb, NOW())
-                        """,
-                        (
-                            proposal_id,
-                            client_id_for_activity,
-                            'proposal_sent',
-                            json.dumps(metadata),
-                        ),
-                    )
-                    conn.commit()
+                # Log activity with or without client_id (client_id is nullable in schema)
+                print(f"[SEND_TO_CLIENT] Inserting activity for proposal {proposal_id}, client_id={client_id_for_activity}")
+                cursor.execute(
+                    """
+                    INSERT INTO proposal_client_activity
+                    (proposal_id, client_id, event_type, metadata, created_at)
+                    VALUES (%s, %s, %s, %s::jsonb, NOW())
+                    """,
+                    (
+                        proposal_id,
+                        client_id_for_activity,  # Can be NULL
+                        'proposal_sent',
+                        json.dumps(metadata),
+                    ),
+                )
+                conn.commit()
+                print(f"[SEND_TO_CLIENT] ✅ Activity logged for proposal {proposal_id}")
             except Exception as activity_err:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
                 print(
                     f"⚠️ Failed to log proposal_sent activity for proposal {proposal_id}: {activity_err}"
                 )
+                traceback.print_exc()
 
             log_finance_audit_async(
                 user_id=sender.get('id'),
@@ -1234,6 +1248,7 @@ def send_to_client(username=None, proposal_id=None):
                         permission_col = _pick_first(inv_cols, ['permission_level', 'permission', 'role'])
                         token_col = _pick_first(inv_cols, ['access_token', 'token'])
                         status_col = _pick_first(inv_cols, ['status'])
+                        expires_col = _pick_first(inv_cols, ['expires_at', 'expires', 'token_expires_at'])
                         proposal_id_col = 'proposal_id' if 'proposal_id' in inv_cols else None
 
                         insert_cols = []
@@ -1259,6 +1274,9 @@ def send_to_client(username=None, proposal_id=None):
                         if status_col:
                             insert_cols.append(status_col)
                             insert_vals.append('pending')
+                        if expires_col:
+                            insert_cols.append(expires_col)
+                            insert_vals.append(datetime.utcnow() + timedelta(days=90))
 
                         if proposal_id_col and inv_email_col and insert_cols:
                             placeholders = ', '.join(['%s'] * len(insert_cols))
@@ -1295,7 +1313,7 @@ def send_to_client(username=None, proposal_id=None):
                         print(f"⚠️ Failed to insert collaboration invitation: {inv_err}")
                         traceback.print_exc()
 
-                    client_link = f"{frontend_url}/#/client/proposals?token={access_token}"
+                    client_link = f"{frontend_url}/?token={access_token}#/client/proposals"
                     
                     sender_name = sender.get('full_name') or sender.get('username') or 'Your Team'
                     
@@ -1443,7 +1461,7 @@ def resend_client_email(username=None, proposal_id=None, user_id=None, email=Non
 
                 client_name = (proposal.get('client_name') or 'Client').strip() or 'Client'
                 proposal_title = (proposal.get('title') or 'Proposal').strip() or 'Proposal'
-                client_link = f"{frontend_url}/#/client/proposals?token={access_token}"
+                client_link = f"{frontend_url}/?token={access_token}#/client/proposals"
 
                 email_subject = f"Proposal: {proposal_title}"
                 email_body = f"""
@@ -2862,7 +2880,7 @@ def invite_collaborator(username=None, proposal_id=None, user_id=None, email=Non
                 from api.utils.email import send_email, get_logo_html
                 from api.utils.helpers import get_frontend_url
                 base_url = get_frontend_url()
-                invite_url = f"{base_url}/#/collaborate?token={access_token}"
+                invite_url = f"{base_url}/?token={access_token}#/collaborate"
                 print(f"🔗 Collaboration invitation URL: {invite_url}")
                 
                 email_body = f"""

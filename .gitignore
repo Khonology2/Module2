@@ -27,6 +27,10 @@ dist/
 coverage/
 .nyc_output
 
+# Flutter generated plugin registries (do not commit)
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
 # Exception: Allow frontend_flutter/build/web for Render deployment
 !frontend_flutter/build/web/
 
@@ -69,4 +73,7 @@ docusign_private.key
 docusign_public.key
 backend/docusign_private.key
 backend/docusign_public.key
+
+# Local debug helpers (do not commit)
+backend/debug_*.py
 
