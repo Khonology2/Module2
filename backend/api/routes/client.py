@@ -1792,6 +1792,65 @@ def get_client_proposal_details(proposal_id):
 
             proposal_dict = dict(proposal)
 
+            def _coerce_sections_from_content(content_value):
+                if content_value is None:
+                    return None
+                parsed = content_value
+                if isinstance(parsed, str):
+                    raw = parsed.strip()
+                    if not raw:
+                        return None
+                    try:
+                        parsed = json.loads(raw)
+                    except Exception:
+                        return None
+                if isinstance(parsed, dict):
+                    sections_val = parsed.get('sections')
+                    if isinstance(sections_val, list):
+                        return sections_val
+                if isinstance(parsed, list):
+                    return parsed
+                return None
+
+            raw_sections_val = proposal_dict.get('sections')
+            if isinstance(raw_sections_val, str):
+                try:
+                    raw_sections_val = json.loads(raw_sections_val)
+                except Exception:
+                    raw_sections_val = None
+
+            sections_val = raw_sections_val if isinstance(raw_sections_val, list) and raw_sections_val else None
+            if sections_val is None:
+                sections_val = _coerce_sections_from_content(proposal_dict.get('content'))
+
+            if isinstance(sections_val, list):
+                normalized_sections = []
+                for i, sec in enumerate(sections_val):
+                    if isinstance(sec, dict):
+                        sec_dict = dict(sec)
+                        raw_title = (
+                            sec_dict.get('title')
+                            or sec_dict.get('heading')
+                            or sec_dict.get('name')
+                            or sec_dict.get('label')
+                            or sec_dict.get('section_title')
+                            or sec_dict.get('sectionTitle')
+                            or sec_dict.get('header')
+                            or sec_dict.get('headline')
+                            or sec_dict.get('headingText')
+                            or sec_dict.get('display_title')
+                            or sec_dict.get('displayTitle')
+                        )
+                        raw_title = str(raw_title).strip() if raw_title is not None else ''
+                        sec_dict['title'] = raw_title or f'Section {i + 1}'
+                        normalized_sections.append(sec_dict)
+                        continue
+                    if isinstance(sec, str) and sec.strip():
+                        normalized_sections.append({'title': f'Section {i + 1}', 'content': sec})
+                        continue
+                if normalized_sections:
+                    proposal_dict['sections'] = normalized_sections
+
             version_info = None
             try:
                 cursor.execute(
@@ -2929,6 +2988,7 @@ def get_client_dashboard_stats(username=None):
 # ============================================================================
 
 @bp.post("/client/activity")
+@bp.post("/api/client/activity")
 def log_client_activity():
     """Log client activity event (open, close, view_section, download, sign, comment)"""
     try:
@@ -3009,6 +3069,71 @@ def log_client_activity():
                 return {'detail': 'Proposal not found'}, 404
             
             actual_proposal_id = proposal['id']
+
+            if event_type == 'view_section' and isinstance(metadata, dict):
+                section_title = metadata.get('section_title')
+                section_title = str(section_title).strip() if section_title is not None else ''
+                section_number = metadata.get('section_number')
+                try:
+                    section_number = int(section_number) if section_number is not None else None
+                except Exception:
+                    section_number = None
+
+                if (not section_title) and section_number is not None and section_number > 0:
+                    cursor.execute(
+                        """
+                        SELECT content
+                        FROM proposals
+                        WHERE id = %s
+                        """,
+                        (actual_proposal_id,),
+                    )
+                    prow = cursor.fetchone() or {}
+                    content_val = prow.get('content') if isinstance(prow, dict) else None
+
+                    sections_val = None
+                    parsed = content_val
+                    if isinstance(parsed, str):
+                        raw = parsed.strip()
+                        if raw:
+                            try:
+                                parsed = json.loads(raw)
+                            except Exception:
+                                parsed = None
+                        else:
+                            parsed = None
+
+                    if isinstance(parsed, dict):
+                        if isinstance(parsed.get('sections'), list):
+                            sections_val = parsed.get('sections')
+                    elif isinstance(parsed, list):
+                        sections_val = parsed
+
+                    idx = section_number - 1
+                    derived_title = ''
+                    if isinstance(sections_val, list) and 0 <= idx < len(sections_val):
+                        sec = sections_val[idx]
+                        if isinstance(sec, dict):
+                            derived_title = (
+                                sec.get('title')
+                                or sec.get('heading')
+                                or sec.get('name')
+                                or sec.get('label')
+                                or sec.get('section_title')
+                                or sec.get('sectionTitle')
+                                or sec.get('header')
+                                or sec.get('headline')
+                                or sec.get('headingText')
+                                or sec.get('display_title')
+                                or sec.get('displayTitle')
+                            )
+                            derived_title = str(derived_title).strip() if derived_title is not None else ''
+                        else:
+                            derived_title = ''
+
+                    derived_title = derived_title or f'Section {section_number}'
+                    metadata['section_title'] = derived_title
+                    metadata['section'] = derived_title
             
             # Insert activity log
             import json as json_module
@@ -3036,6 +3161,7 @@ def log_client_activity():
         return {'detail': str(e)}, 500
 
 @bp.post("/client/session/start")
+@bp.post("/api/client/session/start")
 def start_client_session():
     """Start a new client session for time tracking"""
     try:
@@ -3116,6 +3242,7 @@ def start_client_session():
         return {'detail': str(e)}, 500
 
 @bp.post("/client/session/end")
+@bp.post("/api/client/session/end")
 def end_client_session():
     """End a client session and calculate time spent"""
     try:

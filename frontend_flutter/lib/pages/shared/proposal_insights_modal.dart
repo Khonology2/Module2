@@ -300,12 +300,25 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
       case 'comment':
         return 'Client added a comment';
       case 'view_section':
+        final sectionNum = metadata['section_number'];
+        final sectionTitle = metadata['section_title'] as String?;
         final section = metadata['section'] as String?;
         final duration = metadata['duration'] as int?;
-        if (section != null && duration != null) {
-          return 'Client viewed "$section" for ${duration}s';
+
+        final n = sectionNum is int
+            ? sectionNum
+            : int.tryParse(sectionNum?.toString() ?? '');
+
+        final label = (sectionTitle != null && sectionTitle.trim().isNotEmpty)
+            ? sectionTitle.trim()
+            : ((section != null && section.trim().isNotEmpty)
+                ? section.trim()
+                : (n != null ? 'Section $n' : 'a section'));
+
+        if (duration != null) {
+          return 'Client viewed "$label" for ${duration}s';
         }
-        return 'Client viewed a section';
+        return 'Client viewed "$label"';
       default:
         return 'Client activity: $eventType';
     }

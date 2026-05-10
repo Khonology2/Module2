@@ -69,6 +69,7 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
   List<Map<String, dynamic>> _sections = [];
   int _currentSectionIndex = 0;
   DateTime? _sectionViewStart;
+  Timer? _sectionViewFlushTimer;
 
   int _selectedTab = 0; // 0: Content, 1: Comments
 
@@ -193,10 +194,23 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
       if (decoded is Map<String, dynamic>) {
         if (decoded['sections'] is List) {
           final list = decoded['sections'] as List;
-          return list
-              .where((item) => item is Map)
-              .map((item) => Map<String, dynamic>.from(item as Map))
-              .toList();
+          return list.where((item) => item is Map).map((item) {
+            final m = Map<String, dynamic>.from(item as Map);
+            final title = (m['title'] ??
+                    m['heading'] ??
+                    m['name'] ??
+                    m['label'] ??
+                    m['section_title'] ??
+                    m['sectionTitle'])
+                ?.toString();
+            final text = (m['content'] ?? m['text'] ?? m['body'])?.toString();
+            return {
+              ...m,
+              if ((title ?? '').trim().isNotEmpty) 'title': title.toString(),
+              if ((text ?? '').trim().isNotEmpty && m['content'] == null)
+                'content': text.toString(),
+            };
+          }).toList();
         }
 
         return decoded.entries
@@ -213,10 +227,23 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
       }
 
       if (decoded is List) {
-        return decoded
-            .where((item) => item is Map)
-            .map((item) => Map<String, dynamic>.from(item as Map))
-            .toList();
+        return decoded.where((item) => item is Map).map((item) {
+          final m = Map<String, dynamic>.from(item as Map);
+          final title = (m['title'] ??
+                  m['heading'] ??
+                  m['name'] ??
+                  m['label'] ??
+                  m['section_title'] ??
+                  m['sectionTitle'])
+              ?.toString();
+          final text = (m['content'] ?? m['text'] ?? m['body'])?.toString();
+          return {
+            ...m,
+            if ((title ?? '').trim().isNotEmpty) 'title': title.toString(),
+            if ((text ?? '').trim().isNotEmpty && m['content'] == null)
+              'content': text.toString(),
+          };
+        }).toList();
       }
 
       return [
@@ -231,22 +258,63 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
     }
   }
 
+  Map<String, dynamic> _normalizeSectionMap(Map<String, dynamic> section) {
+    final m = Map<String, dynamic>.from(section);
+    final title = (m['title'] ??
+            m['heading'] ??
+            m['name'] ??
+            m['label'] ??
+            m['section_title'] ??
+            m['sectionTitle'] ??
+            m['header'] ??
+            m['headline'] ??
+            m['headingText'] ??
+            m['display_title'] ??
+            m['displayTitle'])
+        ?.toString()
+        .trim();
+
+    final text = (m['content'] ?? m['text'] ?? m['body'] ?? m['html'])
+        ?.toString()
+        .trim();
+
+    if ((title ?? '').isNotEmpty) {
+      m['title'] = title;
+    }
+    if ((text ?? '').isNotEmpty && m['content'] == null) {
+      m['content'] = text;
+    }
+    return m;
+  }
+
   void _logCurrentSectionView() {
     if (_sections.isEmpty || _sectionViewStart == null) return;
 
     final now = DateTime.now();
     final index = _currentSectionIndex.clamp(0, _sections.length - 1);
     final section = _sections[index];
+    final rawTitle = (() {
+      final candidate = (section['title'] ??
+              section['heading'] ??
+              section['name'] ??
+              section['label'] ??
+              section['section_title'] ??
+              section['sectionTitle'])
+          ?.toString()
+          .trim();
+      return (candidate ?? '').isNotEmpty ? candidate! : '';
+    })();
+    final sectionNumber = index + 1;
     final sectionTitle =
-        (section['title']?.toString().trim().isNotEmpty ?? false)
-            ? section['title'].toString().trim()
-            : 'Section ${index + 1}';
+        rawTitle.isNotEmpty ? rawTitle : 'Section $sectionNumber';
 
     final durationSeconds = now.difference(_sectionViewStart!).inSeconds;
     final safeDuration = durationSeconds <= 0 ? 1 : durationSeconds;
 
     _logEvent('view_section', metadata: {
       'section': sectionTitle,
+      'section_number': sectionNumber,
+      'section_title': rawTitle,
       'duration': safeDuration,
     });
   }
@@ -258,10 +326,23 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
     _commentController.dispose();
     _proposalScrollController.dispose();
     _commentsScrollController.dispose();
+    _sectionViewFlushTimer?.cancel();
     _logCurrentSectionView();
     _endSession();
     _logEvent('close');
     super.dispose();
+  }
+
+  void _startSectionViewFlushTimer() {
+    _sectionViewFlushTimer?.cancel();
+    if (_sections.isEmpty) return;
+    if (_sectionViewStart == null) return;
+
+    _sectionViewFlushTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted) return;
+      _logCurrentSectionView();
+      _sectionViewStart = DateTime.now();
+    });
   }
 
   Future<void> _loadPdfPreview() async {
@@ -566,14 +647,38 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final content = data['proposal']?['content'];
-        if (content != null) {
-          content.toString();
-        } else {}
-        final parsedSections = _parseSectionsFromContent(content);
+        final proposal = data['proposal'] as Map<String, dynamic>?;
+        final content = proposal?['content'];
+        final rawSections = proposal?['sections'];
+
+        List<Map<String, dynamic>> sections;
+        if (rawSections is String && rawSections.trim().isNotEmpty) {
+          try {
+            final decoded = jsonDecode(rawSections);
+            if (decoded is List) {
+              sections = decoded
+                  .whereType<Map>()
+                  .map((m) => Map<String, dynamic>.from(m))
+                  .toList();
+            } else {
+              sections = _parseSectionsFromContent(content);
+            }
+          } catch (_) {
+            sections = _parseSectionsFromContent(content);
+          }
+        } else if (rawSections is List && rawSections.isNotEmpty) {
+          sections = rawSections
+              .whereType<Map>()
+              .map((m) => Map<String, dynamic>.from(m))
+              .toList();
+        } else {
+          sections = _parseSectionsFromContent(content);
+        }
+
+        sections = sections.map(_normalizeSectionMap).toList();
 
         setState(() {
-          _proposalData = data['proposal'];
+          _proposalData = proposal;
           _signatureData = data['signature'] != null
               ? Map<String, dynamic>.from(data['signature'])
               : null;
@@ -586,13 +691,17 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
                   ?.map((c) => Map<String, dynamic>.from(c))
                   .toList() ??
               [];
-          _sections = parsedSections;
+          _sections = sections;
           _currentSectionIndex = 0;
           _sectionViewStart = _sections.isNotEmpty ? DateTime.now() : null;
           _isLoading = false;
         });
 
-        await _loadPdfPreview();
+        _startSectionViewFlushTimer();
+
+        if (mounted && data['proposal'] != null) {
+          await _loadPdfPreview();
+        }
       } else {
         final errorBody = response.body;
         try {
@@ -1902,6 +2011,8 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
       _currentSectionIndex = bounded;
       _sectionViewStart = DateTime.now();
     });
+
+    _startSectionViewFlushTimer();
   }
 
   Widget _buildContentSections(dynamic content) {
