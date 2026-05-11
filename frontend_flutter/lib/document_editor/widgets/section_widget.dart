@@ -59,6 +59,29 @@ class SectionWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final contentPlainText = section.richController.document.toPlainText();
+    final hasPricingPlaceholders = contentPlainText.contains('{{Total}}') ||
+        contentPlainText.contains('{{Subtotal}}') ||
+        contentPlainText.contains('{{VAT}}');
+
+    DocumentTable? priceTable;
+    for (final t in section.tables) {
+      if (t.type == 'price') {
+        priceTable = t;
+        break;
+      }
+    }
+
+    String? resolvedPricingPreview;
+    if (!readOnly && hasPricingPlaceholders && priceTable != null) {
+      resolvedPricingPreview = contentPlainText
+          .replaceAll(
+              '{{Subtotal}}', priceTable.getSubtotal().toStringAsFixed(2))
+          .replaceAll('{{VAT}}', priceTable.getVAT().toStringAsFixed(2))
+          .replaceAll('{{Total}}', priceTable.getTotal().toStringAsFixed(2))
+          .trim();
+    }
+
     return MouseRegion(
       onEnter: (_) => onHoverChanged(true),
       onExit: (_) => onHoverChanged(false),
@@ -248,6 +271,29 @@ class SectionWidget extends StatelessWidget {
                   ),
                 ),
               ),
+              if (resolvedPricingPreview != null) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: Text(
+                    resolvedPricingPreview,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      height: 1.5,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                ),
+              ],
               // Display tables below text (with drag and drop)
               if (section.tables.isNotEmpty)
                 ReorderableListView(

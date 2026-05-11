@@ -55,6 +55,44 @@ class DocumentTable {
     }
   }
 
+  double? _parseFirstNumber(String raw) {
+    final v = raw.trim();
+    if (v.isEmpty) return null;
+
+    // Prefer extracting a numeric token anywhere in the string.
+    // Examples handled:
+    // - "R 350" => 350
+    // - "R {{350}}" => 350
+    // - "2 Weeks" => 2
+    // - "1,500.00" => 1500
+    final match = RegExp(r'-?\d+(?:[\.,]\d+)?').firstMatch(v);
+    if (match == null) return null;
+
+    final token = match.group(0)!.replaceAll(',', '.');
+    // If token contained thousands separators like 1,500.00, above replacement
+    // could yield 1.500.00 which isn't parseable. Try a more conservative cleanup.
+    final cleaned = token.contains('.')
+        ? token.replaceAll(RegExp(r'\.(?=.*\.)'), '')
+        : token;
+    return double.tryParse(cleaned);
+  }
+
+  double _parseQuantity(String raw) {
+    final v = raw.trim();
+    if (v.isEmpty) return 0.0;
+
+    final n = _parseFirstNumber(v) ?? 0.0;
+    final lower = v.toLowerCase();
+
+    // Content library commonly expresses effort as "X Weeks" but rates are day-based.
+    // Interpret weeks as business days (1 week = 5 days).
+    if (lower.contains('week') || RegExp(r'\bwk\b').hasMatch(lower)) {
+      return n * 5.0;
+    }
+
+    return n;
+  }
+
   int? _findHeaderIndex(List<String> headers, List<String> needles) {
     if (headers.isEmpty) return null;
     for (var i = 0; i < headers.length; i++) {
@@ -105,7 +143,7 @@ class DocumentTable {
     if (preferredIndex >= row.length) return preferredIndex;
 
     final preferred = row[preferredIndex].trim();
-    final preferredNumber = double.tryParse(preferred);
+    final preferredNumber = _parseFirstNumber(preferred);
 
     if (preferredNumber != null) {
       return preferredIndex;
@@ -114,7 +152,7 @@ class DocumentTable {
     // Common library-table pattern: a placeholder/label column followed by the numeric column.
     if (preferredIndex + 1 < row.length) {
       final next = row[preferredIndex + 1].trim();
-      if (double.tryParse(next) != null) {
+      if (_parseFirstNumber(next) != null) {
         return preferredIndex + 1;
       }
     }
@@ -142,9 +180,9 @@ class DocumentTable {
 
     if (row.length <= resolvedTotalCol) return;
 
-    final qty = qtyCol < row.length ? double.tryParse(row[qtyCol]) ?? 0.0 : 0.0;
+    final qty = qtyCol < row.length ? _parseQuantity(row[qtyCol]) : 0.0;
     final unit = resolvedUnitCol < row.length
-        ? double.tryParse(row[resolvedUnitCol]) ?? 0.0
+        ? (_parseFirstNumber(row[resolvedUnitCol]) ?? 0.0)
         : 0.0;
 
     row[resolvedTotalCol] = (qty * unit).toStringAsFixed(2);
@@ -173,14 +211,14 @@ class DocumentTable {
 
       double rowTotal = 0.0;
       if (totalCol < row.length) {
-        rowTotal = double.tryParse(row[totalCol]) ?? 0.0;
+        rowTotal = _parseFirstNumber(row[totalCol]) ?? 0.0;
       }
 
       if (rowTotal == 0.0) {
-        final qty =
-            qtyCol < row.length ? double.tryParse(row[qtyCol]) ?? 0.0 : 0.0;
-        final unit =
-            unitCol < row.length ? double.tryParse(row[unitCol]) ?? 0.0 : 0.0;
+        final qty = qtyCol < row.length ? _parseQuantity(row[qtyCol]) : 0.0;
+        final unit = unitCol < row.length
+            ? (_parseFirstNumber(row[unitCol]) ?? 0.0)
+            : 0.0;
         rowTotal = qty * unit;
       }
 
