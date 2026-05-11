@@ -827,11 +827,12 @@ def get_proposal_signatures(username=None, proposal_id=None):
 @bp.get("/proposals/<int:proposal_id>/signed-document")
 @token_required
 def get_signed_document(username=None, proposal_id=None):
-    """Get the signed document PDF from DocuSign for a signed proposal"""
+    """Get the signed document PDF for a signed proposal.
+
+    Supports first-party (in-app) signing by returning the stored signed PDF.
+    Falls back to DocuSign envelope retrieval for legacy signatures.
+    """
     try:
-        if not DOCUSIGN_AVAILABLE:
-            return {'detail': 'DocuSign SDK not installed'}, 503
-        
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             
@@ -839,12 +840,56 @@ def get_signed_document(username=None, proposal_id=None):
             current_user = cursor.fetchone()
             if not current_user:
                 return {'detail': 'User not found'}, 404
+
+            def _get_table_columns(table_name: str):
+                cursor.execute(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = %s
+                    """,
+                    (table_name,),
+                )
+                cols = cursor.fetchall() or []
+                return [
+                    (c['column_name'] if isinstance(c, dict) else c[0])
+                    for c in cols
+                ]
+
+            current_user_id = (
+                current_user.get('id') if isinstance(current_user, dict) else current_user[0]
+            )
+
+            prop_cols = _get_table_columns('proposals')
+            owner_expr = 'owner_id' if 'owner_id' in prop_cols else (
+                'user_id' if 'user_id' in prop_cols else None
+            )
+            if not owner_expr:
+                return {'detail': 'Proposals schema missing owner column'}, 500
+
+            cursor.execute(
+                f"""
+                SELECT id
+                FROM proposals
+                WHERE id = %s AND {owner_expr}::text = %s
+                """,
+                (proposal_id, str(current_user_id)),
+            )
+            proposal_row = cursor.fetchone()
+            if not proposal_row:
+                return {'detail': 'Proposal not found or access denied'}, 404
             
             # Get the signed signature record (check for 'signed' status or any completed status)
             cursor.execute("""
-                SELECT envelope_id, status, signed_at
+                SELECT envelope_id, status, signed_at, signed_document_url
                 FROM proposal_signatures
-                WHERE proposal_id = %s AND (status = 'signed' OR status = 'completed')
+                WHERE proposal_id = %s
+                  AND (
+                        status = 'signed'
+                     OR status = 'completed'
+                     OR status = 'physical_signed'
+                     OR (signed_document_url IS NOT NULL AND signed_document_url <> '')
+                  )
                 ORDER BY signed_at DESC, sent_at DESC
                 LIMIT 1
             """, (proposal_id,))
@@ -865,10 +910,45 @@ def get_signed_document(username=None, proposal_id=None):
                         'detail': f'Proposal has signature record but status is "{any_signature.get("status")}", not "signed". Envelope ID: {any_signature.get("envelope_id")}'
                     }, 400
                 return {'detail': 'No signature record found for this proposal'}, 404
+
+            signed_document_url = (signature.get('signed_document_url') or '').strip()
+            if signed_document_url:
+                try:
+                    try:
+                        import requests
+                    except ImportError:
+                        requests = None
+
+                    if requests is not None:
+                        resp = requests.get(signed_document_url, timeout=25)
+                        if resp.status_code != 200:
+                            return {
+                                'detail': f'Failed to retrieve signed document (status {resp.status_code})'
+                            }, 502
+                        pdf_bytes = resp.content
+                    else:
+                        from urllib.request import urlopen
+                        with urlopen(signed_document_url, timeout=25) as r:
+                            pdf_bytes = r.read()
+
+                    from flask import Response
+                    return Response(
+                        pdf_bytes,
+                        mimetype='application/pdf',
+                        headers={
+                            'Content-Disposition': f'inline; filename="signed_proposal_{proposal_id}.pdf"',
+                            'Content-Type': 'application/pdf',
+                        },
+                    ), 200
+                except Exception as e:
+                    return {'detail': f'Could not retrieve stored signed document: {e}'}, 502
             
             envelope_id = signature.get('envelope_id')
             if not envelope_id:
-                return {'detail': 'No envelope ID found for this signed proposal'}, 404
+                return {'detail': 'No signed document available for this proposal'}, 404
+
+            if not DOCUSIGN_AVAILABLE:
+                return {'detail': 'DocuSign integration not available'}, 503
             
             # Ensure envelope_id is a string and strip whitespace
             envelope_id = str(envelope_id).strip()
@@ -998,9 +1078,6 @@ def get_signed_document(username=None, proposal_id=None):
                 }
             ), 200
             
-    except ApiException as e:
-        print(f"❌ DocuSign API error: {e}")
-        return {'detail': f'DocuSign API error: {str(e)}'}, 500
     except Exception as e:
         print(f"❌ Error getting signed document: {e}")
         traceback.print_exc()
