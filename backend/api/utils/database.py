@@ -686,6 +686,94 @@ def init_pg_schema():
         FOREIGN KEY (created_by) REFERENCES users(id)
         )''')
 
+        try:
+            cursor.execute(
+                """
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'proposal_client_activity'
+                  AND column_name IN ('proposal_id', 'client_id')
+                """
+            )
+            cols = {r[0]: r[1] for r in (cursor.fetchall() or [])}
+            if cols.get('proposal_id') == 'uuid' or cols.get('client_id') == 'uuid':
+                _exec_with_savepoint("DROP TABLE IF EXISTS proposal_client_activity CASCADE")
+        except Exception:
+            pass
+
+        try:
+            cursor.execute(
+                """
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'proposal_client_session'
+                  AND column_name IN ('proposal_id', 'client_id')
+                """
+            )
+            cols = {r[0]: r[1] for r in (cursor.fetchall() or [])}
+            if cols.get('proposal_id') == 'uuid' or cols.get('client_id') == 'uuid':
+                _exec_with_savepoint("DROP TABLE IF EXISTS proposal_client_session CASCADE")
+        except Exception:
+            pass
+
+        _exec_with_savepoint(
+            '''
+            CREATE TABLE IF NOT EXISTS proposal_client_activity (
+                id SERIAL PRIMARY KEY,
+                proposal_id INTEGER NOT NULL,
+                client_id INTEGER,
+                event_type VARCHAR(50) NOT NULL,
+                metadata JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (proposal_id) REFERENCES proposals(id) ON DELETE CASCADE,
+                FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
+            )
+            '''
+        )
+
+        _exec_with_savepoint(
+            '''
+            CREATE TABLE IF NOT EXISTS proposal_client_session (
+                id SERIAL PRIMARY KEY,
+                proposal_id INTEGER NOT NULL,
+                client_id INTEGER,
+                session_start TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                session_end TIMESTAMP,
+                total_seconds INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (proposal_id) REFERENCES proposals(id) ON DELETE CASCADE,
+                FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
+            )
+            '''
+        )
+
+        try:
+            _exec_with_savepoint(
+                "CREATE INDEX IF NOT EXISTS idx_activity_proposal_id ON proposal_client_activity(proposal_id)"
+            )
+            _exec_with_savepoint(
+                "CREATE INDEX IF NOT EXISTS idx_activity_client_id ON proposal_client_activity(client_id)"
+            )
+            _exec_with_savepoint(
+                "CREATE INDEX IF NOT EXISTS idx_activity_event_type ON proposal_client_activity(event_type)"
+            )
+            _exec_with_savepoint(
+                "CREATE INDEX IF NOT EXISTS idx_activity_created_at ON proposal_client_activity(created_at)"
+            )
+            _exec_with_savepoint(
+                "CREATE INDEX IF NOT EXISTS idx_session_proposal_id ON proposal_client_session(proposal_id)"
+            )
+            _exec_with_savepoint(
+                "CREATE INDEX IF NOT EXISTS idx_session_client_id ON proposal_client_session(client_id)"
+            )
+            _exec_with_savepoint(
+                "CREATE INDEX IF NOT EXISTS idx_session_start ON proposal_client_session(session_start)"
+            )
+        except Exception as e:
+            print(f"[WARN] Could not create indexes for proposal_client_activity/session: {e}")
+
         # Ensure proposals.client_id has a foreign key to clients.id
         try:
             _exec_with_savepoint('''

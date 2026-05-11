@@ -2549,32 +2549,48 @@ def get_proposal_analytics(username=None, proposal_id=None):
             section_titles_by_number = _derive_section_titles(proposal.get('content'))
             
             # Get all activity events
-            cursor.execute("""
-                SELECT 
-                    pca.id, pca.event_type, pca.metadata, pca.created_at,
-                    COALESCE(c.contact_person, c.company_name, 'Unknown Client') as client_name, 
-                    COALESCE(c.email, '') as client_email
-                FROM proposal_client_activity pca
-                LEFT JOIN clients c ON pca.client_id = c.id
-                WHERE pca.proposal_id = %s
-                ORDER BY pca.created_at DESC
-            """, (actual_proposal_id,))
-            
-            events = cursor.fetchall()
+            events = []
+            try:
+                cursor.execute("""
+                    SELECT 
+                        pca.id, pca.event_type, pca.metadata, pca.created_at,
+                        COALESCE(c.contact_person, c.company_name, 'Unknown Client') as client_name, 
+                        COALESCE(c.email, '') as client_email
+                    FROM proposal_client_activity pca
+                    LEFT JOIN clients c ON pca.client_id = c.id
+                    WHERE pca.proposal_id = %s
+                    ORDER BY pca.created_at DESC
+                """, (actual_proposal_id,))
+                
+                events = cursor.fetchall()
+            except psycopg2.errors.UndefinedTable:
+                events = []
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
             
             # Get all sessions
-            cursor.execute("""
-                SELECT 
-                    pcs.id, pcs.session_start, pcs.session_end, pcs.total_seconds,
-                    COALESCE(c.contact_person, c.company_name, 'Unknown Client') as client_name, 
-                    COALESCE(c.email, '') as client_email
-                FROM proposal_client_session pcs
-                LEFT JOIN clients c ON pcs.client_id = c.id
-                WHERE pcs.proposal_id = %s
-                ORDER BY pcs.session_start DESC
-            """, (actual_proposal_id,))
-            
-            sessions = cursor.fetchall()
+            sessions = []
+            try:
+                cursor.execute("""
+                    SELECT 
+                        pcs.id, pcs.session_start, pcs.session_end, pcs.total_seconds,
+                        COALESCE(c.contact_person, c.company_name, 'Unknown Client') as client_name, 
+                        COALESCE(c.email, '') as client_email
+                    FROM proposal_client_session pcs
+                    LEFT JOIN clients c ON pcs.client_id = c.id
+                    WHERE pcs.proposal_id = %s
+                    ORDER BY pcs.session_start DESC
+                """, (actual_proposal_id,))
+                
+                sessions = cursor.fetchall()
+            except psycopg2.errors.UndefinedTable:
+                sessions = []
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
             
             # Calculate analytics
             total_time_seconds = sum(s['total_seconds'] or 0 for s in sessions)
