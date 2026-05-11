@@ -66,6 +66,7 @@ class _ProposalWizardPageState extends State<ProposalWizard>
   bool _isInternalApproved = false;
   String? _proposalId; // Store created proposal ID
   bool _isRunningGovernance = false;
+
   /// Prevents overlapping Improve requests (single HF upstream worker).
   String? _improveInFlightModuleId;
 
@@ -130,7 +131,8 @@ class _ProposalWizardPageState extends State<ProposalWizard>
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['detail']?.toString() ?? 'Send to client failed'),
+            content:
+                Text(result['detail']?.toString() ?? 'Send to client failed'),
             backgroundColor: Colors.red,
           ),
         );
@@ -166,7 +168,8 @@ class _ProposalWizardPageState extends State<ProposalWizard>
         setState(() {
           _showEmailFailedBanner = false;
           _lastEmailError = null;
-          _lastClientAccessToken = r['access_token']?.toString() ?? _lastClientAccessToken;
+          _lastClientAccessToken =
+              r['access_token']?.toString() ?? _lastClientAccessToken;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -178,7 +181,8 @@ class _ProposalWizardPageState extends State<ProposalWizard>
         setState(() {
           _showEmailFailedBanner = true;
           _lastEmailError = r['email_error']?.toString() ?? _lastEmailError;
-          _lastClientAccessToken = r['access_token']?.toString() ?? _lastClientAccessToken;
+          _lastClientAccessToken =
+              r['access_token']?.toString() ?? _lastClientAccessToken;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1242,7 +1246,8 @@ class _ProposalWizardPageState extends State<ProposalWizard>
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.red.withOpacity(0.12),
                     border: Border(
@@ -1255,7 +1260,8 @@ class _ProposalWizardPageState extends State<ProposalWizard>
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          _lastEmailError == null || _lastEmailError!.trim().isEmpty
+                          _lastEmailError == null ||
+                                  _lastEmailError!.trim().isEmpty
                               ? 'Email failed to send – retry'
                               : 'Email failed to send – ${_lastEmailError!}',
                           style: const TextStyle(color: Colors.red),
@@ -1274,7 +1280,8 @@ class _ProposalWizardPageState extends State<ProposalWizard>
                       ),
                       const SizedBox(width: 8),
                       IconButton(
-                        onPressed: () => setState(() => _showEmailFailedBanner = false),
+                        onPressed: () =>
+                            setState(() => _showEmailFailedBanner = false),
                         icon: const Icon(Icons.close, color: Colors.red),
                       ),
                     ],
@@ -1619,15 +1626,15 @@ class _ProposalWizardPageState extends State<ProposalWizard>
                               ),
                             ),
                             ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              opportunityName,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF6B7280),
+                              const SizedBox(height: 4),
+                              Text(
+                                opportunityName,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF6B7280),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
                             const SizedBox(height: 4),
                             Text(
                               'Date: $dateLabel',
@@ -2064,34 +2071,29 @@ class _ProposalWizardPageState extends State<ProposalWizard>
                                   const SizedBox(width: 8),
                                   // FEATURE 2: Improve button
                                   TextButton.icon(
-                                    onPressed: (_improveInFlightModuleId !=
-                                                null ||
-                                            controller.text.trim().isEmpty)
-                                        ? null
-                                        : () => _improveSectionContent(
-                                              moduleId,
-                                              module['name'] ?? 'Section',
-                                              controller,
-                                            ),
+                                    onPressed:
+                                        (_improveInFlightModuleId != null ||
+                                                controller.text.trim().isEmpty)
+                                            ? null
+                                            : () => _improveSectionContent(
+                                                  moduleId,
+                                                  module['name'] ?? 'Section',
+                                                  controller,
+                                                ),
                                     icon: Icon(
                                       Icons.edit_note,
                                       color: (_improveInFlightModuleId !=
                                                   null ||
-                                              controller.text
-                                                  .trim()
-                                                  .isEmpty)
+                                              controller.text.trim().isEmpty)
                                           ? Colors.grey
                                           : PremiumTheme.teal,
                                     ),
                                     label: Text(
                                       'Improve',
-                                      style:
-                                          PremiumTheme.bodyMedium.copyWith(
+                                      style: PremiumTheme.bodyMedium.copyWith(
                                         color: (_improveInFlightModuleId !=
                                                     null ||
-                                                controller.text
-                                                    .trim()
-                                                    .isEmpty)
+                                                controller.text.trim().isEmpty)
                                             ? Colors.grey
                                             : PremiumTheme.teal,
                                       ),
@@ -2671,31 +2673,6 @@ class _ProposalWizardPageState extends State<ProposalWizard>
                       const SizedBox(height: 20),
                       // Client Details Fields (auto-populated or manual)
                       if (!_useManualEntry && _selectedClient != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                                color: Colors.green.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.check_circle,
-                                  color: Colors.green, size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Client details auto-filled from database. Update the client record in Client Management to change these values.',
-                                  style: TextStyle(
-                                      color: Colors.green.shade300,
-                                      fontSize: 12),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
                         if ((_formData['clientName']?.toString().isEmpty ??
                                 true) ||
                             (_formData['clientEmail']?.toString().isEmpty ??
@@ -3509,6 +3486,12 @@ class _ProposalWizardPageState extends State<ProposalWizard>
   }
 
   Widget _buildClientDropdown() {
+    final activeClients = _clients.where((client) {
+      final status = client['status']?.toString().toLowerCase() ?? '';
+      // Only allow active clients; treat missing/empty status as active
+      return status.isEmpty || status == 'active';
+    }).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3529,6 +3512,7 @@ class _ProposalWizardPageState extends State<ProposalWizard>
           textDirection: TextDirection.ltr,
           child: DropdownButtonFormField<Map<String, dynamic>>(
             initialValue: _selectedClient,
+            isExpanded: true,
             style: PremiumTheme.bodyMedium.copyWith(
               color: PremiumTheme.textPrimary,
             ),
@@ -3537,6 +3521,9 @@ class _ProposalWizardPageState extends State<ProposalWizard>
               hintText: _isLoadingClients
                   ? 'Loading clients...'
                   : 'Select a client or enter manually',
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
               labelStyle: PremiumTheme.bodyMedium.copyWith(
                 color: PremiumTheme.textSecondary,
               ),
@@ -3560,6 +3547,28 @@ class _ProposalWizardPageState extends State<ProposalWizard>
               ),
             ),
             dropdownColor: PremiumTheme.darkBg2,
+            selectedItemBuilder: (context) {
+              return [
+                Text(
+                  'Enter manually',
+                  style: PremiumTheme.bodyMedium,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                ...activeClients.map((client) {
+                  final name = client['company_name'] ??
+                      client['name'] ??
+                      client['email'] ??
+                      'Unknown';
+                  return Text(
+                    name.toString(),
+                    style: PremiumTheme.bodyMedium,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  );
+                }),
+              ];
+            },
             items: [
               DropdownMenuItem<Map<String, dynamic>>(
                 value: null,
@@ -3568,11 +3577,7 @@ class _ProposalWizardPageState extends State<ProposalWizard>
                   style: PremiumTheme.bodyMedium,
                 ),
               ),
-              ..._clients.where((client) {
-                final status = client['status']?.toString().toLowerCase() ?? '';
-                // Only allow active clients; treat missing/empty status as active
-                return status.isEmpty || status == 'active';
-              }).map((client) {
+              ...activeClients.map((client) {
                 final name = client['company_name'] ??
                     client['name'] ??
                     client['email'] ??
@@ -4609,13 +4614,15 @@ class _ProposalWizardPageState extends State<ProposalWizard>
       }
 
       final proposalData = _buildProposalDataForAI();
-      final payloadPid = int.tryParse(proposalData['proposal_id']?.toString() ?? '');
+      final payloadPid =
+          int.tryParse(proposalData['proposal_id']?.toString() ?? '');
       if (payloadPid == null || payloadPid <= 0) {
         setState(() => _isLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Proposal ID is missing or invalid. Save the proposal and try again.'),
+              content: Text(
+                  'Proposal ID is missing or invalid. Save the proposal and try again.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -4623,15 +4630,18 @@ class _ProposalWizardPageState extends State<ProposalWizard>
         return;
       }
       proposalData['proposal_id'] = payloadPid;
-      if (proposalData['id'] != null && int.tryParse(proposalData['id'].toString()) == null) {
+      if (proposalData['id'] != null &&
+          int.tryParse(proposalData['id'].toString()) == null) {
         proposalData.remove('id');
       }
       final analysis =
           await AIAnalysisService.analyzeProposalRisks(proposalData);
 
       // Backend may return status (PASS/REVIEW/BLOCK) or risk_level; support both
-      String riskLevel =
-          analysis['risk_level']?.toString().toUpperCase().trim() ??
+      String riskLevel = analysis['risk_level']
+              ?.toString()
+              .toUpperCase()
+              .trim() ??
           (analysis['status']?.toString().toUpperCase().trim() == 'PASS'
               ? 'PASS'
               : analysis['status']?.toString().toUpperCase().trim() == 'BLOCK'
@@ -4714,7 +4724,8 @@ class _ProposalWizardPageState extends State<ProposalWizard>
     final proposalIdInt = int.tryParse(_proposalId?.toString() ?? '');
     final data = <String, dynamic>{
       'id': _proposalId ?? 'draft',
-      if (proposalIdInt != null && proposalIdInt > 0) 'proposal_id': proposalIdInt,
+      if (proposalIdInt != null && proposalIdInt > 0)
+        'proposal_id': proposalIdInt,
       'title': _formData['proposalTitle']?.toString().isNotEmpty == true
           ? _formData['proposalTitle'].toString()
           : _formData['opportunityName']?.toString() ?? '',
@@ -4833,9 +4844,7 @@ class _ProposalWizardPageState extends State<ProposalWizard>
         final rawId = created?['id'];
         final createdId = rawId is int
             ? rawId.toString()
-            : (rawId is num
-                ? rawId.toInt().toString()
-                : rawId?.toString());
+            : (rawId is num ? rawId.toInt().toString() : rawId?.toString());
         final createdPid = createdId != null && createdId.isNotEmpty
             ? int.tryParse(createdId.trim())
             : null;
@@ -4857,13 +4866,15 @@ class _ProposalWizardPageState extends State<ProposalWizard>
 
       final proposalData = _buildProposalDataForAI();
       // Risk-gate backend requires proposal_id as integer; do not send non-integer id.
-      final payloadPid = int.tryParse(proposalData['proposal_id']?.toString() ?? '');
+      final payloadPid =
+          int.tryParse(proposalData['proposal_id']?.toString() ?? '');
       if (payloadPid == null || payloadPid <= 0) {
         setState(() => _isRunningGovernance = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Proposal ID is missing or invalid. Save the proposal and try again.'),
+              content: Text(
+                  'Proposal ID is missing or invalid. Save the proposal and try again.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -4871,7 +4882,8 @@ class _ProposalWizardPageState extends State<ProposalWizard>
         return;
       }
       proposalData['proposal_id'] = payloadPid;
-      if (proposalData['id'] != null && int.tryParse(proposalData['id'].toString()) == null) {
+      if (proposalData['id'] != null &&
+          int.tryParse(proposalData['id'].toString()) == null) {
         proposalData.remove('id');
       }
 
