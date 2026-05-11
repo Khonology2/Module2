@@ -2740,6 +2740,13 @@ def get_proposal_analytics(username=None, proposal_id=None):
                 except Exception:
                     duration = 0
                 section_times[section] = section_times.get(section, 0) + duration
+
+            section_total_seconds = sum(int(v or 0) for v in section_times.values())
+
+            # If sessions are not recorded (or still open / not ended), fall back to
+            # aggregating the view_section durations so Total Time Spent is meaningful.
+            if (total_time_seconds or 0) <= 0 and section_total_seconds > 0:
+                total_time_seconds = section_total_seconds
             
             # Format sessions for response
             formatted_sessions = []
