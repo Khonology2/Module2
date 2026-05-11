@@ -3381,10 +3381,70 @@ def client_sign_proposal_in_app(proposal_id):
             if pem and invited_email and pem != invited_email:
                 return {'detail': 'Proposal not found or access denied'}, 404
 
+            # IMPORTANT: Normalize/coerce sections consistently with GET /api/client/proposals/<id>
+            # so the signing payload hash matches what the client received.
+            def _coerce_sections_from_content(content_value):
+                if content_value is None:
+                    return None
+                parsed = content_value
+                if isinstance(parsed, str):
+                    raw = parsed.strip()
+                    if not raw:
+                        return None
+                    try:
+                        parsed = json.loads(raw)
+                    except Exception:
+                        return None
+                if isinstance(parsed, dict):
+                    sections_val = parsed.get('sections')
+                    if isinstance(sections_val, list):
+                        return sections_val
+                if isinstance(parsed, list):
+                    return parsed
+                return None
+
+            raw_sections_val = proposal.get('sections')
+            if isinstance(raw_sections_val, str):
+                try:
+                    raw_sections_val = json.loads(raw_sections_val)
+                except Exception:
+                    raw_sections_val = None
+
+            sections_val = raw_sections_val if isinstance(raw_sections_val, list) and raw_sections_val else None
+            if sections_val is None:
+                sections_val = _coerce_sections_from_content(proposal.get('content'))
+
+            if isinstance(sections_val, list):
+                normalized_sections = []
+                for i, sec in enumerate(sections_val):
+                    if isinstance(sec, dict):
+                        sec_dict = dict(sec)
+                        raw_title = (
+                            sec_dict.get('title')
+                            or sec_dict.get('heading')
+                            or sec_dict.get('name')
+                            or sec_dict.get('label')
+                            or sec_dict.get('section_title')
+                            or sec_dict.get('sectionTitle')
+                            or sec_dict.get('header')
+                            or sec_dict.get('headline')
+                            or sec_dict.get('headingText')
+                            or sec_dict.get('display_title')
+                            or sec_dict.get('displayTitle')
+                        )
+                        raw_title = str(raw_title).strip() if raw_title is not None else ''
+                        sec_dict['title'] = raw_title or f'Section {i + 1}'
+                        normalized_sections.append(sec_dict)
+                        continue
+                    if isinstance(sec, str) and sec.strip():
+                        normalized_sections.append({'title': f'Section {i + 1}', 'content': sec})
+                        continue
+                sections_val = normalized_sections if normalized_sections else sections_val
+
             expected_hash = _compute_signing_payload_hash(
                 proposal.get('title'),
                 proposal.get('content'),
-                proposal.get('sections'),
+                sections_val,
             )
             if signing_payload_hash != expected_hash:
                 return {
