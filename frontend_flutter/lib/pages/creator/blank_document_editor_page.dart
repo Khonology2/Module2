@@ -6475,7 +6475,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     final isChangesRequested = statusKey == 'changes requested';
 
     return Container(
-      color: chrome.isDark ? Colors.white : chrome.floatingFill,
+      color: chrome.headerBarFill,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: Row(
         children: [
@@ -6488,7 +6488,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: chrome.isDark ? Colors.grey[50] : chrome.fieldFill,
+                      color: chrome.fieldFill,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: chrome.fieldBorder, width: 1),
                     ),
@@ -6933,7 +6933,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
         bottom: 16 * kToolbarScale,
       ),
       decoration: BoxDecoration(
-        color: chrome.isDark ? Colors.white : chrome.floatingFill,
+        color: chrome.headerBarFill,
         border: Border(
           bottom: BorderSide(color: chrome.divider, width: 1),
         ),
@@ -9019,7 +9019,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       width: isCollapsed ? 56 : 300,
-      color: chrome.isDark ? Colors.white : chrome.floatingFill,
+      color: chrome.floatingFill,
       child: Column(
         children: [
           // Panel tabs/icons at the top + collapse toggle
@@ -9060,8 +9060,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color:
-                          chrome.isDark ? Colors.grey[100] : chrome.fieldFill,
+                      color: chrome.fieldFill,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: chrome.fieldBorder, width: 1),
                     ),
@@ -9178,10 +9177,21 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
           decoration: InputDecoration(
             labelText: 'Client',
             isDense: true,
+            filled: true,
+            fillColor: chrome.fieldFill,
+            labelStyle: TextStyle(color: chrome.textMuted),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: chrome.fieldBorder, width: 1),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF00BCD4), width: 1),
             ),
           ),
         ),
@@ -9934,19 +9944,19 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
           decoration: BoxDecoration(
             border: Border.all(color: chrome.divider),
             borderRadius: BorderRadius.circular(8),
-            color: chrome.isDark ? Colors.grey[50] : chrome.fieldFill,
+            color: const Color(0xFF0A0C10),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 32, color: const Color(0xFF1A3A52)),
+              Icon(icon, size: 32, color: Colors.white),
               const SizedBox(height: 8),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: chrome.textPrimary,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -13957,22 +13967,23 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.blue[50],
+            color: const Color(0xFF0A0C10),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.blue[200]!),
+            border: Border.all(color: chrome.divider),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue[700], size: 16),
+                  const Icon(Icons.info_outline,
+                      color: Color(0xFF00BCD4), size: 16),
                   const SizedBox(width: 8),
                   Text(
                     'Comprehensive Analysis',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: chrome.textPrimary,
+                      color: Colors.white,
                     ),
                   ),
                 ],
@@ -13982,7 +13993,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                 'Run both governance check and risk assessment to ensure your proposal meets all requirements before completion.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[700],
+                  color: Colors.white.withOpacity(0.75),
                   height: 1.4,
                 ),
               ),
@@ -13995,22 +14006,23 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: const Color(0xFF0A0C10),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[200]!),
+            border: Border.all(color: chrome.divider),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.verified_user, color: Colors.blue[700], size: 20),
+                  const Icon(Icons.verified_user,
+                      color: Color(0xFF00BCD4), size: 20),
                   const SizedBox(width: 8),
                   const Text(
                     'Governance Check',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
+                      color: Colors.white,
                     ),
                   ),
                   if (_hasCompletedGovernanceCheck) ...[
@@ -14032,7 +14044,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                 'Validates proposal structure, required sections, and compliance standards.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Colors.white.withOpacity(0.75),
                 ),
               ),
               if (_governanceResults.isNotEmpty) ...[
@@ -14040,9 +14052,10 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: _governanceResults['status'] == 'Ready'
-                        ? Colors.green[100]
-                        : Colors.orange[100],
+                    color: (_governanceResults['status'] == 'Ready'
+                            ? Colors.green
+                            : Colors.orange)
+                        .withOpacity(0.18),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -14061,7 +14074,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                         'Status: ${_governanceResults['status']}',
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
-                          color: Colors.grey[700],
+                          color: Colors.white.withOpacity(0.85),
                         ),
                       ),
                     ],
@@ -14077,23 +14090,23 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: const Color(0xFF0A0C10),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[200]!),
+            border: Border.all(color: chrome.divider),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.analytics_outlined,
-                      color: Colors.orange[700], size: 20),
+                  const Icon(Icons.analytics_outlined,
+                      color: Color(0xFFFF9800), size: 20),
                   const SizedBox(width: 8),
                   const Text(
                     'Risk Assessment',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
+                      color: Colors.white,
                     ),
                   ),
                   if (_hasCompletedRiskAssessment) ...[
@@ -14111,7 +14124,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                 'Analyzes potential risks and provides mitigation recommendations.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Colors.white.withOpacity(0.75),
                 ),
               ),
               if (_riskAssessment.isNotEmpty) ...[
@@ -14134,7 +14147,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                         'Risk Level: ${_riskAssessment['risk_level']}',
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
-                          color: Colors.grey[700],
+                          color: Colors.white.withOpacity(0.85),
                         ),
                       ),
                     ],

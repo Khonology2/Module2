@@ -465,6 +465,15 @@ class MyApp extends StatelessWidget {
           colorSchemeSeed: Colors.blue,
           textTheme: GoogleFonts.poppinsTextTheme(),
           scaffoldBackgroundColor: Colors.transparent,
+          snackBarTheme: const SnackBarThemeData(
+            backgroundColor: Color(0xFF1A1F26),
+            contentTextStyle: TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
         ),
         builder: (context, child) {
           // Do not paint Global BG here: it sat behind every route and made
@@ -571,7 +580,8 @@ class MyApp extends StatelessWidget {
           },
           '/home': (context) => _wrapManagerScreen(const DashboardPage()),
           '/dashboard': (context) => _wrapManagerScreen(const DashboardPage()),
-          '/creator_dashboard': (context) => _wrapManagerScreen(const DashboardPage()),
+          '/creator_dashboard': (context) =>
+              _wrapManagerScreen(const DashboardPage()),
           '/proposals': (context) => _wrapManagerScreen(ProposalsPage()),
           '/compose': (context) {
             final dynamic rawArgs = ModalRoute.of(context)?.settings.arguments;
@@ -655,23 +665,29 @@ class MyApp extends StatelessWidget {
           },
           '/govern': (context) => const GovernPage(),
           '/preview': (context) => const PreviewPage(),
-          '/content_library': (context) => _wrapManagerScreen(const ContentLibraryPage()),
-          '/content': (context) =>
-              _wrapManagerScreen(const ContentLibraryPage()), // Add missing route
+          '/content_library': (context) =>
+              _wrapManagerScreen(const ContentLibraryPage()),
+          '/content': (context) => _wrapManagerScreen(
+              const ContentLibraryPage()), // Add missing route
           '/templates': (context) => _wrapManagerScreen(const TemplatesPage()),
           '/template-builder': (context) {
             final args = ModalRoute.of(context)?.settings.arguments
                 as Map<String, dynamic>?;
             return TemplateBuilder(templateId: args?['templateId']);
           },
-          '/approvals': (context) => _wrapManagerScreen(const ApproverDashboardPage()),
-          '/approver_dashboard': (context) => _wrapManagerScreen(const ApproverDashboardPage()),
-          '/finance_dashboard': (context) => _wrapManagerScreen(const FinanceDashboardV2Page()),
+          '/approvals': (context) =>
+              _wrapManagerScreen(const ApproverDashboardPage()),
+          '/approver_dashboard': (context) =>
+              _wrapManagerScreen(const ApproverDashboardPage()),
+          '/finance_dashboard': (context) =>
+              _wrapManagerScreen(const FinanceDashboardV2Page()),
           '/finance/onboarding': (context) => const FinanceOnboardingPage(),
           '/finance/clients': (context) => const FinanceClientManagementPage(),
           '/finance/clients/add': (context) => const FinanceAddClientPage(),
-          '/approved_proposals': (context) => _wrapManagerScreen(const ApprovedProposalsPage()),
-          '/admin_approvals': (context) => _wrapManagerScreen(const AdminApprovalsPage()),
+          '/approved_proposals': (context) =>
+              _wrapManagerScreen(const ApprovedProposalsPage()),
+          '/admin_approvals': (context) =>
+              _wrapManagerScreen(const AdminApprovalsPage()),
           '/proposal_review': (context) {
             final args = ModalRoute.of(context)?.settings.arguments
                 as Map<String, dynamic>?;
@@ -680,9 +696,11 @@ class MyApp extends StatelessWidget {
               proposalTitle: args?['title']?.toString(),
             );
           },
-          '/admin_dashboard': (context) => _wrapManagerScreen(const ApproverDashboardPage()),
+          '/admin_dashboard': (context) =>
+              _wrapManagerScreen(const ApproverDashboardPage()),
           '/cinematic': (context) => const CinematicSequencePage(),
-          '/client_management': (context) => _wrapManagerScreen(const ClientManagementPage()),
+          '/client_management': (context) =>
+              _wrapManagerScreen(const ClientManagementPage()),
           '/manager_account_profile': (context) =>
               _wrapManagerScreen(const ManagerAccountProfilePage()),
           '/collaboration': (context) =>
@@ -710,10 +728,11 @@ class MyApp extends StatelessWidget {
                 mode: admin.AnalyticsPageMode.creator));
           },
           '/admin_analytics': (context) {
-            return _wrapManagerScreen(const admin.AnalyticsPage(
-                mode: admin.AnalyticsPageMode.admin));
+            return _wrapManagerScreen(
+                const admin.AnalyticsPage(mode: admin.AnalyticsPageMode.admin));
           },
-          '/admin_history': (context) => _wrapManagerScreen(const AdminHistoryPage()),
+          '/admin_history': (context) =>
+              _wrapManagerScreen(const AdminHistoryPage()),
           '/approved-proposals': (context) => const ApprovedProposalsPage(),
           '/ai-configuration': (context) => const AIConfigurationPage(),
           '/settings': (context) => const SettingsPage(),
