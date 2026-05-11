@@ -2647,6 +2647,7 @@ def get_proposal_analytics(username=None, proposal_id=None):
 
             def _merge_view_section_events(items):
                 merged = []
+                seen = {}
 
                 def _get_section_label(ev):
                     md = ev.get('metadata')
@@ -2665,15 +2666,6 @@ def get_proposal_analytics(username=None, proposal_id=None):
                     except Exception:
                         return 0
 
-                def _get_created_at_dt(ev):
-                    ts = ev.get('created_at')
-                    if not ts:
-                        return None
-                    try:
-                        return datetime.fromisoformat(ts.replace('Z', '+00:00'))
-                    except Exception:
-                        return None
-
                 for ev in items:
                     if ev.get('event_type') != 'view_section':
                         merged.append(ev)
@@ -2681,41 +2673,18 @@ def get_proposal_analytics(username=None, proposal_id=None):
 
                     label = _get_section_label(ev)
                     email = (ev.get('client_email') or '').strip().lower()
-                    dt = _get_created_at_dt(ev)
-
-                    if not merged:
-                        merged.append(ev)
+                    key = (email, label)
+                    if key in seen:
+                        existing = seen[key]
+                        existing_md = existing.get('metadata')
+                        if not isinstance(existing_md, dict):
+                            existing_md = {}
+                        new_md = dict(existing_md)
+                        new_md['duration'] = _get_duration_seconds(existing) + _get_duration_seconds(ev)
+                        existing['metadata'] = new_md
                         continue
 
-                    prev = merged[-1]
-                    if prev.get('event_type') != 'view_section':
-                        merged.append(ev)
-                        continue
-
-                    prev_label = _get_section_label(prev)
-                    prev_email = (prev.get('client_email') or '').strip().lower()
-                    prev_dt = _get_created_at_dt(prev)
-
-                    # Merge only adjacent view_section events for the same client + section
-                    # within a short gap (events are ordered DESC).
-                    gap_ok = False
-                    if dt is not None and prev_dt is not None:
-                        try:
-                            gap_ok = abs((prev_dt - dt).total_seconds()) <= 90
-                        except Exception:
-                            gap_ok = False
-
-                    if label and prev_label and label == prev_label and email == prev_email and gap_ok:
-                        prev_md = prev.get('metadata')
-                        if not isinstance(prev_md, dict):
-                            prev_md = {}
-                        prev_d = _get_duration_seconds(prev)
-                        cur_d = _get_duration_seconds(ev)
-                        new_md = dict(prev_md)
-                        new_md['duration'] = prev_d + cur_d
-                        prev['metadata'] = new_md
-                        continue
-
+                    seen[key] = ev
                     merged.append(ev)
 
                 return merged
