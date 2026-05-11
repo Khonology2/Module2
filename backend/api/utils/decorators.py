@@ -7,6 +7,7 @@ import psycopg2
 import psycopg2.extensions
 import base64
 import json
+import jwt
 from functools import wraps
 from flask import request
 from api.utils.firebase_auth import verify_firebase_token, get_user_from_token
@@ -17,6 +18,26 @@ from api.utils.auth import verify_token
 # Simple in-memory cache to avoid re-querying the DB for the same Firebase user
 # on every request. Keyed by email → (user_id, username).
 USER_CACHE_BY_EMAIL = {}
+
+
+def _get_app_jwt_secret():
+    secret = os.getenv('APP_JWT_SECRET') or os.getenv('JWT_SECRET') or os.getenv('SSO_JWT_SECRET')
+    if not secret:
+        return None
+    return secret
+
+
+def _decode_app_access_token(token):
+    secret = _get_app_jwt_secret()
+    if not secret:
+        return None
+    try:
+        payload = jwt.decode(token, secret, algorithms=['HS256'])
+    except Exception:
+        return None
+    if payload.get('type') != 'access':
+        return None
+    return payload
 
 
 def _verify_user_readable(conn, user_id, max_retries=10):
@@ -292,6 +313,23 @@ def token_required(f):
                 print('[ERROR] Firebase token validation failed and legacy validation failed')
                 return {'detail': 'Invalid or expired token'}, 401
         else:
+            if is_jwt_format:
+                app_payload = _decode_app_access_token(token)
+                if app_payload:
+                    user_id = app_payload.get('sub')
+                    email = app_payload.get('email')
+                    with get_db_connection() as conn:
+                        cursor = conn.cursor()
+                        if user_id:
+                            cursor.execute('SELECT username FROM users WHERE id = %s', (user_id,))
+                        elif email:
+                            cursor.execute('SELECT username FROM users WHERE email = %s', (email,))
+                        else:
+                            cursor = None
+                        row = cursor.fetchone() if cursor else None
+                        username = row[0] if row else None
+                    if username:
+                        return f(username=username, *args, **kwargs)
             username = verify_token(token)
             if username:
                 return f(username=username, *args, **kwargs)

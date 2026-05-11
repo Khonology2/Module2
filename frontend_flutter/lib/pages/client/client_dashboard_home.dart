@@ -7,7 +7,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import 'package:web/web.dart' as web;
 import 'dart:async';
-import 'package:url_launcher/url_launcher_string.dart';
 import 'client_proposal_viewer.dart';
 import '../../api.dart';
 import '../../theme/premium_theme.dart';
@@ -58,6 +57,31 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   String _dashboardDocFilter = 'all';
   int _unreadClientNotifications = 0;
   DateTime? _clientNotificationsLastSeenAt;
+  bool _dashboardOpenLogged = false;
+
+  bool _shouldLogDashboardOpenOncePerWindow(String token, Duration window) {
+    if (!kIsWeb) return true;
+    final clean = token.trim();
+    if (clean.isEmpty) return true;
+    try {
+      final key = 'lukens_client_dashboard_open_logged_at_$clean';
+      final raw = web.window.localStorage[key];
+      if (raw != null && raw.trim().isNotEmpty) {
+        final dt = DateTime.tryParse(raw.trim());
+        if (dt != null) {
+          final diff = DateTime.now().difference(dt);
+          if (diff >= Duration.zero && diff < window) {
+            return false;
+          }
+        }
+      }
+      web.window.localStorage[key] = DateTime.now().toIso8601String();
+    } catch (_) {
+      return true;
+    }
+    return true;
+  }
+
   Map<String, int> _statusCounts = {
     'pending': 0,
     'approved': 0,
@@ -66,7 +90,6 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
   };
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _proposalsScrollController = ScrollController();
-  bool _dashboardOpenLogged = false;
 
   static const List<Map<String, dynamic>> _clientNavItems = [
     {
@@ -2026,7 +2049,8 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
         : isProposalsTab
             ? 'Awaiting Signature'
             : 'Recent Documents';
-    const recentDocsWidth = 580.0;
+    final recentDocsWidth =
+        (MediaQuery.sizeOf(context).width * 0.55).clamp(580.0, 760.0);
     const recentDocsHeight = 370.0;
     final panelWidth = width ?? recentDocsWidth;
     final panelHeight = height ?? recentDocsHeight;
@@ -3477,15 +3501,19 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               ? parsedProposals.first['id']?.toString()
               : null;
           if (firstId != null && firstId.trim().isNotEmpty) {
+            final shouldLog = _shouldLogDashboardOpenOncePerWindow(
+                token, const Duration(minutes: 30));
             _dashboardOpenLogged = true;
-            await _logClientActivity(
-              token: token,
-              proposalId: firstId,
-              eventType: 'dashboard_open',
-              metadata: {
-                'screen': 'client_dashboard',
-              },
-            );
+            if (shouldLog) {
+              await _logClientActivity(
+                token: token,
+                proposalId: firstId,
+                eventType: 'dashboard_open',
+                metadata: {
+                  'screen': 'client_dashboard',
+                },
+              );
+            }
           }
         }
 
@@ -3526,6 +3554,12 @@ class _ClientDashboardHomeState extends State<ClientDashboardHome> {
               _isLoading = false;
             });
             return;
+          }
+
+          if (_selectedNavIndex == 1) {
+            setState(() {
+              _selectedNavIndex = 0;
+            });
           }
 
           // Verification succeeded; retry proposals fetch now that we have a session token.

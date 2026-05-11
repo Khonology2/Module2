@@ -84,11 +84,13 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      gradient: PremiumTheme.tealGradient,
+                      color: chrome.isDark
+                          ? Colors.white.withValues(alpha: 0.2)
+                          : chrome.fieldFill,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.person_add_alt_1,
-                        color: Colors.white, size: 24),
+                    child: Icon(Icons.person_add_alt_1,
+                        color: ManagerChromeTheme.accentRed, size: 24),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -199,7 +201,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: PremiumTheme.teal,
+                      backgroundColor: ManagerChromeTheme.accentRed,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 32, vertical: 16),
@@ -258,6 +260,346 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
   String _getUserName(Map<String, dynamic>? user) {
     if (user == null) return 'User';
     return user['full_name'] ?? user['email'] ?? 'User';
+  }
+
+  Widget _buildHeaderBar(AppState app, ManagerChromeTheme chrome) {
+    return Container(
+      height: 96,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: const BoxDecoration(color: Colors.transparent),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            'Manager Client Management',
+            style: TextStyle(
+              color: chrome.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: RichText(
+              text: TextSpan(
+                text: 'Hello, ',
+                style: TextStyle(
+                  color: chrome.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                ),
+                children: [
+                  TextSpan(
+                    text: _getUserName(app.currentUser),
+                    style: TextStyle(
+                      color: chrome.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Spacer(),
+          _buildHeaderIconButton(
+            chrome: chrome,
+            assetPath: 'assets/images/new icons for manager/messages.png',
+            onTap: () async {
+              await app.fetchNotifications();
+              if (!mounted) return;
+              _showNotificationsSheet(app, messagesOnly: true);
+            },
+            badge: _unreadNotificationCount(app, messagesOnly: true) > 0
+                ? _unreadNotificationCount(app, messagesOnly: true)
+                : null,
+          ),
+          const SizedBox(width: 8),
+          _buildHeaderIconButton(
+            chrome: chrome,
+            assetPath: 'assets/images/new icons for manager/notifications.png',
+            onTap: () async {
+              await app.fetchNotifications();
+              if (!mounted) return;
+              _showNotificationsSheet(app, messagesOnly: false);
+            },
+            badge: _unreadNotificationCount(app, messagesOnly: false) > 0
+                ? _unreadNotificationCount(app, messagesOnly: false)
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderIconButton({
+    required ManagerChromeTheme chrome,
+    required String assetPath,
+    required VoidCallback onTap,
+    int? badge,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            width: 44.86898422241211,
+            height: 44.86898422241211,
+            child: Image.asset(assetPath, fit: BoxFit.contain),
+          ),
+        ),
+        if (badge != null && badge > 0)
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: const BoxDecoration(
+                color: Color(0xFFC10D00),
+                borderRadius: BorderRadius.all(Radius.circular(10)),
+              ),
+              child: Text(
+                badge > 99 ? '99+' : badge.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  static bool _notificationIsCommentMessage(Map<String, dynamic> n) {
+    final t =
+        (n['notification_type'] ?? n['type'] ?? '').toString().toLowerCase();
+    return t.contains('comment') || t == 'mentioned' || t.contains('mention');
+  }
+
+  static Map<String, dynamic> _asNotificationMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      try {
+        return raw.cast<String, dynamic>();
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }
+    return <String, dynamic>{};
+  }
+
+  int _unreadNotificationCount(AppState app, {required bool messagesOnly}) {
+    var n = 0;
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      final isComment = _notificationIsCommentMessage(item);
+      if (messagesOnly != isComment) continue;
+      if (item['is_read'] != true) n++;
+    }
+    return n;
+  }
+
+  List<Map<String, dynamic>> _notificationsFiltered(
+    AppState app, {
+    required bool messagesOnly,
+  }) {
+    final out = <Map<String, dynamic>>[];
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      if (messagesOnly != _notificationIsCommentMessage(item)) continue;
+      out.add(item);
+    }
+    return out;
+  }
+
+  void _showNotificationsSheet(AppState app, {bool messagesOnly = false}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              final chrome = context.watch<ManagerThemeController>().chrome;
+              final notifications =
+                  _notificationsFiltered(app, messagesOnly: messagesOnly);
+              final unreadCount =
+                  _unreadNotificationCount(app, messagesOnly: messagesOnly);
+
+              Future<void> markAllInSheet() async {
+                for (final n
+                    in List<Map<String, dynamic>>.from(notifications)) {
+                  if (n['is_read'] == true) continue;
+                  final idRaw = n['id'];
+                  final id = idRaw is int
+                      ? idRaw
+                      : int.tryParse(idRaw?.toString() ?? '');
+                  if (id != null) await app.markNotificationRead(id);
+                }
+                await app.fetchNotifications();
+                if (context.mounted) setModalState(() {});
+              }
+
+              Future<void> deleteAllInSheet() async {
+                for (final n
+                    in List<Map<String, dynamic>>.from(notifications)) {
+                  final idRaw = n['id'];
+                  final id = idRaw is int
+                      ? idRaw
+                      : int.tryParse(idRaw?.toString() ?? '');
+                  if (id != null) await app.deleteNotification(id);
+                }
+                await app.fetchNotifications();
+                if (context.mounted) setModalState(() {});
+              }
+
+              return Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.7,
+                ),
+                decoration: chrome.floatingPanelDecoration(radius: 14),
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            messagesOnly ? 'Messages' : 'Notifications',
+                            style: TextStyle(
+                              color: chrome.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (unreadCount > 0)
+                          TextButton(
+                            onPressed: markAllInSheet,
+                            style: TextButton.styleFrom(
+                              foregroundColor: ManagerChromeTheme.accentRed,
+                            ),
+                            child: const Text('Mark all read'),
+                          ),
+                        if (notifications.isNotEmpty)
+                          TextButton(
+                            onPressed: deleteAllInSheet,
+                            style: TextButton.styleFrom(
+                              foregroundColor: ManagerChromeTheme.accentRed,
+                            ),
+                            child: const Text('Clear'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: notifications.isEmpty
+                          ? Center(
+                              child: Text(
+                                messagesOnly
+                                    ? 'No messages'
+                                    : 'No notifications',
+                                style: TextStyle(color: chrome.textSecondary),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: notifications.length,
+                              separatorBuilder: (_, __) => Divider(
+                                color: chrome.divider,
+                                height: 12,
+                              ),
+                              itemBuilder: (context, index) {
+                                final n = notifications[index];
+                                final title = (n['title'] ??
+                                        n['subject'] ??
+                                        n['notification_type'] ??
+                                        'Notification')
+                                    .toString();
+                                final body = (n['message'] ??
+                                        n['body'] ??
+                                        n['content'] ??
+                                        '')
+                                    .toString();
+                                final isRead = n['is_read'] == true;
+                                return InkWell(
+                                  onTap: () async {
+                                    final idRaw = n['id'];
+                                    final id = idRaw is int
+                                        ? idRaw
+                                        : int.tryParse(idRaw?.toString() ?? '');
+                                    if (!isRead && id != null) {
+                                      await app.markNotificationRead(id);
+                                      await app.fetchNotifications();
+                                      if (context.mounted) {
+                                        setModalState(() {});
+                                      }
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: chrome.fieldFill,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: chrome.divider),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: chrome.textPrimary,
+                                            fontWeight: isRead
+                                                ? FontWeight.w500
+                                                : FontWeight.w700,
+                                          ),
+                                        ),
+                                        if (body.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            body,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: chrome.textSecondary,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   /// Helper function to check if an invitation email is verified
@@ -324,11 +666,13 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      gradient: PremiumTheme.tealGradient,
+                      color: chrome.isDark
+                          ? Colors.white.withValues(alpha: 0.2)
+                          : chrome.fieldFill,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.mail_outline,
-                        color: Colors.white, size: 24),
+                    child: Icon(Icons.mail_outline,
+                        color: ManagerChromeTheme.accentRed, size: 24),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -404,7 +748,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: PremiumTheme.teal,
+                      backgroundColor: ManagerChromeTheme.accentRed,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 32, vertical: 16),
@@ -451,9 +795,8 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
     required ManagerChromeTheme chrome,
     TextInputType keyboardType = TextInputType.text,
   }) {
-    final fill = chrome.isDark
-        ? Colors.white.withValues(alpha: 0.1)
-        : chrome.fieldFill;
+    final fill =
+        chrome.isDark ? Colors.white.withValues(alpha: 0.1) : chrome.fieldFill;
     final borderSide = chrome.isDark
         ? Colors.white.withValues(alpha: 0.2)
         : chrome.fieldBorder;
@@ -483,7 +826,8 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: TextStyle(color: chrome.textMuted),
-              prefixIcon: Icon(icon, color: PremiumTheme.teal, size: 20),
+              prefixIcon:
+                  Icon(icon, color: ManagerChromeTheme.accentRed, size: 20),
               border: InputBorder.none,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -540,7 +884,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isSuccess ? PremiumTheme.success : PremiumTheme.error,
+        backgroundColor: isSuccess ? PremiumTheme.info : PremiumTheme.error,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -550,8 +894,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
   @override
   Widget build(BuildContext context) {
     final app = Provider.of<AppState>(context);
-    final user = app.currentUser;
-    final userRole = user?['role'] ?? 'Financial Manager';
+    final chrome = context.watch<ManagerThemeController>().chrome;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -561,7 +904,8 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
             Consumer<AppState>(
               builder: (context, app, _) {
                 final user = AuthService.currentUser ?? app.currentUser;
-                final role = (user?['role'] ?? '').toString().toLowerCase().trim();
+                final role =
+                    (user?['role'] ?? '').toString().toLowerCase().trim();
                 final isAdmin = role == 'admin' || role == 'ceo';
                 return AppSideNav(
                   isCollapsed: app.isSidebarCollapsed,
@@ -578,80 +922,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
             Expanded(
               child: Column(
                 children: [
-                  Container(
-                    height: 70,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.black.withValues(alpha: 0.3),
-                          Colors.transparent,
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ClipOval(
-                              child: Image.asset(
-                                'assets/images/User_Profile.png',
-                                width: 48,
-                                height: 48,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _getUserName(user),
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  userRole.toString(),
-                                  style: const TextStyle(
-                                      color: Colors.white70, fontSize: 12),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(width: 10),
-                            PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert, color: Colors.white),
-                              onSelected: (value) {
-                                if (value == 'logout') {
-                                  app.logout();
-                                  AuthService.logout();
-                                  Navigator.pushNamed(context, '/login');
-                                }
-                              },
-                              itemBuilder: (BuildContext context) => const [
-                                PopupMenuItem<String>(
-                                  value: 'logout',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.logout),
-                                      SizedBox(width: 8),
-                                      Text('Logout'),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                  _buildHeaderBar(app, chrome),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
@@ -674,8 +945,10 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                               const SizedBox(height: 20),
                               if (_loading)
                                 const Center(
-                                    child: CircularProgressIndicator(
-                                        color: PremiumTheme.teal))
+                                  child: CircularProgressIndicator(
+                                    color: ManagerChromeTheme.accentRed,
+                                  ),
+                                )
                               else if (_selectedTab == 'clients' ||
                                   !_canManageInvitations())
                                 _buildClientsTable()
@@ -762,7 +1035,9 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
     );
     final subtitleStyle = TextStyle(
       fontSize: 14,
-      color: chrome.isDark ? const Color(0xFFE0F7FA) : chrome.textSecondary,
+      color: chrome.isDark
+          ? Colors.white.withValues(alpha: 0.7)
+          : chrome.textSecondary,
     );
 
     final row = Row(
@@ -772,12 +1047,12 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
           decoration: BoxDecoration(
             color: chrome.isDark
                 ? Colors.white.withValues(alpha: 0.2)
-                : PremiumTheme.teal.withValues(alpha: 0.15),
+                : chrome.fieldFill,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Icon(
             Icons.people,
-            color: chrome.isDark ? Colors.white : PremiumTheme.teal,
+            color: chrome.isDark ? Colors.white : ManagerChromeTheme.accentRed,
             size: 32,
           ),
         ),
@@ -803,7 +1078,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                 style: TextStyle(fontWeight: FontWeight.w600)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
-              foregroundColor: PremiumTheme.teal,
+              foregroundColor: ManagerChromeTheme.accentRed,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -821,7 +1096,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                 style: TextStyle(fontWeight: FontWeight.w600)),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
-              foregroundColor: PremiumTheme.teal,
+              foregroundColor: ManagerChromeTheme.accentRed,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -839,10 +1114,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
             padding: const EdgeInsets.all(32),
-            decoration: PremiumTheme.glassCard(
-              gradientStart: PremiumTheme.cyan,
-              gradientEnd: PremiumTheme.teal,
-            ),
+            decoration: chrome.floatingPanelDecoration(radius: 10),
             child: row,
           ),
         ),
@@ -857,17 +1129,17 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
 
   Widget _buildSearchAndFilter() {
     final chrome = context.watch<ManagerThemeController>().chrome;
-    final innerFill = chrome.isDark
-        ? Colors.white.withValues(alpha: 0.1)
-        : chrome.fieldFill;
+    final innerFill =
+        chrome.isDark ? Colors.white.withValues(alpha: 0.1) : chrome.fieldFill;
     final innerBorder = chrome.isDark
         ? Colors.white.withValues(alpha: 0.2)
         : chrome.fieldBorder;
 
     final inner = Container(
       padding: const EdgeInsets.all(20),
-      decoration:
-          chrome.isDark ? PremiumTheme.glassCard() : chrome.floatingPanelDecoration(radius: 10),
+      decoration: chrome.isDark
+          ? PremiumTheme.glassCard()
+          : chrome.floatingPanelDecoration(radius: 10),
       child: Row(
         children: [
           Expanded(
@@ -883,8 +1155,8 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                 decoration: InputDecoration(
                   hintText: 'Search clients...',
                   hintStyle: TextStyle(color: chrome.textMuted),
-                  prefixIcon:
-                      const Icon(Icons.search, color: PremiumTheme.teal),
+                  prefixIcon: const Icon(Icons.search,
+                      color: ManagerChromeTheme.accentRed),
                   border: InputBorder.none,
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -990,17 +1262,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
     );
 
     Widget wrapStat(Widget inner) {
-      return Expanded(
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: chrome.isDark
-              ? BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: inner,
-                )
-              : inner,
-        ),
-      );
+      return Expanded(child: inner);
     }
 
     return Row(
@@ -1008,9 +1270,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
         wrapStat(
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: chrome.isDark
-                ? PremiumTheme.statCard(PremiumTheme.tealGradient)
-                : chrome.floatingPanelDecoration(radius: 10),
+            decoration: chrome.floatingPanelDecoration(radius: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1018,7 +1278,9 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                   children: [
                     Icon(
                       Icons.people,
-                      color: chrome.isDark ? Colors.white : PremiumTheme.teal,
+                      color: chrome.isDark
+                          ? Colors.white
+                          : ManagerChromeTheme.accentRed,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
@@ -1037,9 +1299,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
           wrapStat(
             Container(
               padding: const EdgeInsets.all(24),
-              decoration: chrome.isDark
-                  ? PremiumTheme.statCard(PremiumTheme.blueGradient)
-                  : chrome.floatingPanelDecoration(radius: 10),
+              decoration: chrome.floatingPanelDecoration(radius: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1047,8 +1307,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                     children: [
                       Icon(
                         Icons.mail,
-                        color:
-                            chrome.isDark ? Colors.white : PremiumTheme.info,
+                        color: chrome.isDark ? Colors.white : PremiumTheme.info,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
@@ -1067,9 +1326,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
         wrapStat(
           Container(
             padding: const EdgeInsets.all(24),
-            decoration: chrome.isDark
-                ? PremiumTheme.statCard(PremiumTheme.purpleGradient)
-                : chrome.floatingPanelDecoration(radius: 10),
+            decoration: chrome.floatingPanelDecoration(radius: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1077,8 +1334,9 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                   children: [
                     Icon(
                       Icons.rate_review,
-                      color:
-                          chrome.isDark ? Colors.white : PremiumTheme.purple,
+                      color: chrome.isDark
+                          ? Colors.white
+                          : ManagerChromeTheme.accentRed,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
@@ -1115,8 +1373,9 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
     final inactiveColor = chrome.isDark ? Colors.white : chrome.textPrimary;
 
     final inner = Container(
-      decoration:
-          chrome.isDark ? PremiumTheme.glassCard() : chrome.floatingPanelDecoration(radius: 10),
+      decoration: chrome.isDark
+          ? PremiumTheme.glassCard()
+          : chrome.floatingPanelDecoration(radius: 10),
       child: Row(
         children: [
           Expanded(
@@ -1126,11 +1385,11 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
                   color: _selectedTab == 'clients'
-                      ? PremiumTheme.teal.withValues(alpha: 0.3)
+                      ? Colors.transparent
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
                   border: _selectedTab == 'clients'
-                      ? Border.all(color: PremiumTheme.teal, width: 2)
+                      ? Border.all(color: chrome.divider, width: 1)
                       : null,
                 ),
                 child: Row(
@@ -1139,7 +1398,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                     Icon(
                       Icons.people,
                       color: _selectedTab == 'clients'
-                          ? PremiumTheme.teal
+                          ? ManagerChromeTheme.accentRed
                           : inactiveColor,
                     ),
                     const SizedBox(width: 8),
@@ -1147,7 +1406,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                       'Clients (${_clients.length})',
                       style: TextStyle(
                         color: _selectedTab == 'clients'
-                            ? PremiumTheme.teal
+                            ? ManagerChromeTheme.accentRed
                             : inactiveColor,
                         fontWeight: _selectedTab == 'clients'
                             ? FontWeight.w600
@@ -1167,11 +1426,11 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
                     color: _selectedTab == 'invitations'
-                        ? PremiumTheme.teal.withValues(alpha: 0.3)
+                        ? Colors.transparent
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(20),
                     border: _selectedTab == 'invitations'
-                        ? Border.all(color: PremiumTheme.teal, width: 2)
+                        ? Border.all(color: chrome.divider, width: 1)
                         : null,
                   ),
                   child: Row(
@@ -1180,7 +1439,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                       Icon(
                         Icons.mail,
                         color: _selectedTab == 'invitations'
-                            ? PremiumTheme.teal
+                            ? ManagerChromeTheme.accentRed
                             : inactiveColor,
                       ),
                       const SizedBox(width: 8),
@@ -1190,12 +1449,11 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                               i['status']?.toString().toLowerCase() ?? '';
                           final clientId = i['client_id'];
                           return status != 'completed' &&
-                              (clientId == null ||
-                                  clientId.toString().isEmpty);
+                              (clientId == null || clientId.toString().isEmpty);
                         }).length})',
                         style: TextStyle(
                           color: _selectedTab == 'invitations'
-                              ? PremiumTheme.teal
+                              ? ManagerChromeTheme.accentRed
                               : inactiveColor,
                           fontWeight: _selectedTab == 'invitations'
                               ? FontWeight.w600
@@ -1237,8 +1495,9 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
     if (filteredClients.isEmpty) {
       final emptyInner = Container(
         padding: const EdgeInsets.all(48),
-        decoration:
-            chrome.isDark ? PremiumTheme.glassCard() : chrome.floatingPanelDecoration(radius: 10),
+        decoration: chrome.isDark
+            ? PremiumTheme.glassCard()
+            : chrome.floatingPanelDecoration(radius: 10),
         child: Center(
           child: Column(
             children: [
@@ -1273,8 +1532,9 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
     }
 
     final tableInner = Container(
-      decoration:
-          chrome.isDark ? PremiumTheme.glassCard() : chrome.floatingPanelDecoration(radius: 10),
+      decoration: chrome.isDark
+          ? PremiumTheme.glassCard()
+          : chrome.floatingPanelDecoration(radius: 10),
       child: Column(
         children: [
           Container(
@@ -1305,12 +1565,6 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                 Expanded(
                     flex: 2,
                     child: Text('Email',
-                        style: TextStyle(
-                            color: chrome.textPrimary,
-                            fontWeight: FontWeight.w600))),
-                Expanded(
-                    flex: 2,
-                    child: Text('Industry',
                         style: TextStyle(
                             color: chrome.textPrimary,
                             fontWeight: FontWeight.w600))),
@@ -1346,27 +1600,15 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
     );
   }
 
-  Widget _buildClientRow(Map<String, dynamic> client, ManagerChromeTheme chrome) {
+  Widget _buildClientRow(
+      Map<String, dynamic> client, ManagerChromeTheme chrome) {
     final company = client['company_name'] ?? 'N/A';
     final contact = client['contact_person'] ?? 'N/A';
     final email = client['email'] ?? 'N/A';
-    // Get holding information from various possible keys
-    final holdingInfo = client['holding_information'] ??
-        client['holdingInformation'] ??
-        client['holding'] ??
-        client['client_holding'] ??
-        client['industry']; // fallback to industry if holding is not found
-
-    final industry = (holdingInfo == null ||
-            holdingInfo.toString().trim().isEmpty ||
-            holdingInfo.toString().trim().toLowerCase() == 'n/a')
-        ? 'Holding'
-        : holdingInfo.toString();
     final status = client['status'] ?? 'active';
 
-    final rowDivider = chrome.isDark
-        ? Colors.white.withValues(alpha: 0.1)
-        : chrome.divider;
+    final rowDivider =
+        chrome.isDark ? Colors.white.withValues(alpha: 0.1) : chrome.divider;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1380,20 +1622,16 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
         children: [
           Expanded(
               flex: 3,
-              child: Text(company,
-                  style: TextStyle(color: chrome.textPrimary))),
+              child:
+                  Text(company, style: TextStyle(color: chrome.textPrimary))),
           Expanded(
               flex: 2,
-              child: Text(contact,
-                  style: TextStyle(color: chrome.textSecondary))),
+              child:
+                  Text(contact, style: TextStyle(color: chrome.textSecondary))),
           Expanded(
               flex: 2,
-              child: Text(email,
-                  style: TextStyle(color: chrome.textSecondary))),
-          Expanded(
-              flex: 2,
-              child: Text(industry,
-                  style: TextStyle(color: chrome.textSecondary))),
+              child:
+                  Text(email, style: TextStyle(color: chrome.textSecondary))),
           Expanded(
             flex: 1,
             child: Container(
@@ -1480,8 +1718,9 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
     if (filteredInvitations.isEmpty) {
       final emptyInner = Container(
         padding: const EdgeInsets.all(48),
-        decoration:
-            chrome.isDark ? PremiumTheme.glassCard() : chrome.floatingPanelDecoration(radius: 10),
+        decoration: chrome.isDark
+            ? PremiumTheme.glassCard()
+            : chrome.floatingPanelDecoration(radius: 10),
         child: Center(
           child: Column(
             children: [
@@ -1516,8 +1755,9 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
     }
 
     final tableInner = Container(
-      decoration:
-          chrome.isDark ? PremiumTheme.glassCard() : chrome.floatingPanelDecoration(radius: 10),
+      decoration: chrome.isDark
+          ? PremiumTheme.glassCard()
+          : chrome.floatingPanelDecoration(radius: 10),
       child: Column(
         children: [
           Container(
@@ -1607,9 +1847,8 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
             .format(DateTime.parse(invite['expires_at'].toString()))
         : 'N/A';
 
-    final rowDivider = chrome.isDark
-        ? Colors.white.withValues(alpha: 0.1)
-        : chrome.divider;
+    final rowDivider =
+        chrome.isDark ? Colors.white.withValues(alpha: 0.1) : chrome.divider;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1625,8 +1864,8 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
               child: Text(email, style: TextStyle(color: chrome.textPrimary))),
           Expanded(
               flex: 2,
-              child: Text(company,
-                  style: TextStyle(color: chrome.textSecondary))),
+              child:
+                  Text(company, style: TextStyle(color: chrome.textSecondary))),
           Expanded(
               flex: 2,
               child: Text(sentDate,
@@ -1641,12 +1880,12 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: emailVerified
-                    ? PremiumTheme.success.withValues(alpha: 0.2)
+                    ? PremiumTheme.info.withValues(alpha: 0.2)
                     : _getStatusColor(status).withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                     color: emailVerified
-                        ? PremiumTheme.success
+                        ? PremiumTheme.info
                         : _getStatusColor(status),
                     width: 1),
               ),
@@ -1654,7 +1893,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
                 emailVerified ? 'VERIFIED' : status.toUpperCase(),
                 style: TextStyle(
                   color: emailVerified
-                      ? PremiumTheme.success
+                      ? PremiumTheme.info
                       : _getStatusColor(status),
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -1671,7 +1910,7 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'completed':
-        return PremiumTheme.success;
+        return PremiumTheme.info;
       case 'pending':
         return PremiumTheme.warning;
       case 'expired':

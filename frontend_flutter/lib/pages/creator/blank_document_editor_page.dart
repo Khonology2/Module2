@@ -502,7 +502,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
           end = idx + selectedText.length;
         }
 
-        if (start == null || end == null) {
+        if (end == null) {
           skippedNoOffset++;
           continue;
         }

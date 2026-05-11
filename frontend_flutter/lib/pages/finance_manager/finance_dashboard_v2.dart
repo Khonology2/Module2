@@ -2580,11 +2580,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardV2Page> {
                                 itemBuilder: (context, index) {
                                   final rawItem = notifications[index];
                                   final Map<String, dynamic> notification =
-                                      rawItem is Map<String, dynamic>
-                                          ? rawItem
-                                          : (rawItem is Map
-                                              ? rawItem.cast<String, dynamic>()
-                                              : <String, dynamic>{});
+                                      rawItem;
 
                                   final title =
                                       notification['title']?.toString().trim();

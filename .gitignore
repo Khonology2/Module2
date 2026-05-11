@@ -27,6 +27,10 @@ dist/
 coverage/
 .nyc_output
 
+# Flutter generated plugin registries (do not commit)
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
 # Exception: Allow frontend_flutter/build/web for Render deployment
 !frontend_flutter/build/web/
 
