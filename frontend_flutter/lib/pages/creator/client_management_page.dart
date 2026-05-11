@@ -1042,21 +1042,13 @@ class _ClientManagementPageState extends State<ClientManagementPage> {
 
     final row = Row(
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: chrome.isDark
-                ? Colors.white.withValues(alpha: 0.2)
-                : chrome.fieldFill,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(
-            Icons.people,
-            color: chrome.isDark ? Colors.white : ManagerChromeTheme.accentRed,
-            size: 32,
-          ),
+        Image.asset(
+          'assets/images/collaborations_red.png',
+          width: 72,
+          height: 72,
+          fit: BoxFit.contain,
         ),
-        const SizedBox(width: 20),
+        const SizedBox(width: 18),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
