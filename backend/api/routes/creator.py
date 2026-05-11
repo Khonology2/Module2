@@ -2492,7 +2492,7 @@ def get_proposal_analytics(username=None, proposal_id=None):
             
             # Verify proposal exists and user has access
             cursor.execute("""
-                SELECT id, title, status, client_id
+                SELECT id, title, status, client_id, content
                 FROM proposals 
                 WHERE id = %s OR id::text = %s
             """, (proposal_id, str(proposal_id)))
@@ -2502,6 +2502,51 @@ def get_proposal_analytics(username=None, proposal_id=None):
                 return {'detail': 'Proposal not found'}, 404
             
             actual_proposal_id = proposal['id']
+
+            def _derive_section_titles(content_value):
+                """Build a 1-indexed map of section_number -> title."""
+                try:
+                    parsed = content_value
+                    if isinstance(parsed, str):
+                        raw = parsed.strip()
+                        if not raw:
+                            return {}
+                        parsed = json.loads(raw)
+
+                    sections_val = None
+                    if isinstance(parsed, dict) and isinstance(parsed.get('sections'), list):
+                        sections_val = parsed.get('sections')
+                    elif isinstance(parsed, list):
+                        sections_val = parsed
+
+                    if not isinstance(sections_val, list):
+                        return {}
+
+                    titles = {}
+                    for i, sec in enumerate(sections_val):
+                        title = ''
+                        if isinstance(sec, dict):
+                            title = (
+                                sec.get('title')
+                                or sec.get('heading')
+                                or sec.get('name')
+                                or sec.get('label')
+                                or sec.get('section_title')
+                                or sec.get('sectionTitle')
+                                or sec.get('header')
+                                or sec.get('headline')
+                                or sec.get('headingText')
+                                or sec.get('display_title')
+                                or sec.get('displayTitle')
+                            )
+                            title = str(title).strip() if title is not None else ''
+                        if title:
+                            titles[i + 1] = title
+                    return titles
+                except Exception:
+                    return {}
+
+            section_titles_by_number = _derive_section_titles(proposal.get('content'))
             
             # Get all activity events
             cursor.execute("""
@@ -2558,14 +2603,127 @@ def get_proposal_analytics(username=None, proposal_id=None):
             # Format events for response
             formatted_events = []
             for event in events:
+                metadata = event['metadata'] if event['metadata'] else {}
+                if event['event_type'] == 'view_section' and isinstance(metadata, dict):
+                    section_title = metadata.get('section_title')
+                    section_title = str(section_title).strip() if section_title is not None else ''
+                    section_number = metadata.get('section_number')
+                    try:
+                        section_number = int(section_number) if section_number is not None else None
+                    except Exception:
+                        section_number = None
+
+                    if (not section_title) and section_number is not None and section_number > 0:
+                        derived = section_titles_by_number.get(section_number, '')
+                        derived = derived or f'Section {section_number}'
+                        metadata = dict(metadata)
+                        metadata['section_title'] = derived
+                        metadata['section'] = derived
+
                 formatted_events.append({
                     'id': str(event['id']),
                     'event_type': event['event_type'],
-                    'metadata': event['metadata'] if event['metadata'] else {},
+                    'metadata': metadata,
                     'created_at': event['created_at'].isoformat() if event['created_at'] else None,
                     'client_name': event.get('client_name'),
                     'client_email': event.get('client_email')
                 })
+
+            def _merge_view_section_events(items):
+                merged = []
+
+                def _get_section_label(ev):
+                    md = ev.get('metadata')
+                    if not isinstance(md, dict):
+                        return ''
+                    label = md.get('section') or md.get('section_title') or ''
+                    return str(label).strip()
+
+                def _get_duration_seconds(ev):
+                    md = ev.get('metadata')
+                    if not isinstance(md, dict):
+                        return 0
+                    d = md.get('duration')
+                    try:
+                        return int(d) if d is not None else 0
+                    except Exception:
+                        return 0
+
+                def _get_created_at_dt(ev):
+                    ts = ev.get('created_at')
+                    if not ts:
+                        return None
+                    try:
+                        return datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                    except Exception:
+                        return None
+
+                for ev in items:
+                    if ev.get('event_type') != 'view_section':
+                        merged.append(ev)
+                        continue
+
+                    label = _get_section_label(ev)
+                    email = (ev.get('client_email') or '').strip().lower()
+                    dt = _get_created_at_dt(ev)
+
+                    if not merged:
+                        merged.append(ev)
+                        continue
+
+                    prev = merged[-1]
+                    if prev.get('event_type') != 'view_section':
+                        merged.append(ev)
+                        continue
+
+                    prev_label = _get_section_label(prev)
+                    prev_email = (prev.get('client_email') or '').strip().lower()
+                    prev_dt = _get_created_at_dt(prev)
+
+                    # Merge only adjacent view_section events for the same client + section
+                    # within a short gap (events are ordered DESC).
+                    gap_ok = False
+                    if dt is not None and prev_dt is not None:
+                        try:
+                            gap_ok = abs((prev_dt - dt).total_seconds()) <= 90
+                        except Exception:
+                            gap_ok = False
+
+                    if label and prev_label and label == prev_label and email == prev_email and gap_ok:
+                        prev_md = prev.get('metadata')
+                        if not isinstance(prev_md, dict):
+                            prev_md = {}
+                        prev_d = _get_duration_seconds(prev)
+                        cur_d = _get_duration_seconds(ev)
+                        new_md = dict(prev_md)
+                        new_md['duration'] = prev_d + cur_d
+                        prev['metadata'] = new_md
+                        continue
+
+                    merged.append(ev)
+
+                return merged
+
+            formatted_events = _merge_view_section_events(formatted_events)
+
+            # Recompute section_times using normalized event metadata (ensures titles show)
+            section_times = {}
+            for event in formatted_events:
+                if event.get('event_type') != 'view_section':
+                    continue
+                metadata = event.get('metadata') or {}
+                if not isinstance(metadata, dict):
+                    continue
+                section = metadata.get('section')
+                section = str(section).strip() if section is not None else ''
+                if not section:
+                    section = 'Unknown'
+                duration = metadata.get('duration')
+                try:
+                    duration = int(duration) if duration is not None else 0
+                except Exception:
+                    duration = 0
+                section_times[section] = section_times.get(section, 0) + duration
             
             # Format sessions for response
             formatted_sessions = []

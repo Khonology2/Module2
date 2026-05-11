@@ -11,13 +11,21 @@ import 'header.dart';
 
 /// Read-only structured proposal body aligned with [ProposalReviewPage]
 /// (admin/finance): metadata-driven header/footer and section pages including tables.
-class ClientProposalDocumentPreview extends StatelessWidget {
+class ClientProposalDocumentPreview extends StatefulWidget {
   final Map<String, dynamic> proposal;
+  final ScrollController? scrollController;
+  final ValueChanged<int>? onSectionChanged;
 
   const ClientProposalDocumentPreview({
     super.key,
     required this.proposal,
+    this.scrollController,
+    this.onSectionChanged,
   });
+
+  @override
+  State<ClientProposalDocumentPreview> createState() =>
+      _ClientProposalDocumentPreviewState();
 
   static const String _stdHeaderLogo =
       'assets/images/new icons for manager/khonology_logo.png';
@@ -25,7 +33,8 @@ class ClientProposalDocumentPreview extends StatelessWidget {
   static const String _stdRiskGateAsset =
       'assets/images/new icons for manager/risk_gate_tab.png';
 
-  static Map<String, dynamic>? parseDocumentData(Map<String, dynamic> proposal) {
+  static Map<String, dynamic>? parseDocumentData(
+      Map<String, dynamic> proposal) {
     dynamic raw = proposal['content'];
     Map<String, dynamic>? decoded;
     if (raw is String && raw.trim().isNotEmpty) {
@@ -449,13 +458,74 @@ class ClientProposalDocumentPreview extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ClientProposalDocumentPreviewState
+    extends State<ClientProposalDocumentPreview> {
+  late ScrollController _controller;
+  bool _ownsController = false;
+  int? _lastSectionIndex;
+
+  static const double _pageHeight = 1273;
+  static const double _pageSpacing = 32;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = widget.scrollController ?? ScrollController();
+    _ownsController = widget.scrollController == null;
+    _controller.addListener(_handleScroll);
+  }
+
+  @override
+  void didUpdateWidget(covariant ClientProposalDocumentPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.scrollController != widget.scrollController) {
+      _controller.removeListener(_handleScroll);
+
+      if (_ownsController) {
+        _controller.dispose();
+      }
+
+      _lastSectionIndex = null;
+      _controller = widget.scrollController ?? ScrollController();
+      _ownsController = widget.scrollController == null;
+      _controller.addListener(_handleScroll);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_handleScroll);
+    if (_ownsController) {
+      _controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    final cb = widget.onSectionChanged;
+    if (cb == null) return;
+
+    final stride = _pageHeight + _pageSpacing;
+    final offset = _controller.hasClients ? _controller.offset : 0.0;
+
+    final raw = ((offset + (stride / 2)) / stride).floor();
+    final idx = raw < 0 ? 0 : raw;
+
+    if (_lastSectionIndex == idx) return;
+    _lastSectionIndex = idx;
+    cb(idx);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final data = parseDocumentData(proposal);
+    final data =
+        ClientProposalDocumentPreview.parseDocumentData(widget.proposal);
     if (data == null) {
       return SelectableText(
-        _formatContent(proposal['content']),
+        ClientProposalDocumentPreview._formatContent(
+            widget.proposal['content']),
         style: const TextStyle(
           color: Colors.black87,
           fontSize: 14,
@@ -467,7 +537,8 @@ class ClientProposalDocumentPreview extends StatelessWidget {
     final sectionsRaw = data['sections'];
     if (sectionsRaw is! List || sectionsRaw.isEmpty) {
       return SelectableText(
-        _formatContent(proposal['content']),
+        ClientProposalDocumentPreview._formatContent(
+            widget.proposal['content']),
         style: const TextStyle(
           color: Colors.black87,
           fontSize: 14,
@@ -485,12 +556,13 @@ class ClientProposalDocumentPreview extends StatelessWidget {
         ? Map<String, dynamic>.from(data['metadata'] as Map)
         : <String, dynamic>{};
 
-    final useStandardized = _isTruthy(metadata['standardizedProposalLayout']);
+    final useStandardized = ClientProposalDocumentPreview._isTruthy(
+        metadata['standardizedProposalLayout']);
     final DateTime standardizedDate =
-        _parseStandardizedDateFromMetadata(metadata);
-    final rawDocTitle = (data['title'] ?? proposal['title'] ?? '')
-        .toString()
-        .trim();
+        ClientProposalDocumentPreview._parseStandardizedDateFromMetadata(
+            metadata);
+    final rawDocTitle =
+        (data['title'] ?? widget.proposal['title'] ?? '').toString().trim();
     final String? displayDocumentTitleForCustomHeader =
         rawDocTitle.isNotEmpty ? rawDocTitle : null;
 
@@ -507,7 +579,7 @@ class ClientProposalDocumentPreview extends StatelessWidget {
         footerLogoUrl.trim().isNotEmpty;
 
     int? proposalId;
-    final dynamic rawId = proposal['id'];
+    final dynamic rawId = widget.proposal['id'];
     if (rawId is int) {
       proposalId = rawId;
     } else if (rawId is String) {
@@ -517,7 +589,7 @@ class ClientProposalDocumentPreview extends StatelessWidget {
     }
 
     const double pageWidth = 900;
-    const double pageHeight = 1273;
+    const double pageHeight = _pageHeight;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -538,6 +610,7 @@ class ClientProposalDocumentPreview extends StatelessWidget {
         }
 
         return SingleChildScrollView(
+          controller: _controller,
           child: Column(
             children: [
               ...sections.asMap().entries.map((entry) {
@@ -558,13 +631,15 @@ class ClientProposalDocumentPreview extends StatelessWidget {
                 final String? backgroundImageUrl =
                     section['backgroundImageUrl'] as String?;
 
-                final bool isCover = _isTruthy(section['isCoverPage']) ||
+                final bool isCover = ClientProposalDocumentPreview._isTruthy(
+                        section['isCoverPage']) ||
                     normalize(section['sectionType']) == 'cover' ||
                     (index == 0 && backgroundImageUrl != null);
 
                 final int? bgColorValue = section['backgroundColor'] is int
                     ? section['backgroundColor'] as int
-                    : int.tryParse(section['backgroundColor']?.toString() ?? '');
+                    : int.tryParse(
+                        section['backgroundColor']?.toString() ?? '');
                 final Color backgroundColor =
                     bgColorValue != null ? Color(bgColorValue) : Colors.white;
 
@@ -647,7 +722,7 @@ class ClientProposalDocumentPreview extends StatelessWidget {
                           ),
                           child: Column(
                             children: [
-                              _readOnlyStandardizedReportHeader(
+                              widget._readOnlyStandardizedReportHeader(
                                 pageTitle: sectionPageTitle,
                                 showMetaBar: false,
                                 standardizedDate: standardizedDate,
@@ -665,7 +740,7 @@ class ClientProposalDocumentPreview extends StatelessWidget {
                                         ),
                                 ),
                               ),
-                              _readOnlyStandardizedReportFooter(),
+                              widget._readOnlyStandardizedReportFooter(),
                             ],
                           ),
                         ),
@@ -706,21 +781,21 @@ class ClientProposalDocumentPreview extends StatelessWidget {
                         child: Column(
                           children: [
                             if (useStandardized)
-                              _readOnlyStandardizedReportHeader(
+                              widget._readOnlyStandardizedReportHeader(
                                 pageTitle: sectionPageTitle,
                                 showMetaBar: true,
                                 standardizedDate: standardizedDate,
                               )
                             else if (showCustomHeader)
-                              _buildAdminHeader(
+                              widget._buildAdminHeader(
                                 metadata,
                                 displayDocumentTitleForCustomHeader,
                               ),
                             buildScrollableSectionBody(),
                             if (useStandardized)
-                              _readOnlyStandardizedReportFooter()
+                              widget._readOnlyStandardizedReportFooter()
                             else if (showCustomFooter)
-                              _buildAdminFooter(
+                              widget._buildAdminFooter(
                                 metadata: metadata,
                                 pageNumber: index + 1,
                                 totalPages: sections.length,

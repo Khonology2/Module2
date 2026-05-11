@@ -299,7 +299,12 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
               section['name'] ??
               section['label'] ??
               section['section_title'] ??
-              section['sectionTitle'])
+              section['sectionTitle'] ??
+              section['header'] ??
+              section['headline'] ??
+              section['headingText'] ??
+              section['display_title'] ??
+              section['displayTitle'])
           ?.toString()
           .trim();
       return (candidate ?? '').isNotEmpty ? candidate! : '';
@@ -1945,17 +1950,20 @@ class _ClientProposalViewerState extends State<ClientProposalViewer> {
         thumbColor: const Color(0xFFC10D00),
         trackColor: Colors.black.withValues(alpha: 0.25),
         trackBorderColor: Colors.white.withValues(alpha: 0.25),
-        child: SingleChildScrollView(
-          controller: _proposalScrollController,
-          padding: const EdgeInsets.all(24),
-          child: child,
-        ),
+        child: child,
       );
     }
 
     if (hasStructuredSections) {
       return shell(
-        ClientProposalDocumentPreview(proposal: proposal),
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: ClientProposalDocumentPreview(
+            proposal: proposal,
+            scrollController: _proposalScrollController,
+            onSectionChanged: _onSectionChanged,
+          ),
+        ),
       );
     }
 
