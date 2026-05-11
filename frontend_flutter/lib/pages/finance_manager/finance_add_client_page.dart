@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../services/client_service.dart';
 import '../../theme/premium_theme.dart';
+import '../../widgets/manager_page_background.dart';
 
 class FinanceAddClientPage extends StatefulWidget {
   const FinanceAddClientPage({super.key});
@@ -101,101 +102,124 @@ class _FinanceAddClientPageState extends State<FinanceAddClientPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('Add Client'),
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                color: PremiumTheme.darkBg2.withOpacity(0.9),
-                border: Border.all(color: Colors.white.withOpacity(0.06)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildField(
-                    label: 'Enter Client Information Name',
-                    controller: _nameController,
-                    icon: Icons.business,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildField(
-                    label: 'Enter Client Information Holding Information',
-                    controller: _holdingController,
-                    icon: Icons.apartment,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildField(
-                    label: 'Enter Client Information Address',
-                    controller: _addressController,
-                    icon: Icons.location_on,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildField(
-                    label: 'Enter Client Information Client Contact Name',
-                    controller: _contactNameController,
-                    icon: Icons.person,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildField(
-                    label:
-                        'Enter Client Information Client Contact Email Address',
-                    controller: _contactEmailController,
-                    icon: Icons.email,
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildField(
-                    label:
-                        'Enter Client Information Client Contact Mobile Number',
-                    controller: _contactMobileController,
-                    icon: Icons.phone,
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed:
-                            _saving ? null : () => Navigator.pop(context),
-                        child: const Text('Cancel'),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        onPressed: _saving ? null : _save,
-                        icon: _saving
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.save),
-                        label: Text(_saving ? 'Saving...' : 'Save Client'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: PremiumTheme.teal,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+      body: ManagerPageBackground(
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 946.2045288461986),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0x24FFFFFF),
+                      borderRadius: BorderRadius.circular(5.32),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x40000000),
+                          blurRadius: 3.55,
+                          offset: Offset(0, 3.55),
                         ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildField(
+                            label: 'Enter Client Information Name',
+                            controller: _nameController,
+                            icon: Icons.business,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildField(
+                            label:
+                                'Enter Client Information Holding Information',
+                            controller: _holdingController,
+                            icon: Icons.apartment,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildField(
+                            label: 'Enter Client Information Address',
+                            controller: _addressController,
+                            icon: Icons.location_on,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildField(
+                            label:
+                                'Enter Client Information Client Contact Name',
+                            controller: _contactNameController,
+                            icon: Icons.person,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildField(
+                            label:
+                                'Enter Client Information Client Contact Email Address',
+                            controller: _contactEmailController,
+                            icon: Icons.email,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildField(
+                            label:
+                                'Enter Client Information Client Contact Mobile Number',
+                            controller: _contactMobileController,
+                            icon: Icons.phone,
+                            keyboardType: TextInputType.phone,
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: _saving
+                                    ? null
+                                    : () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                onPressed: _saving ? null : _save,
+                                icon: _saving
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(Icons.save),
+                                label:
+                                    Text(_saving ? 'Saving...' : 'Save Client'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: PremiumTheme.primaryRed,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
