@@ -1775,7 +1775,10 @@ class _ProposalWizardPageState extends State<ProposalWizard>
         child: SizedBox(
           width: 900,
           height: 600,
-          child: ContentLibrarySelectionDialog(),
+          child: const ContentLibrarySelectionDialog(
+            textOnly: true,
+            dialogTitle: 'Insert Text Block',
+          ),
         ),
       ),
     );
