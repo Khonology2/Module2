@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../../api.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/asset_service.dart';
 import '../../theme/manager_theme_controller.dart';
 import '../../theme/premium_theme.dart';
 import '../../widgets/custom_scrollbar.dart';
@@ -60,6 +61,12 @@ class AdminHistoryPage extends StatefulWidget {
 class _AdminHistoryPageState extends State<AdminHistoryPage>
     with TickerProviderStateMixin {
   static const Color _adminBlockBase = Color(0xFF252525);
+
+  static const String _historyBubbleIcon =
+      'assets/images/Admin_new_icons/Group 33776.png';
+
+  static const String _managerSearchIcon =
+      'assets/images/new icons for manager/Search_Seek_Red Badge_White.png';
 
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _proposalQueryCtrl = TextEditingController();
@@ -140,9 +147,41 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
     );
   }
 
+  Widget _buildAdminPanelWhiteIconRing({
+    required ManagerChromeTheme chrome,
+    required Widget child,
+    double diameter = 54,
+  }) {
+    final pad = diameter * 0.07;
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: chrome.isDark
+              ? Colors.white.withValues(alpha: 0.14)
+              : Colors.black.withValues(alpha: 0.06),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: chrome.isDark ? 0.18 : 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(pad),
+      child: child,
+    );
+  }
+
   Widget _buildPageHeader(AppState app) {
     final user = AuthService.currentUser ?? app.currentUser ?? {};
     final email = user['email']?.toString() ?? 'admin@example.com';
+    final chrome = context.watch<ManagerThemeController>().chrome;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -162,35 +201,33 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
             ),
           ],
         ),
-        Row(
-          children: [
-            ClipOval(
-              child: Image.asset(
-                'assets/images/User_Profile.png',
-                width: 48,
-                height: 48,
-                fit: BoxFit.cover,
+        Tooltip(
+          message: email,
+          child: InkWell(
+            onTap: () {
+              Navigator.pushReplacementNamed(
+                  context, '/manager_account_profile');
+            },
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: chrome.filterBorder,
+                  width: 1,
+                ),
+              ),
+              padding: const EdgeInsets.all(2),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/User_Profile.png',
+                  width: 48,
+                  height: 48,
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  email,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Text(
-                  'Admin',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ],
     );
@@ -575,27 +612,41 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
 
   InputDecoration _toolbarDecoration({
     required String hintText,
-    required IconData icon,
+    IconData? icon,
+    String? prefixAsset,
   }) {
+    final chrome = context.watch<ManagerThemeController>().chrome;
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(color: Colors.white54, fontSize: 13),
-      prefixIcon: Icon(
-        icon,
-        color: Colors.white70,
-        size: 18,
-      ),
+      hintStyle: TextStyle(color: chrome.textMuted, fontSize: 13),
+      prefixIcon: prefixAsset != null
+          ? Padding(
+              padding: const EdgeInsets.all(10),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: AssetService.buildImageWidget(
+                  prefixAsset,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            )
+          : Icon(
+              icon,
+              color: chrome.textMuted,
+              size: 18,
+            ),
       filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.04),
+      fillColor: chrome.fieldFill,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide:
-            BorderSide(color: Colors.white.withValues(alpha: 0.12), width: 1),
+        borderSide: BorderSide(color: chrome.fieldBorder, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF3498DB), width: 1.2),
+        borderSide:
+            const BorderSide(color: PremiumTheme.primaryRed, width: 1.2),
       ),
     );
   }
@@ -641,7 +692,7 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
           iconEnabledColor: Colors.white70,
           decoration: _toolbarDecoration(
             hintText: 'Date range',
-            icon: Icons.date_range,
+            prefixAsset: _historyBubbleIcon,
           ),
           items: [
             for (final p in DateRangePreset.values)
@@ -677,7 +728,8 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
               iconEnabledColor: Colors.white70,
               decoration: _toolbarDecoration(
                 hintText: 'Event type',
-                icon: Icons.category_outlined,
+                prefixAsset:
+                    'assets/images/new icons for manager/proposal_workflow.png',
               ),
               items: [
                 const DropdownMenuItem<AuditEventType?>(
@@ -699,30 +751,81 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
           ),
         );
 
-        final searchField = TextField(
-          controller: _proposalQueryCtrl,
-          style: const TextStyle(color: Colors.white, fontSize: 13),
-          decoration: _toolbarDecoration(
-            hintText: 'Search proposal title or ID',
-            icon: Icons.search,
-          ),
+        final chrome = context.watch<ManagerThemeController>().chrome;
+
+        final searchField = Row(
+          children: [
+            ClipOval(
+              child: SizedBox(
+                width: 38,
+                height: 38,
+                child: AssetService.buildImageWidget(
+                  _managerSearchIcon,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SizedBox(
+                height: 38,
+                child: TextField(
+                  controller: _proposalQueryCtrl,
+                  style: TextStyle(color: chrome.textPrimary, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Search proposal title or ID',
+                    hintStyle: TextStyle(color: chrome.textMuted, fontSize: 13),
+                    filled: true,
+                    fillColor: chrome.fieldFill,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(999),
+                      borderSide:
+                          BorderSide(color: chrome.fieldBorder, width: 1),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(999),
+                      borderSide: const BorderSide(
+                          color: PremiumTheme.primaryRed, width: 1.2),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
 
-        final refreshBtn = InkWell(
-          onTap: _load,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-            ),
-            child: const Icon(
-              Icons.refresh,
-              color: Colors.white70,
-              size: 20,
+        final refreshBtn = Tooltip(
+          message: 'Refresh',
+          child: InkWell(
+            onTap: _load,
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFEF4444), Color(0xFFB91C1C)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFEF4444).withValues(alpha: 0.28),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.refresh,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
             ),
           ),
         );
@@ -1035,7 +1138,17 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
-                  children: const [
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildAdminPanelWhiteIconRing(
+                      chrome: chrome,
+                      diameter: 54,
+                      child: Image.asset(
+                        _historyBubbleIcon,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1043,15 +1156,21 @@ class _AdminHistoryPageState extends State<AdminHistoryPage>
                           Text(
                             'History',
                             style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
+                              color: chrome.textPrimary,
+                              fontSize: 15,
                               fontWeight: FontWeight.w700,
+                              fontFamily: 'Poppins',
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
                             'A read-only log of proposal activity',
-                            style: TextStyle(color: Colors.white70, fontSize: 13),
+                            style: TextStyle(
+                              color: chrome.textMuted,
+                              fontSize: 11,
+                              height: 1.35,
+                              fontFamily: 'Poppins',
+                            ),
                           ),
                         ],
                       ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../api.dart';
 import '../services/api_service.dart';
+import '../theme/manager_theme_controller.dart';
+import '../theme/premium_theme.dart';
 
 class AIContentGenerator extends StatefulWidget {
   final bool open;
@@ -268,337 +270,438 @@ Return only a comma-separated list of tags.''';
   Widget build(BuildContext context) {
     if (!widget.open) return const SizedBox.shrink();
 
-    return Dialog(
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.9,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                const Icon(Icons.auto_awesome, color: Colors.purple, size: 24),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'AI Content Generator',
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: widget.onClose,
-                ),
-              ],
+    final chrome = context.watch<ManagerThemeController>().chrome;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onClose,
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.55),
             ),
-            const Divider(height: 32),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Input Section
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Content Type Dropdown
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Content Type *',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                border:
-                                    Border.all(color: Colors.grey.shade300),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: _selectedBlockType.isEmpty
-                                      ? null
-                                      : _selectedBlockType,
-                                  hint: const Text('Select content type'),
-                                  isExpanded: true,
-                                  items: _blockTypes.map((type) {
-                                    return DropdownMenuItem<String>(
-                                      value: type['value'],
-                                      child: Text(type['label']!),
-                                    );
-                                  }).toList(),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _selectedBlockType = value!;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Prompt Input
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Content Requirements *',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: _promptController,
-                              maxLines: 4,
-                              decoration: const InputDecoration(
-                                hintText:
-                                    "E.g., 'Create a case study about a cloud migration project for a retail client that reduced infrastructure costs by 40% and improved uptime to 99.99%'",
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.all(12),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Describe what you need. Be specific about key points, achievements, or requirements.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Generate Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: _isGenerating ? null : _generateContent,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.purple,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: _isGenerating
-                                ? const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                  Colors.white),
-                                        ),
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text('Generating...'),
-                                    ],
-                                  )
-                                : const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.auto_awesome, size: 20),
-                                      SizedBox(width: 8),
-                                      Text('Generate Content'),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // Generated Content Section
-                    if (_generatedContent.isNotEmpty) ...[
-                      const Divider(height: 32),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+        ),
+        Center(
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+            child: DefaultTextStyle(
+              style: TextStyle(color: chrome.textPrimary),
+              child: IconTheme(
+                data: IconThemeData(color: chrome.textPrimary),
+                child: Container(
+                  width: MediaQuery.of(context).size.width * 0.9,
+                  height: MediaQuery.of(context).size.height * 0.9,
+                  padding: const EdgeInsets.all(24),
+                  decoration: chrome.floatingPanelDecoration(radius: 14).copyWith(
+                    color: chrome.dropdownSurface,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          // Header
-                          const Row(
-                            children: [
-                              Icon(Icons.auto_awesome,
-                                  color: Colors.purple, size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Generated Content',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                          const Icon(Icons.auto_awesome,
+                              color: PremiumTheme.primaryRed, size: 24),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'AI Content Generator',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: chrome.textPrimary,
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Title Input
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Title *',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _titleController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Give this content block a title',
-                                  border: OutlineInputBorder(),
-                                  contentPadding: EdgeInsets.all(12),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Content Editor
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Content (editable)',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                height: 300,
-                                decoration: BoxDecoration(
-                                  border:
-                                      Border.all(color: Colors.grey.shade300),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: TextField(
-                                  controller: _contentController,
-                                  maxLines: null,
-                                  expands: true,
-                                  decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                    contentPadding: EdgeInsets.all(12),
-                                  ),
-                                  style: const TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Info Box
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              border: Border.all(color: Colors.blue.shade200),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.auto_awesome,
-                                    color: Colors.blue, size: 16),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Content will be automatically tagged when saved',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.blue.shade900,
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
-                          const SizedBox(height: 16),
-
-                          // Action Buttons
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              ElevatedButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _generatedContent = '';
-                                    _contentController.clear();
-                                    _titleController.clear();
-                                  });
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.grey.shade100,
-                                  foregroundColor: Colors.grey.shade800,
-                                ),
-                                child: const Text('Regenerate'),
-                              ),
-                              const SizedBox(width: 12),
-                              ElevatedButton(
-                                onPressed: _isSaving ? null : _saveContent,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: _isSaving
-                                    ? const Row(
-                                        children: [
-                                          SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                      Colors.white),
-                                            ),
-                                          ),
-                                          SizedBox(width: 8),
-                                          Text('Saving...'),
-                                        ],
-                                      )
-                                    : const Text('Save to Library'),
-                              ),
-                            ],
+                          IconButton(
+                            icon: Icon(Icons.close, color: chrome.textPrimary),
+                            onPressed: widget.onClose,
                           ),
                         ],
                       ),
+                      Divider(height: 32, color: chrome.divider),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Content Type *',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: chrome.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      color: chrome.fieldFill,
+                                      border:
+                                          Border.all(color: chrome.fieldBorder),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButton<String>(
+                                        value: _selectedBlockType.isEmpty
+                                            ? null
+                                            : _selectedBlockType,
+                                        hint: Text(
+                                          'Select content type',
+                                          style:
+                                              TextStyle(color: chrome.textMuted),
+                                        ),
+                                        isExpanded: true,
+                                        dropdownColor: chrome.dropdownSurface,
+                                        iconEnabledColor: chrome.textPrimary,
+                                        style: TextStyle(
+                                            color: chrome.textPrimary),
+                                        items: _blockTypes.map((type) {
+                                          return DropdownMenuItem<String>(
+                                            value: type['value'],
+                                            child: Text(
+                                              type['label']!,
+                                              style: TextStyle(
+                                                  color: chrome.textPrimary),
+                                            ),
+                                          );
+                                        }).toList(),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _selectedBlockType = value!;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Content Requirements *',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: chrome.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: _promptController,
+                                    maxLines: 4,
+                                    style:
+                                        TextStyle(color: chrome.textPrimary),
+                                    decoration: InputDecoration(
+                                      hintText:
+                                          "E.g., 'Create a case study about a cloud migration project for a retail client that reduced infrastructure costs by 40% and improved uptime to 99.99%'",
+                                      hintStyle:
+                                          TextStyle(color: chrome.textMuted),
+                                      filled: true,
+                                      fillColor: chrome.fieldFill,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: BorderSide(
+                                            color: chrome.fieldBorder),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: BorderSide(
+                                            color: chrome.fieldBorder),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: const BorderSide(
+                                            color: PremiumTheme.primaryRed),
+                                      ),
+                                      contentPadding: const EdgeInsets.all(12),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Describe what you need. Be specific about key points, achievements, or requirements.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: chrome.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: ElevatedButton(
+                                  onPressed:
+                                      _isGenerating ? null : _generateContent,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: PremiumTheme.primaryRed,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: _isGenerating
+                                      ? const Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<Color>(
+                                                        Colors.white),
+                                              ),
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text('Generating...'),
+                                          ],
+                                        )
+                                      : const Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.auto_awesome, size: 20),
+                                            SizedBox(width: 8),
+                                            Text('Generate Content'),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                              if (_generatedContent.isNotEmpty) ...[
+                                Divider(height: 32, color: chrome.divider),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.auto_awesome,
+                                            color: PremiumTheme.primaryRed,
+                                            size: 20),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Generated Content',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: chrome.textPrimary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Title *',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: chrome.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        TextField(
+                                          controller: _titleController,
+                                          style: TextStyle(
+                                              color: chrome.textPrimary),
+                                          decoration: InputDecoration(
+                                            hintText:
+                                                'Give this content block a title',
+                                            hintStyle: TextStyle(
+                                                color: chrome.textMuted),
+                                            filled: true,
+                                            fillColor: chrome.fieldFill,
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              borderSide: BorderSide(
+                                                  color: chrome.fieldBorder),
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              borderSide: BorderSide(
+                                                  color: chrome.fieldBorder),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              borderSide: const BorderSide(
+                                                  color:
+                                                      PremiumTheme.primaryRed),
+                                            ),
+                                            contentPadding:
+                                                const EdgeInsets.all(12),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Content (editable)',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: chrome.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          height: 300,
+                                          decoration: BoxDecoration(
+                                            color: chrome.fieldFill,
+                                            border: Border.all(
+                                                color: chrome.fieldBorder),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                          ),
+                                          child: TextField(
+                                            controller: _contentController,
+                                            maxLines: null,
+                                            expands: true,
+                                            decoration: const InputDecoration(
+                                              border: InputBorder.none,
+                                              contentPadding: EdgeInsets.all(12),
+                                            ),
+                                            style: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 12,
+                                              color: chrome.textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: chrome.fieldFill,
+                                        border: Border.all(
+                                            color: chrome.fieldBorder),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.auto_awesome,
+                                              color: PremiumTheme.primaryRed,
+                                              size: 16),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Content will be automatically tagged when saved',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: chrome.textSecondary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _generatedContent = '';
+                                              _contentController.clear();
+                                              _titleController.clear();
+                                            });
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: chrome.fieldFill,
+                                            foregroundColor: chrome.textPrimary,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              side: const BorderSide(
+                                                  color:
+                                                      PremiumTheme.primaryRed),
+                                            ),
+                                          ),
+                                          child: const Text('Regenerate'),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        ElevatedButton(
+                                          onPressed:
+                                              _isSaving ? null : _saveContent,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                PremiumTheme.primaryRed,
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                          ),
+                                          child: _isSaving
+                                              ? const Row(
+                                                  children: [
+                                                    SizedBox(
+                                                      width: 16,
+                                                      height: 16,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        valueColor:
+                                                            AlwaysStoppedAnimation<
+                                                                    Color>(
+                                                                Colors.white),
+                                                      ),
+                                                    ),
+                                                    SizedBox(width: 8),
+                                                    Text('Saving...'),
+                                                  ],
+                                                )
+                                              : const Text('Save to Library'),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
-}
+ }
