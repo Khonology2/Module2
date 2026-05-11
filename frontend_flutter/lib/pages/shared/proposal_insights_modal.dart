@@ -60,14 +60,18 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
 
   @override
   Widget build(BuildContext context) {
+    const modalBg = Color(0xFF0F0F0F);
+    final accent = PremiumTheme.primaryRed;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(24),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 800, maxHeight: 600),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: modalBg,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Column(
           children: [
@@ -75,7 +79,7 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: PremiumTheme.info,
+                color: accent,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
@@ -118,12 +122,12 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
 
             // Tabs
             Container(
-              color: Colors.grey[100],
+              color: modalBg,
               child: TabBar(
                 controller: _tabController,
-                labelColor: PremiumTheme.info,
-                unselectedLabelColor: Colors.grey[600],
-                indicatorColor: PremiumTheme.info,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white70,
+                indicatorColor: accent,
                 tabs: const [
                   Tab(text: 'Activity'),
                   Tab(text: 'Analytics'),
@@ -134,7 +138,11 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
             // Content
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(accent),
+                      ),
+                    )
                   : _error != null
                       ? Center(
                           child: Column(
@@ -145,7 +153,7 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
                               const SizedBox(height: 16),
                               Text(
                                 _error!,
-                                style: const TextStyle(color: Colors.red),
+                                style: const TextStyle(color: Colors.white),
                               ),
                               const SizedBox(height: 16),
                               ElevatedButton(
@@ -204,6 +212,9 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
     final metadata = event['metadata'] as Map? ?? {};
     final clientName = event['client_name'] as String? ?? 'Client';
 
+    final accent = PremiumTheme.primaryRed;
+    const cardBg = Color(0xFF141414);
+
     String eventDescription = _getEventDescription(eventType, metadata);
     String timeAgo = _formatTimeAgo(createdAt);
 
@@ -213,40 +224,40 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
     switch (eventType) {
       case 'open':
         icon = Icons.visibility;
-        iconColor = PremiumTheme.info;
+        iconColor = accent;
         break;
       case 'close':
         icon = Icons.close;
-        iconColor = Colors.grey;
+        iconColor = Colors.white70;
         break;
       case 'download':
         icon = Icons.download;
-        iconColor = PremiumTheme.teal;
+        iconColor = accent;
         break;
       case 'sign':
         icon = Icons.draw;
-        iconColor = PremiumTheme.success;
+        iconColor = accent;
         break;
       case 'comment':
         icon = Icons.comment;
-        iconColor = PremiumTheme.orange;
+        iconColor = accent;
         break;
       case 'view_section':
         icon = Icons.article;
-        iconColor = PremiumTheme.purple;
+        iconColor = accent;
         break;
       default:
         icon = Icons.circle;
-        iconColor = Colors.grey;
+        iconColor = Colors.white60;
     }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: cardBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
       ),
       child: Row(
         children: [
@@ -254,7 +265,7 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.1),
+              color: accent.withValues(alpha: 0.18),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: iconColor, size: 20),
@@ -269,13 +280,14 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '$timeAgo • $clientName',
                   style: TextStyle(
-                    color: Colors.grey[600],
+                    color: Colors.white70,
                     fontSize: 12,
                   ),
                 ),
@@ -326,6 +338,7 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
 
   Widget _buildAnalyticsTab() {
     final analytics = _analytics?['analytics'] as Map<String, dynamic>? ?? {};
+    final accent = PremiumTheme.primaryRed;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -340,7 +353,7 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
                   'Total Time Spent',
                   analytics['total_time_formatted'] as String? ?? '0s',
                   Icons.access_time,
-                  PremiumTheme.info,
+                  accent,
                 ),
               ),
               const SizedBox(width: 12),
@@ -349,7 +362,7 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
                   'Views',
                   (analytics['views'] ?? 0).toString(),
                   Icons.visibility,
-                  PremiumTheme.purple,
+                  accent,
                 ),
               ),
             ],
@@ -362,7 +375,7 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
                   'Downloads',
                   (analytics['downloads'] ?? 0).toString(),
                   Icons.download,
-                  PremiumTheme.teal,
+                  accent,
                 ),
               ),
               const SizedBox(width: 12),
@@ -371,7 +384,7 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
                   'Sessions',
                   (analytics['sessions_count'] ?? 0).toString(),
                   Icons.history,
-                  PremiumTheme.orange,
+                  accent,
                 ),
               ),
             ],
@@ -396,6 +409,7 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 12),
@@ -410,25 +424,27 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
 
   Widget _buildStatCard(
       String label, String value, IconData icon, Color color) {
+    const cardBg = Color(0xFF141414);
+    final accent = PremiumTheme.primaryRed;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: color, size: 20),
+              Icon(icon, color: accent, size: 20),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Colors.white70,
                 ),
               ),
             ],
@@ -439,7 +455,7 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: color,
+              color: Colors.white,
             ),
           ),
         ],
@@ -455,7 +471,7 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
           label,
           style: TextStyle(
             fontSize: 14,
-            color: Colors.grey[600],
+            color: Colors.white70,
           ),
         ),
         Text(
@@ -463,6 +479,7 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
+            color: Colors.white,
           ),
         ),
       ],
@@ -471,23 +488,28 @@ class _ProposalInsightsModalState extends State<ProposalInsightsModal>
 
   Widget _buildSectionTimeItem(String section, dynamic seconds) {
     final duration = _formatDuration(seconds is int ? seconds : 0);
+    const cardBg = Color(0xFF141414);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: cardBg,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             section,
-            style: const TextStyle(fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+            ),
           ),
           Text(
             duration,
-            style: TextStyle(color: PremiumTheme.info),
+            style: TextStyle(color: PremiumTheme.primaryRed),
           ),
         ],
       ),
