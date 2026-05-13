@@ -26,6 +26,7 @@ try:
         Paragraph,
         Spacer,
         PageBreak,
+        Flowable,
         Table as PdfTable,
         TableStyle,
     )
@@ -495,6 +496,7 @@ def generate_proposal_pdf(
     signer_name=None,
     signer_title=None,
     signed_date=None,
+    standardizedProposalLayout=False,
 ):
     """Generate PDF from proposal content"""
     if not PDF_AVAILABLE:
@@ -605,9 +607,20 @@ def generate_proposal_pdf(
         try:
             import urllib.request
 
-            with urllib.request.urlopen(url, timeout=10) as resp:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (compatible; ProposalHubPDF/1.0)',
+                    'Accept': '*/*',
+                },
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
                 return resp.read()
         except Exception:
+            try:
+                print(f"[PDF_GEN] failed_to_fetch_image url={url[:200]}")
+            except Exception:
+                pass
             return None
 
     def _get_meta_dict(structured):
@@ -642,6 +655,45 @@ def generate_proposal_pdf(
         if footer_pos not in ('left', 'center', 'right'):
             footer_pos = 'left'
 
+        return header_logo_url, footer_logo_url, header_pos, footer_pos
+
+    def _default_header_bg_url():
+        return (os.getenv('PDF_HEADER_BACKGROUND_URL') or '').strip() or None
+
+    def _default_accent_color():
+        return (os.getenv('PDF_ACCENT_COLOR') or '').strip() or None
+
+    def _parse_hex_color(v, *, default_rgb=(0.756, 0.051, 0.0)):
+        if not v:
+            return default_rgb
+        try:
+            s = str(v).strip()
+            if s.startswith('#'):
+                s = s[1:]
+            if len(s) == 3:
+                s = ''.join(ch + ch for ch in s)
+            if len(s) != 6:
+                return default_rgb
+            r = int(s[0:2], 16) / 255.0
+            g = int(s[2:4], 16) / 255.0
+            b = int(s[4:6], 16) / 255.0
+            return (r, g, b)
+        except Exception:
+            return default_rgb
+
+    def _default_logo_config():
+        header_logo_url = (os.getenv('PDF_HEADER_LOGO_URL') or '').strip() or None
+        footer_logo_url = (os.getenv('PDF_FOOTER_LOGO_URL') or '').strip() or None
+
+        if not header_logo_url:
+            header_logo_url = (os.getenv('KHONOLOGY_LOGO_URL') or '').strip() or None
+
+        header_pos = (os.getenv('PDF_HEADER_LOGO_POSITION') or 'right').strip().lower()
+        footer_pos = (os.getenv('PDF_FOOTER_LOGO_POSITION') or 'left').strip().lower()
+        if header_pos not in ('left', 'center', 'right'):
+            header_pos = 'right'
+        if footer_pos not in ('left', 'center', 'right'):
+            footer_pos = 'left'
         return header_logo_url, footer_logo_url, header_pos, footer_pos
 
     _SKIP_KEYS = {
@@ -895,8 +947,125 @@ def generate_proposal_pdf(
 
     metadata = _get_meta_dict(structured)
     header_logo_url, footer_logo_url, header_logo_pos, footer_logo_pos = _extract_logo_config(metadata)
-    header_logo_bytes = _fetch_cover_bytes(header_logo_url) if header_logo_url else None
+    hide_header_footer_on_cover = bool(
+        metadata.get('hideHeaderFooterOnCover')
+        or metadata.get('hide_header_footer_on_cover')
+    )
+
+    def _is_truthy(value) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            return value == 1
+        if isinstance(value, str):
+            v = value.strip().lower()
+            return v in ('true', '1', 't', 'yes', 'y')
+        return False
+
+    use_standardized_layout = _is_truthy(
+        metadata.get('standardizedProposalLayout')
+        or metadata.get('standardized_proposal_layout')
+    )
+
+    def _read_local_bytes(*parts: str):
+        try:
+            path = os.path.join(*parts)
+            with open(path, 'rb') as f:
+                return f.read()
+        except Exception:
+            return None
+
+    # Standardized layout in Flutter uses local assets.
+    # Prefer those same assets for PDF generation so DocuSign matches manager preview.
+    # Paths are relative to repo root when deployed on Render.
+    _repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+    _frontend_assets = os.path.join(_repo_root, 'frontend_flutter', 'assets')
+    _std_header_bg_bytes = None
+    _std_header_logo_bytes = None
+    _std_footer_asset_bytes = None
+    if use_standardized_layout:
+        _std_header_bg_bytes = _read_local_bytes(
+            _frontend_assets,
+            'images',
+            'new icons for manager',
+            'new_universal_bg_darkmode.png',
+        )
+        _std_header_logo_bytes = _read_local_bytes(
+            _frontend_assets,
+            'images',
+            'new icons for manager',
+            'khonology_logo.png',
+        )
+        _std_footer_asset_bytes = _read_local_bytes(
+            _frontend_assets,
+            'images',
+            'footer.png',
+        )
+
+    standardized_date_raw = (
+        (metadata.get('standardizedProposalDate') or metadata.get('standardized_proposal_date'))
+        if isinstance(metadata, dict)
+        else None
+    )
+    standardized_date = None
+    if isinstance(standardized_date_raw, str) and standardized_date_raw.strip():
+        s = standardized_date_raw.strip()
+        try:
+            standardized_date = datetime.fromisoformat(s.replace('Z', '+00:00'))
+        except Exception:
+            standardized_date = None
+        if standardized_date is None:
+            for fmt in ('%Y-%m-%d', '%d/%m/%Y'):
+                try:
+                    standardized_date = datetime.strptime(s, fmt)
+                    break
+                except Exception:
+                    continue
+
+    header_bg_url = (
+        (metadata.get('headerBackgroundImageUrl') or metadata.get('header_background_image_url'))
+        if isinstance(metadata, dict)
+        else None
+    )
+    if isinstance(header_bg_url, str):
+        header_bg_url = header_bg_url.strip() or None
+    else:
+        header_bg_url = None
+    header_bg_url = header_bg_url or _default_header_bg_url()
+    header_bg_bytes = _std_header_bg_bytes or (_fetch_cover_bytes(header_bg_url) if header_bg_url else None)
+
+    accent_hex = (
+        (metadata.get('accentColor') or metadata.get('accent_color'))
+        if isinstance(metadata, dict)
+        else None
+    )
+    if isinstance(accent_hex, str):
+        accent_hex = accent_hex.strip() or None
+    else:
+        accent_hex = None
+    accent_hex = accent_hex or _default_accent_color()
+    accent_rgb = _parse_hex_color(accent_hex)
+
+    if not header_logo_url and not footer_logo_url:
+        default_header_url, default_footer_url, default_header_pos, default_footer_pos = _default_logo_config()
+        header_logo_url = header_logo_url or default_header_url
+        footer_logo_url = footer_logo_url or default_footer_url
+        header_logo_pos = header_logo_pos or default_header_pos
+        footer_logo_pos = footer_logo_pos or default_footer_pos
+    else:
+        default_header_url, default_footer_url, default_header_pos, default_footer_pos = _default_logo_config()
+        header_logo_url = header_logo_url or default_header_url
+        footer_logo_url = footer_logo_url or default_footer_url
+        header_logo_pos = header_logo_pos or default_header_pos
+        footer_logo_pos = footer_logo_pos or default_footer_pos
+
+    header_logo_bytes = _std_header_logo_bytes or (_fetch_cover_bytes(header_logo_url) if header_logo_url else None)
     footer_logo_bytes = _fetch_cover_bytes(footer_logo_url) if footer_logo_url else None
+
+    if use_standardized_layout and not footer_logo_bytes:
+        footer_logo_bytes = header_logo_bytes
+
+    footer_asset_bytes = _std_footer_asset_bytes
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -904,7 +1073,7 @@ def generate_proposal_pdf(
         pagesize=A4,
         leftMargin=0.85 * inch,
         rightMargin=0.85 * inch,
-        topMargin=1.05 * inch,
+        topMargin=1.95 * inch,
         bottomMargin=1.0 * inch,
         title=title or "Proposal",
         author="ProposalHub",
@@ -972,6 +1141,20 @@ def generate_proposal_pdf(
         elements.append(Spacer(1, 0.01 * inch))
         elements.append(PageBreak())
 
+    class _SectionTitleMarker(Flowable):
+        def __init__(self, section_title: str):
+            super().__init__()
+            self.section_title = (section_title or '').strip()
+
+        def wrap(self, availWidth, availHeight):
+            return 0, 0
+
+        def draw(self):
+            try:
+                self.canv._current_section_title = self.section_title
+            except Exception:
+                pass
+
     t_elements0 = time.perf_counter()
 
     # Hard cap number of sections rendered in preview.
@@ -1017,6 +1200,7 @@ def generate_proposal_pdf(
             except Exception:
                 pass
             numbered_title = f"{idx + 1}. {section_title}".strip()
+            elements.append(_SectionTitleMarker(section_title))
             elements.append(Paragraph(html.escape(numbered_title), heading_style))
 
             # Optional: render subsection blocks if the body is structured.
@@ -1066,6 +1250,7 @@ def generate_proposal_pdf(
     t_elements_ms = (time.perf_counter() - t_elements0) * 1000.0
 
     elements.append(PageBreak())
+    elements.append(_SectionTitleMarker('Signature'))
     elements.append(Paragraph("Signature", heading_style))
     elements.append(Spacer(1, 0.3 * inch))
     elements.append(Paragraph("Please sign in the space below.", content_style))
@@ -1085,6 +1270,8 @@ def generate_proposal_pdf(
 
     has_cover_page = bool(cover_bytes)
     header_title = (title or "Proposal").strip() or "Proposal"
+    header_date_dt = standardized_date or created_at
+    header_date_text = header_date_dt.strftime('%d/%m/%Y')
 
     def _pos_x(pos: str, *, left_x: float, right_x: float, width: float):
         if pos == 'left':
@@ -1110,6 +1297,26 @@ def generate_proposal_pdf(
         except Exception:
             return
 
+    def _draw_footer_asset(c, _doc, *, img_bytes, y: float, max_h: float):
+        if not img_bytes:
+            return
+        try:
+            page_width, _ = _doc.pagesize
+            img = ImageReader(BytesIO(img_bytes))
+            iw, ih = img.getSize()
+            if not iw or not ih:
+                return
+            left_x = doc.leftMargin
+            right_x = page_width - doc.rightMargin
+            max_w = max(right_x - left_x, 1)
+            scale = min(max_w / float(iw), max_h / float(ih))
+            w = float(iw) * scale
+            h = float(ih) * scale
+            x = (left_x + right_x) / 2.0 - (w / 2.0)
+            c.drawImage(img, x, y, width=w, height=h, preserveAspectRatio=True, mask='auto')
+        except Exception:
+            return
+
     def _draw_cover_page(c, _doc):
         if not cover_bytes:
             return
@@ -1121,6 +1328,64 @@ def generate_proposal_pdf(
             c.restoreState()
         except Exception:
             pass
+
+    def _draw_header_banner(c, _doc, *, report_title: str, page_title: str, date_text: str):
+        page_width, page_height = _doc.pagesize
+        banner_h = 0.60 * inch
+        bar_h = 0.28 * inch
+        top_y = page_height
+
+        c.saveState()
+
+        header_bg_ok = False
+        if header_bg_bytes:
+            try:
+                img = ImageReader(BytesIO(header_bg_bytes))
+                c.drawImage(
+                    img,
+                    0,
+                    top_y - banner_h,
+                    width=page_width,
+                    height=banner_h,
+                    preserveAspectRatio=False,
+                    anchor='c',
+                )
+                header_bg_ok = True
+            except Exception:
+                header_bg_ok = False
+
+        if not header_bg_ok:
+            c.setFillColorRGB(0.07, 0.07, 0.07)
+            c.rect(0, top_y - banner_h, page_width, banner_h, stroke=0, fill=1)
+
+        c.setFillColorRGB(*accent_rgb)
+        c.rect(0, top_y - banner_h - bar_h, page_width, bar_h, stroke=0, fill=1)
+
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont('Helvetica-Bold', 10)
+        c.drawString(doc.leftMargin, top_y - (0.33 * inch), report_title)
+        c.setFont('Helvetica', 9)
+        c.drawRightString(page_width - doc.rightMargin, top_y - (0.33 * inch), date_text)
+
+        _draw_logo(
+            c,
+            doc,
+            img_bytes=header_logo_bytes,
+            y=top_y - (0.52 * inch),
+            height=0.32 * inch,
+            pos=header_logo_pos,
+        )
+
+        c.setFillColorRGB(1, 1, 1)
+        c.setFont('Helvetica-Bold', 9)
+        c.drawString(doc.leftMargin, top_y - banner_h - (0.20 * inch), f"Title: {page_title}")
+        c.drawRightString(
+            page_width - doc.rightMargin,
+            top_y - banner_h - (0.20 * inch),
+            f"Date: {date_text}",
+        )
+
+        c.restoreState()
 
     class _NumberedCanvas(canvas.Canvas):
         def __init__(self, *args, **kwargs):
@@ -1142,26 +1407,44 @@ def generate_proposal_pdf(
         def _draw_header_footer(self, total_pages: int):
             page_width, page_height = doc.pagesize
             page_num = self.getPageNumber()
-            if has_cover_page and page_num == 1:
+            if hide_header_footer_on_cover and has_cover_page and page_num == 1:
                 return
             self.saveState()
+            page_title = getattr(self, '_current_section_title', None) or header_title
+            _draw_header_banner(
+                self,
+                doc,
+                report_title='PROPOSAL REPORT',
+                page_title=page_title,
+                date_text=header_date_text,
+            )
+
             self.setFont("Helvetica", 8)
             self.setFillColorRGB(0.25, 0.25, 0.25)
-
-            header_y = page_height - (0.75 * inch)
             footer_y = 0.75 * inch
-
             self.setStrokeColorRGB(0.85, 0.85, 0.85)
             self.setLineWidth(0.5)
-            self.line(doc.leftMargin, header_y - 8, page_width - doc.rightMargin, header_y - 8)
             self.line(doc.leftMargin, footer_y + 8, page_width - doc.rightMargin, footer_y + 8)
 
-            _draw_logo(self, doc, img_bytes=header_logo_bytes, y=header_y - 6, height=0.28 * inch, pos=header_logo_pos)
-            self.drawString(doc.leftMargin, header_y, header_title)
-
-            _draw_logo(self, doc, img_bytes=footer_logo_bytes, y=footer_y - 3, height=0.22 * inch, pos=footer_logo_pos)
-            footer_right = f"Page {page_num} of {total_pages}"
-            self.drawRightString(page_width - doc.rightMargin, footer_y, footer_right)
+            if use_standardized_layout:
+                _draw_footer_asset(
+                    self,
+                    doc,
+                    img_bytes=footer_asset_bytes or footer_logo_bytes,
+                    y=footer_y - 10,
+                    max_h=0.40 * inch,
+                )
+            else:
+                _draw_logo(
+                    self,
+                    doc,
+                    img_bytes=footer_logo_bytes,
+                    y=footer_y - 3,
+                    height=0.22 * inch,
+                    pos=footer_logo_pos,
+                )
+                footer_right = f"Page {page_num} of {total_pages}"
+                self.drawRightString(page_width - doc.rightMargin, footer_y, footer_right)
             self.restoreState()
 
     t_build0 = time.perf_counter()

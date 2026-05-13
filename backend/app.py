@@ -22,6 +22,14 @@ backend_dir = Path(__file__).resolve().parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
+# Load backend/.env FIRST so stale OS-level DATABASE_URL / DB_* never shadow the file.
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=Path(__file__).resolve().with_name(".env"), override=True)
+
+# Single Postgres pool + config resolution (see api/utils/database.py).
+from api.utils.database import get_db_connection, get_pg_pool, release_pg_conn, _pg_conn
+
 import psycopg2
 import psycopg2.extras
 import cloudinary
@@ -60,7 +68,7 @@ except ImportError:
     # DocuSign SDK missing: warn user (emoji-friendly message)
     print("⚠️ DocuSign SDK not installed. Run: pip install docusign-esign")
 from cryptography.fernet import Fernet
-from flask import Flask, request, jsonify, send_file, Response, send_from_directory, has_request_context, render_template, redirect, url_for, session
+from flask import Flask, request, jsonify, send_file, Response, send_from_directory, has_request_context, render_template, redirect, url_for, session, make_response
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -68,7 +76,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from asgiref.wsgi import WsgiToAsgi
 import openai
-from dotenv import load_dotenv
 from api.utils.ai_safety import AISafetyError
 from api.utils.decorators import token_required as firebase_token_required
 from api.utils.profile_avatar import (
@@ -79,9 +86,6 @@ try:
     from hf_ai_assistant_service import HFAIAssistantError
 except ImportError:
     HFAIAssistantError = type("HFAIAssistantError", (Exception,), {})  # no-op if module missing
-
-# Load environment variables
-load_dotenv(dotenv_path=Path(__file__).resolve().with_name('.env'), override=True)
 
 def _mask_env_secret(value: str) -> str:
     token = (value or "").strip()
@@ -107,6 +111,8 @@ app.secret_key = os.getenv('SECRET_KEY', os.getenv('FLASK_SECRET_KEY', 'dev-secr
 app.config.setdefault('SESSION_COOKIE_HTTPONLY', True)
 app.config.setdefault('SESSION_COOKIE_SAMESITE', 'Lax')
 app.config.setdefault('SESSION_COOKIE_SECURE', (os.getenv('SESSION_COOKIE_SECURE') or '').strip().lower() in ('1', 'true', 'yes'))
+# Set true only after init_pg_schema() succeeds; used by /api/firebase fallback.
+app.config.setdefault('PG_SCHEMA_AVAILABLE', False)
 
 _MOJO_API_KEY = (os.getenv('MOJO_API_KEY') or '').strip()
 _MOJO_BASE_URL = (os.getenv('MOJO_BASE_URL') or 'https://api.mojoauth.com').strip().rstrip('/')
@@ -271,6 +277,7 @@ _cors_origins = [
     "https://proposals2025.netlify.app",
     # Render production frontend
     "https://lukens-1.onrender.com",
+    re.compile(r"^https://[a-z0-9-]+\.onrender\.com$", re.IGNORECASE),
     # Allow Flutter web dev server ports (e.g. http://localhost:56886)
     re.compile(r"^http://localhost(:\d+)?$"),
     re.compile(r"^http://127\.0\.0\.1(:\d+)?$"),
@@ -326,6 +333,10 @@ CORS(
         "Content-Type",
         "Authorization",
         "X-Requested-With",
+        "X-AI-Provider",
+        "X-AI-Model",
+        "X-Provider-Api-Key",
+        "X-AI-Request-ID",
         "X-Client-Device-Id",
         "X-Client-Session-Token",
         "x-client-device-id",
@@ -397,6 +408,7 @@ def handle_options_preflight(remaining=None):
     resp.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, POST, OPTIONS, PUT, PATCH, DELETE'
     resp.headers['Access-Control-Allow-Headers'] = (
         'Content-Type, Authorization, X-Requested-With, Accept, X-AI-Request-ID, '
+        'X-AI-Provider, X-AI-Model, X-Provider-Api-Key, '
         'X-Client-Device-Id, X-Client-Session-Token, X-Device-Id'
     )
     resp.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -413,6 +425,7 @@ def _add_cors_headers(resp):
         resp.headers['Access-Control-Allow-Methods'] = 'GET, HEAD, POST, OPTIONS, PUT, PATCH, DELETE'
         resp.headers['Access-Control-Allow-Headers'] = (
             'Content-Type, Authorization, X-Requested-With, Accept, X-AI-Request-ID, '
+            'X-AI-Provider, X-AI-Model, X-Provider-Api-Key, '
             'X-Client-Device-Id, X-Client-Session-Token, X-Device-Id'
         )
     return resp
@@ -422,6 +435,8 @@ asgi_app = WsgiToAsgi(app)
 
 # Mark if database has been initialized
 _db_initialized = False
+# After first schema init attempt (success or failure); avoids hammering Postgres.
+_pg_schema_init_attempted = False
 
 limiter = Limiter(
     **(
@@ -473,176 +488,6 @@ openai.api_key = os.getenv('OPENAI_API_KEY')
 
 # Database initialization - PostgreSQL only
 BACKEND_TYPE = 'postgresql'
-
-# PostgreSQL connection pool
-_pg_pool = None
-
-
-def _build_db_config_from_env():
-    prefer_local = os.getenv('DB_PREFER_LOCAL', 'false').lower() == 'true'
-    if prefer_local:
-        local_config = {
-            'host': os.getenv('LOCAL_DB_HOST', 'localhost'),
-            'database': os.getenv('LOCAL_DB_NAME', os.getenv('DB_NAME', 'proposal_db')),
-            'user': os.getenv('LOCAL_DB_USER', os.getenv('DB_USER', 'postgres')),
-            'password': os.getenv('LOCAL_DB_PASSWORD', os.getenv('DB_PASSWORD', '')),
-            'port': int(os.getenv('LOCAL_DB_PORT', os.getenv('DB_PORT', '5432'))),
-        }
-        local_sslmode = os.getenv('LOCAL_DB_SSLMODE')
-        if local_sslmode:
-            local_config['sslmode'] = local_sslmode
-        return local_config
-
-    database_url = os.getenv('DATABASE_URL')
-    if database_url:
-        from urllib.parse import urlparse, parse_qs
-
-        parsed = urlparse(database_url)
-        host = (parsed.hostname or '').strip()
-        # Render "Internal" URL host looks like dpg-xxx-a (no domain). It only works on Render.
-        # From your PC we must use the External URL. Prefer DATABASE_URL_EXTERNAL, else DB_HOST if it has a domain.
-        if host.startswith('dpg-') and '.' not in host:
-            external_url = os.getenv('DATABASE_URL_EXTERNAL')
-            if external_url:
-                database_url = external_url
-                parsed = urlparse(database_url)
-                host = (parsed.hostname or '').strip()
-            elif os.getenv('DB_HOST') and '.' in (os.getenv('DB_HOST') or ''):
-                return {
-                    'host': os.getenv('DB_HOST').strip(),
-                    'database': os.getenv('DB_NAME') or (parsed.path or '').lstrip('/') or 'proposal_db',
-                    'user': os.getenv('DB_USER') or parsed.username,
-                    'password': os.getenv('DB_PASSWORD') or parsed.password,
-                    'port': int(os.getenv('DB_PORT') or str(parsed.port or 5432)),
-                    'sslmode': os.getenv('DB_SSLMODE') or 'require',
-                }
-        # Accept common Postgres URL scheme variants.
-        scheme = (parsed.scheme or '').lower()
-        if scheme.startswith('postgresql+'):
-            scheme = 'postgresql'
-        if scheme not in ('postgres', 'postgresql'):
-            raise ValueError(
-                'DATABASE_URL must start with postgres:// or postgresql:// '
-                '(optionally with a driver like postgresql+psycopg2://)'
-            )
-
-        db_config = {
-            'host': parsed.hostname,
-            'database': (parsed.path or '').lstrip('/'),
-            'user': parsed.username,
-            'password': parsed.password,
-            'port': parsed.port or 5432,
-        }
-
-        query = parse_qs(parsed.query or '')
-        sslmode_from_url = (query.get('sslmode') or [None])[0]
-
-        ssl_mode = sslmode_from_url or os.getenv('DB_SSLMODE')
-        if not ssl_mode:
-            if os.getenv('DB_REQUIRE_SSL', 'false').lower() == 'true':
-                ssl_mode = 'require'
-            elif db_config.get('host') and 'render.com' in db_config['host'].lower():
-                ssl_mode = 'require'
-            else:
-                ssl_mode = 'prefer'
-
-        if ssl_mode:
-            db_config['sslmode'] = ssl_mode
-
-        missing = [k for k in ('host', 'database', 'user') if not db_config.get(k)]
-        if missing:
-            raise ValueError(f"DATABASE_URL missing required parts: {', '.join(missing)}")
-
-        return db_config
-
-    return {
-        'host': os.getenv('DB_HOST', 'localhost'),
-        'database': os.getenv('DB_NAME', 'proposal_db'),
-        'user': os.getenv('DB_USER', 'postgres'),
-        'password': os.getenv('DB_PASSWORD', ''),
-        'port': int(os.getenv('DB_PORT', '5432')),
-    }
-
-def get_pg_pool():
-    global _pg_pool
-    if _pg_pool is None:
-        import psycopg2.pool
-        try:
-            db_config = _build_db_config_from_env()
-            # Helpful hint for a common Render misconfiguration:
-            # Render "Internal Database URL" hosts often look like "dpg-xxxx-a" (no dots).
-            # That value won't resolve outside Render's internal network; in that case you
-            # must use the External Database URL / full host like "dpg-xxxx-a.<region>-postgres.render.com".
-            host = (db_config.get('host') or '').strip()
-            if host.startswith('dpg-') and '.' not in host:
-                print(
-                    "[WARN] DB host looks like a Render internal hostname without a domain "
-                    f"({host!r}). If this service is not on Render's private network, "
-                    "set DATABASE_URL to the External Database URL (with a full *.render.com hostname) "
-                    "or set DB_HOST to the full hostname."
-                )
-            if 'sslmode' in db_config:
-                print(f"[*] Using SSL mode: {db_config['sslmode']} for external connection")
-            print(f"[*] Connecting to PostgreSQL: {db_config['host']}:{db_config['port']}/{db_config['database']}")
-            _pg_pool = psycopg2.pool.SimpleConnectionPool(
-                minconn=1,
-                maxconn=20,  # Increased max connections
-                **db_config
-            )
-            print("[OK] PostgreSQL connection pool created successfully")
-        except Exception as e:
-            print(f"[ERROR] Error creating PostgreSQL connection pool: {e}")
-            raise
-    return _pg_pool
-
-def _pg_conn():
-    try:
-        return get_pg_pool().getconn()
-    except Exception as e:
-        print(f"[ERROR] Error getting PostgreSQL connection: {e}")
-        raise
-
-def release_pg_conn(conn):
-    try:
-        if conn:
-            try:
-                import psycopg2.extensions as ext
-                tx_status = conn.get_transaction_status()
-                if tx_status in (
-                    ext.TRANSACTION_STATUS_INTRANS,
-                    ext.TRANSACTION_STATUS_INERROR,
-                ):
-                    conn.rollback()
-            except Exception:
-                pass
-            try:
-                conn.autocommit = False
-            except Exception:
-                pass
-            try:
-                get_pg_pool().putconn(conn)
-            except psycopg2.pool.PoolError:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-                return
-    except Exception as e:
-        print(f"[WARN] Error releasing PostgreSQL connection: {e}")
-
-# Context manager for automatic connection cleanup
-from contextlib import contextmanager
-
-@contextmanager
-def get_db_connection():
-    """Context manager that ensures connections are always returned to pool"""
-    conn = None
-    try:
-        conn = _pg_conn()
-        yield conn
-    finally:
-        if conn:
-            release_pg_conn(conn)
 
 # Token for encryption
 ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', 'dev-key-change-in-production')
@@ -1113,16 +958,24 @@ def init_pg_schema():
 @app.before_request
 def init_db():
     """Initialize PostgreSQL schema on first request"""
-    global _db_initialized
+    global _db_initialized, _pg_schema_init_attempted
     # If someone calls init_db() manually (e.g., from __main__ or a script),
     # Flask's request proxy won't be available. Handle that gracefully.
     if not has_request_context():
         if _db_initialized:
             return
         print("[*] Initializing PostgreSQL schema (no request context)...")
-        init_pg_schema()
-        _db_initialized = True
-        print("[OK] Database schema initialized successfully")
+        try:
+            init_pg_schema()
+            _db_initialized = True
+            _pg_schema_init_attempted = True
+            app.config['PG_SCHEMA_AVAILABLE'] = True
+            print("[OK] Database schema initialized successfully")
+        except Exception as e:
+            _pg_schema_init_attempted = True
+            app.config['PG_SCHEMA_AVAILABLE'] = False
+            print(f"[ERROR] Database initialization error: {e}")
+            raise
         return
     # Skip initialization for CORS preflight requests to avoid non-2xx responses
     # which will cause browsers to block the request due to failed preflight.
@@ -1140,14 +993,28 @@ def init_db():
         return
     if _db_initialized:
         return
-    
+    if _pg_schema_init_attempted:
+        # Schema init already failed; do not retry every request.
+        if request.path == "/api/firebase":
+            return
+        raise RuntimeError(
+            "PostgreSQL schema is not available. "
+            "Fix DATABASE_URL / DB_* or set ALLOW_FIREBASE_WITHOUT_DB=true for local-only login."
+        )
+
+    _pg_schema_init_attempted = True
     try:
         print("[*] Initializing PostgreSQL schema...")
         init_pg_schema()
         _db_initialized = True
+        app.config['PG_SCHEMA_AVAILABLE'] = True
         print("[OK] Database schema initialized successfully")
     except Exception as e:
+        app.config['PG_SCHEMA_AVAILABLE'] = False
         print(f"[ERROR] Database initialization error: {e}")
+        # Let Firebase login attempt a no-DB fallback (see api/routes/auth.py).
+        if request.path == "/api/firebase":
+            return
         raise
 
 # Auth token storage (in production, use Redis or session manager)
@@ -2629,7 +2496,7 @@ def approve_proposal(username, proposal_id):
                         conn.commit()
                         
                         frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:8081')
-                        proposal_url = f"{frontend_url}/#/collaborate?token={access_token}"
+                        proposal_url = f"{frontend_url}/?token={access_token}#/collaborate"
                         
                         email_body = f"""
                         <html>
@@ -2729,7 +2596,7 @@ def reject_proposal(username, proposal_id):
         traceback.print_exc()
         return {'detail': str(e)}, 500
 
-@app.patch("/proposals/<int:proposal_id>/status")
+@app.post("/proposals/<int:proposal_id>/update_status")
 @token_required
 def update_proposal_status(username, proposal_id):
     try:
@@ -2748,22 +2615,6 @@ def update_proposal_status(username, proposal_id):
         conn.commit()
         release_pg_conn(conn)
         return {'detail': 'Status updated'}, 200
-    except Exception as e:
-        return {'detail': str(e)}, 500
-
-@app.post("/proposals/<int:proposal_id>/send_to_client")
-@token_required
-def send_to_client(username, proposal_id):
-    try:
-        conn = _pg_conn()
-        cursor = conn.cursor()
-        cursor.execute(
-            '''UPDATE proposals SET status = 'Sent to Client' WHERE id = %s''',
-            (proposal_id,)
-        )
-        conn.commit()
-        release_pg_conn(conn)
-        return {'detail': 'Proposal sent to client'}, 200
     except Exception as e:
         return {'detail': str(e)}, 500
 
@@ -3755,7 +3606,7 @@ def invite_collaborator(username, proposal_id):
             
             # Send invitation email
             frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:8081')
-            collaboration_url = f"{frontend_url}/#/collaborate?token={access_token}"
+            collaboration_url = f"{frontend_url}/?token={access_token}#/collaborate"
             
             subject = f"You've been invited to collaborate on '{proposal_title}'"
             html_content = f"""
@@ -4870,233 +4721,8 @@ def client_log_activity():
         traceback.print_exc()
         return {'detail': str(e)}, 500
 
-@app.get("/api/client/proposals/<int:proposal_id>")
-def get_client_proposal_details(proposal_id):
-    """Get detailed proposal information for client"""
-    try:
-        token = request.args.get('token')
-        if not token:
-            return {'detail': 'Access token required'}, 400
-        
-        with get_db_connection() as conn:
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-            def _get_table_columns(table_name: str):
-                cursor.execute(
-                    """
-                    SELECT column_name
-                    FROM information_schema.columns
-                    WHERE table_name = %s
-                    """,
-                    (table_name,),
-                )
-                cols = cursor.fetchall() or []
-                return [
-                    (c['column_name'] if isinstance(c, dict) else c[0])
-                    for c in cols
-                ]
-
-            def _pick_first(existing, candidates):
-                for c in candidates:
-                    if c in existing:
-                        return c
-                return None
-            
-            # Verify token and get client email
-            inv_cols = _get_table_columns('collaboration_invitations')
-            inv_email_col = _pick_first(inv_cols, ['invited_email', 'invitee_email', 'email', 'client_email'])
-            expires_col = _pick_first(inv_cols, ['expires_at'])
-            token_col = _pick_first(inv_cols, ['access_token', 'token'])
-
-            if not inv_email_col:
-                return {'detail': 'Collaboration invitations schema missing email column'}, 500
-            if not token_col:
-                return {'detail': 'Collaboration invitations schema missing token column'}, 500
-
-            expires_select = f", {expires_col}" if expires_col else ", NULL::timestamp as expires_at"
-            cursor.execute(
-                f"""
-                SELECT {inv_email_col} AS invited_email{expires_select}
-                FROM collaboration_invitations
-                WHERE {token_col} = %s
-                """,
-                (token,),
-            )
-            
-            invitation = cursor.fetchone()
-            if not invitation:
-                return {'detail': 'Invalid access token'}, 404
-            
-            if invitation['expires_at'] and datetime.now() > invitation['expires_at']:
-                return {'detail': 'Access token has expired'}, 403
-            
-            prop_cols = _get_table_columns('proposals')
-            client_col = 'client' if 'client' in prop_cols else ('client_name' if 'client_name' in prop_cols else None)
-            client_select = f"p.{client_col}" if client_col else "NULL::text"
-            client_email_col = 'client_email' if 'client_email' in prop_cols else None
-            user_id_col = 'user_id' if 'user_id' in prop_cols else ('owner_id' if 'owner_id' in prop_cols else None)
-            user_id_select = f"p.{user_id_col}" if user_id_col else "NULL"
-
-            if not client_email_col:
-                return {'detail': 'Proposals schema missing client_email column'}, 500
-
-            def _get_column_data_type(table_name: str, column_name: str):
-                if not column_name:
-                    return None
-                cursor.execute(
-                    """
-                    SELECT data_type
-                    FROM information_schema.columns
-                    WHERE table_schema = 'public'
-                      AND table_name = %s
-                      AND column_name = %s
-                    """,
-                    (table_name, column_name),
-                )
-                row = cursor.fetchone()
-                if not row:
-                    return None
-                if isinstance(row, dict):
-                    return row.get('data_type')
-                return row[0]
-
-            if user_id_col == 'owner_id':
-                join_clause = "LEFT JOIN users u ON u.id = p.owner_id"
-            elif user_id_col == 'user_id':
-                user_id_type = (_get_column_data_type('proposals', 'user_id') or '').lower()
-                if user_id_type in ('integer', 'bigint', 'smallint'):
-                    join_clause = "LEFT JOIN users u ON u.id = p.user_id"
-                else:
-                    # In some schemas proposals.user_id stores the owner's username.
-                    join_clause = "LEFT JOIN users u ON u.username = p.user_id"
-            else:
-                join_clause = "LEFT JOIN users u ON 1=0"
-
-            # Get proposal details
-            cursor.execute(
-                f"""
-                SELECT p.id, p.title, p.content, p.status, p.created_at, p.updated_at,
-                       {client_select} AS client, p.{client_email_col} AS client_email, {user_id_select} AS user_id,
-                       u.full_name as owner_name, u.email as owner_email
-                FROM proposals p
-                {join_clause}
-                WHERE p.id = %s AND p.{client_email_col} = %s
-                """,
-                (proposal_id, invitation['invited_email']),
-            )
-            
-            proposal = cursor.fetchone()
-            if not proposal:
-                return {'detail': 'Proposal not found or access denied'}, 404
-            
-            # Get comments
-            cursor.execute("""
-                SELECT dc.id, dc.comment_text, dc.created_at, dc.created_by,
-                       u.full_name as created_by_name, u.email as created_by_email
-                FROM document_comments dc
-                LEFT JOIN users u ON dc.created_by = u.id
-                WHERE dc.proposal_id = %s
-                ORDER BY dc.created_at DESC
-            """, (proposal_id,))
-            
-            comments = cursor.fetchall()
-            
-            # Get activity log (simplified - you can enhance this)
-            activity = [
-                {
-                    'action': 'Proposal Created',
-                    'description': f'Proposal was created by {proposal["owner_name"]}',
-                    'timestamp': proposal['created_at'].isoformat() if proposal['created_at'] else None
-                },
-                {
-                    'action': 'Sent to Client',
-                    'description': f'Proposal was sent to {(proposal.get("client") or proposal.get("client_name") or "the client")}',
-                    'timestamp': proposal['updated_at'].isoformat() if proposal['updated_at'] else None
-                }
-            ]
-
-            signature = None
-            try:
-                sig_cols = _get_table_columns('proposal_signatures')
-                if 'id' in sig_cols and 'proposal_id' in sig_cols:
-                    signed_url_col = (
-                        'signed_document_url'
-                        if 'signed_document_url' in sig_cols
-                        else ('signed_pdf_url' if 'signed_pdf_url' in sig_cols else None)
-                    )
-                    envelope_col = 'envelope_id' if 'envelope_id' in sig_cols else None
-                    status_col = 'status' if 'status' in sig_cols else None
-                    signing_url_col = 'signing_url' if 'signing_url' in sig_cols else None
-                    created_col = 'created_at' if 'created_at' in sig_cols else None
-                    signed_at_col = (
-                        'signed_at'
-                        if 'signed_at' in sig_cols
-                        else ('completed_at' if 'completed_at' in sig_cols else None)
-                    )
-
-                    select_bits = [
-                        'id',
-                        'proposal_id',
-                    ]
-                    if signed_url_col:
-                        select_bits.append(f"{signed_url_col} as signed_document_url")
-                    else:
-                        select_bits.append("NULL::text as signed_document_url")
-                    if envelope_col:
-                        select_bits.append(f"{envelope_col} as envelope_id")
-                    else:
-                        select_bits.append("NULL::text as envelope_id")
-                    if status_col:
-                        select_bits.append(f"{status_col} as status")
-                    else:
-                        select_bits.append("NULL::text as status")
-                    if signing_url_col:
-                        select_bits.append(f"{signing_url_col} as signing_url")
-                    else:
-                        select_bits.append("NULL::text as signing_url")
-                    if signed_at_col:
-                        select_bits.append(f"{signed_at_col} as signed_at")
-                    else:
-                        select_bits.append("NULL::timestamp as signed_at")
-                    if created_col:
-                        select_bits.append(f"{created_col} as created_at")
-                    else:
-                        select_bits.append("NOW() as created_at")
-
-                    cursor.execute(
-                        f"""
-                        SELECT {', '.join(select_bits)}
-                        FROM proposal_signatures
-                        WHERE proposal_id = %s
-                        ORDER BY COALESCE({signed_at_col or created_col or 'id'}, id) DESC
-                        LIMIT 1
-                        """,
-                        (proposal_id,),
-                    )
-                    sig_row = cursor.fetchone()
-                    if sig_row:
-                        signature = {
-                            'status': sig_row.get('status') or 'unknown',
-                            'envelope_id': sig_row.get('envelope_id'),
-                            'signing_url': sig_row.get('signing_url'),
-                            'signed_document_url': sig_row.get('signed_document_url'),
-                            'signed_at': sig_row.get('signed_at').isoformat() if sig_row.get('signed_at') else None,
-                        }
-            except Exception:
-                # If signature table/columns differ, don't break the client view.
-                signature = None
-            
-            return {
-                'proposal': dict(proposal),
-                'signature': signature,
-                'comments': [dict(c) for c in comments],
-                'activity': activity
-            }, 200
-            
-    except Exception as e:
-        print(f"❌ Error getting client proposal details: {e}")
-        traceback.print_exc()
-        return {'detail': str(e)}, 500
+# NOTE: GET /api/client/proposals/<id> is implemented on the client blueprint
+# (api.routes.client) with signing_payload_hash, device session, and sections support.
 
 @app.post("/api/client/proposals/<int:proposal_id>/comment")
 def add_client_comment(proposal_id):
@@ -5322,7 +4948,7 @@ def client_approve_proposal(proposal_id):
                 )
 
                 frontend_url = get_frontend_url()
-                return_url = f"{frontend_url}/#/collaborate?token={token}&signed=true"
+                return_url = f"{frontend_url}/?token={token}&signed=true#/collaborate"
 
                 envelope_result = create_docusign_envelope(
                     proposal_id=proposal_id,
@@ -7411,18 +7037,17 @@ def health_check():
     """Health check endpoint with connection pool info"""
     pool_info = {
         "status": "ok",
-        "db_initialized": _db_initialized
+        "db_initialized": _db_initialized,
+        "pg_schema_available": app.config.get("PG_SCHEMA_AVAILABLE", False),
     }
     
-    # Add connection pool status if available
+    # Add connection pool status if available (shared pool from api.utils.database)
     try:
-        if _pg_pool:
-            # Try to get pool stats (note: SimpleConnectionPool doesn't expose all stats)
+        pool = get_pg_pool()
+        if pool is not None:
             pool_info["database"] = "postgresql"
             pool_info["pool_type"] = "SimpleConnectionPool"
             pool_info["pool_configured"] = True
-            
-            # Test connection
             try:
                 with get_db_connection() as conn:
                     cursor = conn.cursor()
@@ -7434,6 +7059,7 @@ def health_check():
         else:
             pool_info["pool_configured"] = False
     except Exception as e:
+        pool_info["pool_configured"] = False
         pool_info["pool_error"] = str(e)
     
     return pool_info, 200
@@ -7456,8 +7082,12 @@ if __name__ == '__main__':
         print("[*] Initializing PostgreSQL schema (startup)...")
         init_pg_schema()
         _db_initialized = True
+        app.config['PG_SCHEMA_AVAILABLE'] = True
+        _pg_schema_init_attempted = True
         print("[OK] Database schema initialized successfully")
     except Exception as e:
+        _pg_schema_init_attempted = True
+        app.config['PG_SCHEMA_AVAILABLE'] = False
         print(f"Warning: Database initialization failed: {e}")
     import os
     # Local dev expects 5000 (frontend is hardcoded to 127.0.0.1:5000).

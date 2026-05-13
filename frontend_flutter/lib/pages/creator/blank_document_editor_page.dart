@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'content_library_dialog.dart';
 import '../../services/auth_service.dart';
 import '../../services/api_service.dart';
@@ -25,6 +26,7 @@ import '../../widgets/admin/admin_sidebar.dart';
 import '../../widgets/manager_page_background.dart';
 import '../../utils/html_content_parser.dart';
 import '../../widgets/header.dart';
+import '../../widgets/glass_date_picker.dart';
 import 'governance_panel.dart';
 import '../../services/ai_analysis_service.dart';
 // Import models from document_editor
@@ -79,6 +81,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
   bool _isLoadingClients = false;
   int? _selectedClientId;
   bool _isSaving = false;
+  bool _isSubmittingForApproval = false;
   DateTime? _lastSaved;
   List<DocumentSection> _sections = [];
   int _hoveredSectionIndex = -1;
@@ -88,6 +91,25 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
   /// Avoid registering Quill/listener hooks twice for the same section (e.g. AI init + auto-save setup).
   final Set<String> _sectionRichListenersAttached = {};
   String _selectedCurrency = 'Rand (ZAR)';
+
+  ImageProvider _networkImageProvider(
+    String url, {
+    int? cacheWidth,
+    int? cacheHeight,
+  }) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) {
+      return const AssetImage('');
+    }
+    if (kIsWeb && (cacheWidth != null || cacheHeight != null)) {
+      return ResizeImage(
+        NetworkImage(trimmed),
+        width: cacheWidth,
+        height: cacheHeight,
+      );
+    }
+    return NetworkImage(trimmed);
+  }
 
   Widget _buildPositionedPricingTable(
     int sectionIndex,
@@ -434,8 +456,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
 
         // Root comments + replies both can have offsets; apply to all.
         String? blockId = c['block_id']?.toString();
-        final sectionIndex =
-            int.tryParse(c['section_index']?.toString() ?? '');
+        final sectionIndex = int.tryParse(c['section_index']?.toString() ?? '');
 
         // Determine the best target section for this highlight.
         int? targetSectionIndex;
@@ -502,8 +523,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
 
         matched++;
         final commentId = int.tryParse(c['id']?.toString() ?? '');
-        final isFocusedComment =
-            _focusedHighlightCommentId != null && commentId == _focusedHighlightCommentId;
+        final isFocusedComment = _focusedHighlightCommentId != null &&
+            commentId == _focusedHighlightCommentId;
         final pulseWave = _highlightPulseActive
             ? (0.5 + 0.5 * math.sin(_highlightPulseTick * 0.7))
             : 0.6;
@@ -524,7 +545,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
             );
       }
 
-      print('🖍️ Highlights: ${_comments.length} comments, $matched with offsets, $skippedNoBlock no block_id, $skippedNoOffset no offsets');
+      print(
+          '🖍️ Highlights: ${_comments.length} comments, $matched with offsets, $skippedNoBlock no block_id, $skippedNoOffset no offsets');
 
       final sectionIds = _sections.map((s) => s.id).toList();
       final blockIds = rangesByBlock.keys.toList();
@@ -561,6 +583,14 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
   List<String> _uploadedImages = [];
   List<Map<String, dynamic>> _libraryImages = [];
   bool _isLoadingLibraryImages = false;
+  bool _useStandardizedProposalLayout = false;
+  DateTime _standardizedProposalDate = DateTime.now();
+  static const String _standardHeaderLogoAsset =
+      'assets/images/new icons for manager/khonology_logo.png';
+  static const String _standardHeaderBgAsset = ManagerChromeTheme.darkBgAsset;
+  static const String _standardFooterAsset = 'assets/images/footer.png';
+  static const String _standardRiskGateAsset =
+      'assets/images/new icons for manager/risk_gate_tab.png';
   String? _headerLogoUrl;
   String? _footerLogoUrl;
   String _headerLogoPosition = 'left'; // 'left', 'center', 'right'
@@ -602,6 +632,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
   late TextEditingController _commentController;
   final FocusNode _commentFocusNode = FocusNode();
   final ScrollController _commentsScrollController = ScrollController();
+  final ScrollController _pageScrollController = ScrollController();
   OverlayEntry? _threadOverlay;
   int? _activeThreadRootId;
   late TextEditingController _threadReplyController;
@@ -1042,18 +1073,44 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
       });
     } else if (widget.proposalId == null) {
       // Only create initial section for new documents without AI content
-      final initialSection = DocumentSection(
-        title: widget.initialCoverImageUrl != null ? '' : 'Untitled Section',
-        content: '',
-        backgroundImageUrl: widget.initialCoverImageUrl,
-        sectionType: widget.initialCoverImageUrl != null ? 'cover' : 'content',
-        isCoverPage: widget.initialCoverImageUrl != null,
-      );
-      _sections.add(initialSection);
+      if (widget.initialCoverImageUrl != null) {
+        _useStandardizedProposalLayout = true;
 
-      // Add focus listeners for UI updates
-      initialSection.contentFocus.addListener(() => setState(() {}));
-      initialSection.titleFocus.addListener(() => setState(() {}));
+        final coverSection = DocumentSection(
+          title: '',
+          content: '',
+          backgroundImageUrl: widget.initialCoverImageUrl,
+          sectionType: 'cover',
+          isCoverPage: true,
+        );
+        _sections.add(coverSection);
+
+        final firstContentPage = DocumentSection(
+          title: 'Untitled Section',
+          content: '',
+          sectionType: 'content',
+          isCoverPage: false,
+        );
+        _sections.add(firstContentPage);
+
+        for (final section in _sections) {
+          section.contentFocus.addListener(() => setState(() {}));
+          section.titleFocus.addListener(() => setState(() {}));
+          _attachSectionListeners(section);
+        }
+      } else {
+        final initialSection = DocumentSection(
+          title: 'Untitled Section',
+          content: '',
+          sectionType: 'content',
+          isCoverPage: false,
+        );
+        _sections.add(initialSection);
+
+        // Add focus listeners for UI updates
+        initialSection.contentFocus.addListener(() => setState(() {}));
+        initialSection.titleFocus.addListener(() => setState(() {}));
+      }
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -1290,6 +1347,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
   }
 
   Future<void> _submitForApprovalFinance() async {
+    if (_isSubmittingForApproval) return;
+
     // First save the document
     if (_hasUnsavedChanges) {
       await _saveToBackend();
@@ -1332,11 +1391,30 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     if (confirmed != true) return;
 
     try {
+      setState(() => _isSubmittingForApproval = true);
+      if (mounted) {
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        );
+      }
+
       final app = context.read<AppState>();
       await app.updateProposalStatus(
         _savedProposalId!.toString(),
         'Pending Approval',
       );
+
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
 
       if (!mounted) return;
       setState(() {
@@ -1356,6 +1434,9 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
         (route) => false,
       );
     } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).maybePop();
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1363,6 +1444,10 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmittingForApproval = false);
+      }
     }
   }
 
@@ -1661,8 +1746,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
       Map<String, dynamic>? contentData;
       final dynamic rawContent = proposal['content'];
       if (rawContent != null &&
-          (!(rawContent is String) ||
-              rawContent.trim().isNotEmpty)) {
+          (!(rawContent is String) || rawContent.trim().isNotEmpty)) {
         try {
           dynamic decodedContent = rawContent;
           if (rawContent is String) {
@@ -1691,8 +1775,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
           if (rawSections is List && rawSections.isNotEmpty) {
             sectionList = rawSections;
           } else if (rawSections is Map && rawSections.isNotEmpty) {
-            sectionList =
-                rawSections.entries.map<Map<String, dynamic>>((e) {
+            sectionList = rawSections.entries.map<Map<String, dynamic>>((e) {
               final v = e.value;
               return {
                 'title': e.key.toString(),
@@ -1845,6 +1928,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
               _selectedCurrency = metadata['currency'] ?? _selectedCurrency;
               _headerLogoUrl = metadata['headerLogoUrl'] as String?;
               _footerLogoUrl = metadata['footerLogoUrl'] as String?;
+              _useStandardizedProposalLayout =
+                  metadata['standardizedProposalLayout'] == true;
               _headerLogoPosition =
                   (metadata['headerLogoPosition'] as String?) ?? 'left';
               _footerLogoPosition =
@@ -1855,6 +1940,13 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                   (metadata['footerProposalIdPosition'] as String?) ?? 'right';
               _headerBackgroundImageUrl =
                   metadata['headerBackgroundImageUrl'] as String?;
+              final dateRaw = metadata['standardizedProposalDate']?.toString();
+              if (dateRaw != null && dateRaw.trim().isNotEmpty) {
+                final parsed = DateTime.tryParse(dateRaw);
+                if (parsed != null) {
+                  _standardizedProposalDate = parsed;
+                }
+              }
             }
           });
 
@@ -2271,6 +2363,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     _removeAddCommentOverlay();
     _removeThreadOverlay();
     _commentsScrollController.dispose();
+    _pageScrollController.dispose();
     _threadReplyController.dispose();
     _threadReplyFocusNode.dispose();
     _titleController.dispose();
@@ -2902,11 +2995,10 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
   void _insertMention(Map<String, dynamic> user) {
     if (_mentionStartIndex == -1) return;
 
-    String mentionKey =
-        (user['mention_key']?.toString().trim() ??
-                user['username']?.toString().trim() ??
-                '')
-            .replaceAll(' ', '');
+    String mentionKey = (user['mention_key']?.toString().trim() ??
+            user['username']?.toString().trim() ??
+            '')
+        .replaceAll(' ', '');
     if (mentionKey.isEmpty) {
       final email = user['email']?.toString() ?? '';
       if (email.contains('@')) {
@@ -3675,8 +3767,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
   DateTime _toSast(DateTime dt) {
     final utc = dt.isUtc
         ? dt
-        : DateTime.utc(dt.year, dt.month, dt.day, dt.hour, dt.minute,
-            dt.second, dt.millisecond, dt.microsecond);
+        : DateTime.utc(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second,
+            dt.millisecond, dt.microsecond);
     return utc.add(const Duration(hours: 2));
   }
 
@@ -4231,13 +4323,13 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
           final sel = section.richController.selection;
           if (sel.isCollapsed && sel.baseOffset > 0) {
             final offset = sel.baseOffset;
-            final style = section.richController.document
-                .collectStyle(offset - 1, 1);
+            final style =
+                section.richController.document.collectStyle(offset - 1, 1);
             if (style.containsKey(Attribute.background.key)) {
               _isMutatingHighlights = true;
               try {
-                section.richController.formatText(
-                    offset - 1, 1, Attribute.background);
+                section.richController
+                    .formatText(offset - 1, 1, Attribute.background);
               } finally {
                 _isMutatingHighlights = false;
               }
@@ -4310,37 +4402,37 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
   String _serializeDocumentContent() {
     final documentData = {
       'title': _titleController.text,
-      'sections': _sections
-          .map((section) {
-                final cleanDelta =
-                    _stripHighlightBackgrounds(section.exportRichDelta());
-                return {
-                'id': section.id,
-                'title': section.titleController.text,
-                'content': section.controller.text,
-                'richContentDelta': cleanDelta,
-                'lineSpacing': section.lineSpacing,
-                'paragraphAlignment': section.paragraphAlignment,
-                'richParagraphs': paragraphsFromQuillDelta(
-                  cleanDelta,
-                  defaultFontFamily: _selectedFont,
-                  defaultFontSize: double.tryParse(_selectedFontSize) ?? 12.0,
-                  defaultAlignment: section.paragraphAlignment,
-                  defaultLineSpacing: section.lineSpacing,
-                ).map((p) => p.toJson()).toList(),
-                'backgroundColor': section.backgroundColor.value,
-                'backgroundImageUrl': section.backgroundImageUrl,
-                'sectionType': section.sectionType,
-                'isCoverPage': section.isCoverPage,
-                'inlineImages':
-                    section.inlineImages.map((img) => img.toJson()).toList(),
-                'tables':
-                    section.tables.map((table) => table.toJson()).toList(),
-                'positionedPricingTables': section.positionedPricingTables
-                    .map((p) => p.toJson())
-                    .toList(),
-              };})
-          .toList(),
+      'sections': _sections.map((section) {
+        final cleanDelta =
+            _stripHighlightBackgrounds(section.exportRichDelta());
+        final richParagraphs = kIsWeb
+            ? <Map<String, dynamic>>[]
+            : paragraphsFromQuillDelta(
+                cleanDelta,
+                defaultFontFamily: _selectedFont,
+                defaultFontSize: double.tryParse(_selectedFontSize) ?? 12.0,
+                defaultAlignment: section.paragraphAlignment,
+                defaultLineSpacing: section.lineSpacing,
+              ).map((p) => p.toJson()).toList();
+        return {
+          'id': section.id,
+          'title': section.titleController.text,
+          'content': section.controller.text,
+          'richContentDelta': cleanDelta,
+          'lineSpacing': section.lineSpacing,
+          'paragraphAlignment': section.paragraphAlignment,
+          'richParagraphs': richParagraphs,
+          'backgroundColor': section.backgroundColor.value,
+          'backgroundImageUrl': section.backgroundImageUrl,
+          'sectionType': section.sectionType,
+          'isCoverPage': section.isCoverPage,
+          'inlineImages':
+              section.inlineImages.map((img) => img.toJson()).toList(),
+          'tables': section.tables.map((table) => table.toJson()).toList(),
+          'positionedPricingTables':
+              section.positionedPricingTables.map((p) => p.toJson()).toList(),
+        };
+      }).toList(),
       'metadata': {
         'currency': _selectedCurrency,
         'version': _currentVersionNumber,
@@ -4352,6 +4444,9 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
         'footerPageNumberPosition': _footerPageNumberPosition,
         'footerProposalIdPosition': _footerProposalIdPosition,
         'headerBackgroundImageUrl': _headerBackgroundImageUrl,
+        'standardizedProposalLayout': _useStandardizedProposalLayout,
+        'standardizedProposalDate':
+            DateFormat('yyyy-MM-dd').format(_standardizedProposalDate),
       }
     };
     return json.encode(documentData);
@@ -4363,7 +4458,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     setState(() => _isSaving = true);
     try {
       // Save to backend
-      await _saveToBackend();
+      await _saveToBackend(reloadFromBackend: false);
 
       if (!mounted) return;
       // For stricter approver sessions, auto-save should NOT create
@@ -4465,7 +4560,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     }
   }
 
-  Future<void> _saveToBackend() async {
+  Future<void> _saveToBackend({bool reloadFromBackend = true}) async {
     // Get auth token (fresh or cached)
     final token = await _getAuthToken();
 
@@ -4513,8 +4608,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
           print('✅ Proposal created with ID: $_savedProposalId');
           print(
               '💾 Proposal ID saved in state - future saves will UPDATE this proposal');
-          // Reload full proposal data to ensure we have everything
-          if (newProposalId != null) {
+          // Avoid backend round-trip during autosave to prevent UI flicker.
+          if (reloadFromBackend && newProposalId != null) {
             await _loadProposalFromDatabase(newProposalId);
           }
         } else {
@@ -4543,7 +4638,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
           setState(() {
             _proposalData = Map<String, dynamic>.from(result);
           });
-        } else {
+        } else if (reloadFromBackend) {
           // Reload proposal data to ensure we have the latest
           await _loadProposalFromDatabase(_savedProposalId!);
         }
@@ -5424,8 +5519,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     // Keep admin navigation available in-editor so admins can move back
     // to dashboard pages after opening a proposal from mention notifications.
     // Finance still hides this sidebar unless changes were requested.
-    final hideLeftSidebar =
-        context.watch<RoleService>().isFinance() &&
+    final hideLeftSidebar = context.watch<RoleService>().isFinance() &&
         _statusForSidebar != 'changes requested';
 
     return Scaffold(
@@ -5433,77 +5527,98 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
       body: ManagerPageBackground(
         child: Row(
           children: [
-          // Left Sidebar (hide in read-only mode AND collaborator mode)
-          if (!isReadOnly && !isCollaboratorMode && !hideLeftSidebar)
-            (isAdminUser
-                ? Material(
-                    child: AdminSidebar(
-                      isCollapsed: appState.isAdminSidebarCollapsed,
-                      currentPage: appState.adminNavLabel,
-                      onToggle: appState.toggleAdminSidebar,
-                      onSelect: (label) {
-                        appState.setAdminNavLabel(label);
-                        _navigateToPage(label);
-                      },
-                    ),
-                  )
-                : _buildLeftSidebar()),
-          // Sections Sidebar (conditional, hide in read-only mode AND collaborator mode)
-          if (!isReadOnly && !isCollaboratorMode && _showSectionsSidebar)
-            _buildSectionsSidebar(),
-          // Main content
-          Expanded(
-            child: _currentPage == 'Governance & Risk'
-                ? _buildGovernanceRiskView()
-                : Column(
-                    children: [
-                      // Top header
-                      _buildTopHeader(),
-                      // Formatting toolbar (hide in read-only mode)
-                      if (!isReadOnly) _buildToolbar(),
-                      // Main document area
-                      Expanded(
-                        child: Row(
-                          children: [
-                            // Center content
-                            Expanded(
-                              child: Stack(
-                                children: [
-                                  SingleChildScrollView(
-                                    child: Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 40,
-                                          vertical: 50,
-                                        ),
-                                        child: Column(
-                                          children: [
-                                            // Generate A4 pages
-                                            ..._buildA4Pages(),
-                                            // Plus button to add new page
-                                            const SizedBox(height: 24),
-                                            _buildAddPageButton(),
-                                            const SizedBox(height: 40),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Right sidebar (hide in read-only mode AND collaborator mode)
-                            if (!isReadOnly && !isCollaboratorMode)
-                              _buildRightSidebar(),
-                            if (_showCommentsPanel || forceCommentsPanelOpen)
-                              _buildCommentsPanel(),
-                          ],
-                        ),
+            // Left Sidebar (hide in read-only mode AND collaborator mode)
+            if (!isReadOnly && !isCollaboratorMode && !hideLeftSidebar)
+              (isAdminUser
+                  ? Material(
+                      child: AdminSidebar(
+                        isCollapsed: appState.isAdminSidebarCollapsed,
+                        currentPage: appState.adminNavLabel,
+                        onToggle: appState.toggleAdminSidebar,
+                        onSelect: (label) {
+                          appState.setAdminNavLabel(label);
+                          _navigateToPage(label);
+                        },
                       ),
-                    ],
-                  ),
-          ),
-        ],
+                    )
+                  : _buildLeftSidebar()),
+            // Sections Sidebar (conditional, hide in read-only mode AND collaborator mode)
+            if (!isReadOnly && !isCollaboratorMode && _showSectionsSidebar)
+              _buildSectionsSidebar(),
+            // Main content
+            Expanded(
+              child: _currentPage == 'Governance & Risk'
+                  ? _buildGovernanceRiskView()
+                  : Column(
+                      children: [
+                        // Top header
+                        _buildTopHeader(),
+                        // Formatting toolbar (hide in read-only mode)
+                        if (!isReadOnly) _buildToolbar(),
+                        // Main document area
+                        Expanded(
+                          child: Row(
+                            children: [
+                              // Center content
+                              Expanded(
+                                child: Stack(
+                                  children: [
+                                    Builder(
+                                      builder: (context) {
+                                        final pages = _buildA4Pages();
+                                        return RawScrollbar(
+                                          controller: _pageScrollController,
+                                          thumbVisibility: true,
+                                          trackVisibility: true,
+                                          interactive: true,
+                                          thickness: 12,
+                                          radius: const Radius.circular(10),
+                                          thumbColor: const Color(0xFFC10D00),
+                                          trackColor: Colors.black
+                                              .withValues(alpha: 0.25),
+                                          trackBorderColor: Colors.white
+                                              .withValues(alpha: 0.25),
+                                          child: ListView.builder(
+                                            controller: _pageScrollController,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 40,
+                                              vertical: 50,
+                                            ),
+                                            itemCount: pages.length + 1,
+                                            itemBuilder: (context, index) {
+                                              if (index < pages.length) {
+                                                return Center(
+                                                  child: pages[index],
+                                                );
+                                              }
+
+                                              return Column(
+                                                children: [
+                                                  const SizedBox(height: 24),
+                                                  _buildAddPageButton(),
+                                                  const SizedBox(height: 40),
+                                                ],
+                                              );
+                                            },
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Right sidebar (hide in read-only mode AND collaborator mode)
+                              if (!isReadOnly && !isCollaboratorMode)
+                                _buildRightSidebar(),
+                              if (_showCommentsPanel || forceCommentsPanelOpen)
+                                _buildCommentsPanel(),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
         ),
       ),
     );
@@ -5854,14 +5969,13 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   height: 1,
-                  color: chrome.isDark
-                      ? const Color(0xFF2C3E50)
-                      : chrome.divider,
+                  color:
+                      chrome.isDark ? const Color(0xFF2C3E50) : chrome.divider,
                 ),
               const SizedBox(height: 12),
               // Logout button
-              _buildNavItem('Logout',
-                  'assets/images/Logout_KhonoBuzz.png', false, chrome),
+              _buildNavItem('Logout', 'assets/images/Logout_KhonoBuzz.png',
+                  false, chrome),
               const SizedBox(height: 20),
             ],
           ),
@@ -5956,8 +6070,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     }
   }
 
-  Widget _buildNavItem(
-      String label, String assetPath, bool isActive, ManagerChromeTheme chrome) {
+  Widget _buildNavItem(String label, String assetPath, bool isActive,
+      ManagerChromeTheme chrome) {
     final inactiveLabel =
         chrome.isDark ? const Color(0xFFECF0F1) : chrome.textPrimary;
     if (_isSidebarCollapsed) {
@@ -6807,8 +6921,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     final double ddFont = 14 * kToolbarScale;
     final double gapSm = 12 * kToolbarScale;
     final double gapMd = 18 * kToolbarScale;
-    final ddStyle =
-        TextStyle(fontSize: ddFont, color: chrome.textPrimary);
+    final ddStyle = TextStyle(fontSize: ddFont, color: chrome.textPrimary);
 
     // Single toolbar instance bound to the active section (selectedSectionIndex).
     // Formatting actions apply to current Quill selection/cursor.
@@ -6998,8 +7111,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
   Widget _buildSmallDropdown(
       String label, List<String> items, Function(String?) onChanged) {
     final chrome = context.watch<ManagerThemeController>().chrome;
-    final itemStyle =
-        TextStyle(fontSize: 12, color: chrome.textPrimary);
+    final itemStyle = TextStyle(fontSize: 12, color: chrome.textPrimary);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -7308,6 +7420,293 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
     );
   }
 
+  Widget _buildStandardizedProposalHeader({
+    required String pageTitle,
+    required bool showRiskIcon,
+    bool showMetaBar = true,
+    bool allowDateEdit = false,
+    TextEditingController? pageTitleController,
+    bool allowTitleEdit = false,
+  }) {
+    return Container(
+      height: 118,
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage(_standardHeaderBgAsset),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.14),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 22, vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Transform.translate(
+                            offset: const Offset(-8, 0),
+                            child: SizedBox(
+                              height: 50,
+                              child: Image.asset(
+                                _standardHeaderLogoAsset,
+                                fit: BoxFit.contain,
+                                alignment: Alignment.centerLeft,
+                                errorBuilder: (_, __, ___) => const Text(
+                                  'KHONOLOGY',
+                                  style: TextStyle(
+                                    color: Color(0xFFC10D00),
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 2.8,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.only(left: 20),
+                            child: Text(
+                              'PROPOSAL REPORT',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.4,
+                                height: 1.0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (showRiskIcon)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Container(
+                          width: 58,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              width: 2,
+                            ),
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: Transform.scale(
+                            scale: 2.0,
+                            child: Image.asset(
+                              _standardRiskGateAsset,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.health_and_safety,
+                                color: Color(0xFFC10D00),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (!showMetaBar)
+            Container(
+              width: double.infinity,
+              color: Colors.black.withValues(alpha: 0.22),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: InkWell(
+                  onTap: allowDateEdit
+                      ? () async {
+                          final picked = await showGlassDatePicker(
+                            context: context,
+                            initialDate: _standardizedProposalDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked == null) return;
+                          setState(() => _standardizedProposalDate = picked);
+                          _onContentChanged();
+                        }
+                      : null,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.calendar_month,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          DateFormat('dd/MM/yyyy')
+                              .format(_standardizedProposalDate),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (showMetaBar)
+            Container(
+              width: double.infinity,
+              color: const Color(0xFFC10D00),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Text(
+                          'Title: ',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Expanded(
+                          child: allowTitleEdit && pageTitleController != null
+                              ? TextFormField(
+                                  controller: pageTitleController,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  onChanged: (_) => _onContentChanged(),
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    border: InputBorder.none,
+                                    hintText: 'Untitled Section',
+                                    hintStyle: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  pageTitle.trim().isEmpty
+                                      ? 'Untitled Section'
+                                      : pageTitle,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Date: ${DateFormat('dd/MM/yyyy').format(_standardizedProposalDate)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStandardizedProposalFooter() {
+    return Container(
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+      ),
+      child: Center(
+        child: Image.asset(
+          _standardFooterAsset,
+          fit: BoxFit.contain,
+          height: 28,
+          errorBuilder: (_, __, ___) => const Text(
+            'CCC',
+            style: TextStyle(
+              color: Color(0xFFC10D00),
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStandardizedCoverPage({
+    required double pageWidth,
+    required double pageHeight,
+    required String? backgroundImageUrl,
+    required String pageTitle,
+  }) {
+    return Container(
+      width: pageWidth,
+      height: pageHeight,
+      color: Colors.white,
+      child: Column(
+        children: [
+          _buildStandardizedProposalHeader(
+            pageTitle: pageTitle,
+            showRiskIcon: true,
+            showMetaBar: false,
+            allowDateEdit: true,
+          ),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              color: Colors.white,
+              child: backgroundImageUrl == null
+                  ? const SizedBox.shrink()
+                  : SizedBox.expand(
+                      child: Image.network(
+                        backgroundImageUrl,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                        cacheWidth: kIsWeb ? (pageWidth * 2).round() : null,
+                        cacheHeight: kIsWeb ? (pageHeight * 2).round() : null,
+                      ),
+                    ),
+            ),
+          ),
+          _buildStandardizedProposalFooter(),
+        ],
+      ),
+    );
+  }
+
   List<Widget> _buildA4Pages() {
     // A4 dimensions: 210mm x 297mm (aspect ratio 0.707)
     // Using larger width of 900px for better visibility
@@ -7320,6 +7719,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
       (index) {
         final section = _sections[index];
         final headerLogoWidget = _buildHeaderLogoWidget();
+        final pageTitle = section.titleController.text.trim();
         final isCover = section.isCoverPage ||
             section.sectionType.trim().toLowerCase() == 'cover';
         return Container(
@@ -7332,45 +7732,70 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                 : Colors.white,
             image: section.backgroundImageUrl != null
                 ? DecorationImage(
-                    image: NetworkImage(section.backgroundImageUrl!),
+                    image: _networkImageProvider(
+                      section.backgroundImageUrl!,
+                      cacheWidth: kIsWeb ? (pageWidth * 2).round() : null,
+                      cacheHeight: kIsWeb ? (pageHeight * 2).round() : null,
+                    ),
                     fit: BoxFit.cover,
-                    opacity: isCover ? 1.0 : 0.7, // Full-bleed cover image
+                    filterQuality:
+                        kIsWeb ? FilterQuality.low : FilterQuality.medium,
+                    // Opacity forces an extra saveLayer/compositing pass. Avoid on web.
+                    opacity: isCover
+                        ? 1.0
+                        : (kIsWeb ? 1.0 : 0.7), // Full-bleed cover image
                   )
                 : null,
             borderRadius:
                 isCover ? BorderRadius.zero : BorderRadius.circular(4),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 20,
-                offset: const Offset(0, 5),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            boxShadow: kIsWeb
+                ? const []
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 5),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
           child: isCover
-              ? const SizedBox.expand()
+              ? (_useStandardizedProposalLayout
+                  ? _buildStandardizedCoverPage(
+                      pageWidth: pageWidth,
+                      pageHeight: pageHeight,
+                      backgroundImageUrl: section.backgroundImageUrl,
+                      pageTitle: pageTitle,
+                    )
+                  : const SizedBox.expand())
               : Column(
                   children: [
-                    DocumentHeader(
-                      title: null,
-                      subtitle: null,
-                      leading: _headerLogoPosition == 'left'
-                          ? headerLogoWidget
-                          : null,
-                      center: _headerLogoPosition == 'center'
-                          ? headerLogoWidget
-                          : null,
-                      trailing: _headerLogoPosition == 'right'
-                          ? headerLogoWidget
-                          : null,
-                      backgroundImageUrl: _headerBackgroundImageUrl,
-                      onTap: _pickHeaderLogo,
-                    ),
+                    _useStandardizedProposalLayout
+                        ? _buildStandardizedProposalHeader(
+                            pageTitle: pageTitle,
+                            showRiskIcon: true,
+                            pageTitleController: section.titleController,
+                            allowTitleEdit: !widget.readOnly,
+                          )
+                        : DocumentHeader(
+                            title: null,
+                            subtitle: null,
+                            leading: _headerLogoPosition == 'left'
+                                ? headerLogoWidget
+                                : null,
+                            center: _headerLogoPosition == 'center'
+                                ? headerLogoWidget
+                                : null,
+                            trailing: _headerLogoPosition == 'right'
+                                ? headerLogoWidget
+                                : null,
+                            backgroundImageUrl: _headerBackgroundImageUrl,
+                            onTap: _pickHeaderLogo,
+                          ),
                     Expanded(
                       child: SingleChildScrollView(
                         clipBehavior: Clip.none,
@@ -7407,12 +7832,14 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                         ),
                       ),
                     ),
-                    _buildDraggableFooter(
-                      pageNumber: index + 1,
-                      totalPages: _sections.length,
-                      showDivider: true,
-                      enableDragging: true,
-                    ),
+                    _useStandardizedProposalLayout
+                        ? _buildStandardizedProposalFooter()
+                        : _buildDraggableFooter(
+                            pageNumber: index + 1,
+                            totalPages: _sections.length,
+                            showDivider: true,
+                            enableDragging: true,
+                          ),
                   ],
                 ),
         );
@@ -8613,12 +9040,12 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                             Icons.tune, 'templates', 'Templates', chrome),
                         _buildPanelTabIcon(
                             Icons.add_box_outlined, 'build', 'Build', chrome),
-                        _buildPanelTabIcon(
-                            Icons.cloud_upload_outlined, 'upload', 'Upload', chrome),
+                        _buildPanelTabIcon(Icons.cloud_upload_outlined,
+                            'upload', 'Upload', chrome),
                         _buildPanelTabIcon(
                             Icons.edit_note, 'signature', 'Signature', chrome),
-                        _buildPanelTabIcon(
-                            Icons.verified, 'review', 'Review & Complete', chrome),
+                        _buildPanelTabIcon(Icons.verified, 'review',
+                            'Review & Complete', chrome),
                         _buildAIAnalysisIcon(),
                       ],
                     ),
@@ -8633,7 +9060,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: chrome.isDark ? Colors.grey[100] : chrome.fieldFill,
+                      color:
+                          chrome.isDark ? Colors.grey[100] : chrome.fieldFill,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: chrome.fieldBorder, width: 1),
                     ),
@@ -10586,9 +11014,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: headerOnDark
-                  ? const Color(0xFF1A3A52)
-                  : chrome.floatingFill,
+              color:
+                  headerOnDark ? const Color(0xFF1A3A52) : chrome.floatingFill,
               border: Border(bottom: BorderSide(color: chrome.divider)),
             ),
             child: Row(
@@ -10619,9 +11046,7 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: openCount > 0
-                          ? Colors.white
-                          : chrome.textMuted,
+                      color: openCount > 0 ? Colors.white : chrome.textMuted,
                     ),
                   ),
                 ),
@@ -11428,6 +11853,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                               final isCover = section.isCoverPage ||
                                   section.sectionType.trim().toLowerCase() ==
                                       'cover';
+                              final pageTitle =
+                                  section.titleController.text.trim();
 
                               return Container(
                                 width: pageWidth,
@@ -11458,28 +11885,44 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                                   ],
                                 ),
                                 child: isCover
-                                    ? const SizedBox.expand()
+                                    ? (_useStandardizedProposalLayout
+                                        ? _buildStandardizedCoverPage(
+                                            pageWidth: pageWidth,
+                                            pageHeight: pageHeight,
+                                            backgroundImageUrl:
+                                                section.backgroundImageUrl,
+                                            pageTitle: pageTitle,
+                                          )
+                                        : const SizedBox.expand())
                                     : Column(
                                         children: [
-                                          DocumentHeader(
-                                            title: null,
-                                            subtitle: null,
-                                            leading:
-                                                _headerLogoPosition == 'left'
-                                                    ? headerLogoWidget
-                                                    : null,
-                                            center:
-                                                _headerLogoPosition == 'center'
-                                                    ? headerLogoWidget
-                                                    : null,
-                                            trailing:
-                                                _headerLogoPosition == 'right'
-                                                    ? headerLogoWidget
-                                                    : null,
-                                            backgroundImageUrl:
-                                                _headerBackgroundImageUrl,
-                                            showDivider: false,
-                                          ),
+                                          _useStandardizedProposalLayout
+                                              ? _buildStandardizedProposalHeader(
+                                                  pageTitle: pageTitle,
+                                                  showRiskIcon: true,
+                                                  allowTitleEdit: false,
+                                                )
+                                              : DocumentHeader(
+                                                  title: null,
+                                                  subtitle: null,
+                                                  leading:
+                                                      _headerLogoPosition ==
+                                                              'left'
+                                                          ? headerLogoWidget
+                                                          : null,
+                                                  center: _headerLogoPosition ==
+                                                          'center'
+                                                      ? headerLogoWidget
+                                                      : null,
+                                                  trailing:
+                                                      _headerLogoPosition ==
+                                                              'right'
+                                                          ? headerLogoWidget
+                                                          : null,
+                                                  backgroundImageUrl:
+                                                      _headerBackgroundImageUrl,
+                                                  showDivider: false,
+                                                ),
                                           Expanded(
                                             child: SingleChildScrollView(
                                               child: Padding(
@@ -11557,12 +12000,14 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                                               ),
                                             ),
                                           ),
-                                          _buildDraggableFooter(
-                                            pageNumber: index + 1,
-                                            totalPages: _sections.length,
-                                            showDivider: false,
-                                            enableDragging: false,
-                                          ),
+                                          _useStandardizedProposalLayout
+                                              ? _buildStandardizedProposalFooter()
+                                              : _buildDraggableFooter(
+                                                  pageNumber: index + 1,
+                                                  totalPages: _sections.length,
+                                                  showDivider: false,
+                                                  enableDragging: false,
+                                                ),
                                         ],
                                       ),
                               );
@@ -12545,7 +12990,8 @@ class _BlankDocumentEditorPageState extends State<BlankDocumentEditorPage> {
                                             raw.contains('server error')) {
                                           friendly =
                                               'AI service error. Please try again in a moment.';
-                                        } else if (raw.startsWith('Exception: ')) {
+                                        } else if (raw
+                                            .startsWith('Exception: ')) {
                                           friendly = raw.substring(11);
                                         } else {
                                           friendly = raw;

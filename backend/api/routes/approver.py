@@ -7,6 +7,8 @@ import traceback
 import secrets
 import html
 import psycopg2.extras
+import json
+import uuid
 from datetime import datetime, timedelta
 
 from api.utils.database import get_db_connection
@@ -119,11 +121,13 @@ def get_pending_approvals(username=None, user_id=None, email=None):
             else:
                 budget_expr = 'NULL::numeric'
 
+            # Do not SELECT body text here — large JSON/HTML columns make this endpoint
+            # exceed typical client timeouts; review pages load full content by id.
             query = f'''
                 SELECT 
                     id,
                     title,
-                    content,
+                    NULL::text AS content,
                     {client_expr} AS client,
                     {client_email_expr} AS client_email,
                     {owner_expr} AS user_id,
@@ -528,6 +532,83 @@ def approve_proposal(username=None, proposal_id=None):
                 new_status = status_row['status']
                 print(f"[SUCCESS] Proposal {proposal_id} '{title}' approved and status updated")
 
+                # Log proposal_sent activity for client notifications
+                try:
+                    cursor.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS proposal_client_activity (
+                            id SERIAL PRIMARY KEY,
+                            proposal_id INTEGER REFERENCES proposals(id) ON DELETE CASCADE,
+                            client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+                            event_type VARCHAR(50) NOT NULL,
+                            metadata JSONB,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                        """
+                    )
+                    cursor.execute(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_activity_client_created
+                        ON proposal_client_activity(client_id, created_at DESC)
+                        """
+                    )
+
+                    activity_metadata = {
+                        'proposal_id': proposal_id,
+                        'proposal_title': title,
+                        'sender_username': username,
+                        'sender_name': approver_name,
+                        'source': 'finance_approval',
+                    }
+
+                    client_id_for_activity = None
+                    if client_email and '@' in client_email:
+                        cursor.execute(
+                            """
+                            INSERT INTO clients (email, name, company_name, contact_person, token)
+                            VALUES (%s, %s, %s, %s, %s)
+                            ON CONFLICT (email) DO UPDATE SET
+                                name = COALESCE(EXCLUDED.name, clients.name),
+                                company_name = COALESCE(EXCLUDED.company_name, clients.company_name),
+                                contact_person = COALESCE(EXCLUDED.contact_person, clients.contact_person)
+                            RETURNING id
+                            """,
+                            (client_email, client_name or client_email or 'Client', client_name or client_email, client_name or '', str(uuid.uuid4())),
+                        )
+                        row = cursor.fetchone()
+                        if row and (row.get('id') if isinstance(row, dict) else row[0]) is not None:
+                            client_id_for_activity = row.get('id') if isinstance(row, dict) else row[0]
+                        else:
+                            cursor.execute(
+                                "SELECT id FROM clients WHERE lower(email) = lower(%s) LIMIT 1",
+                                (client_email,),
+                            )
+                            c_row = cursor.fetchone()
+                            if c_row:
+                                client_id_for_activity = c_row.get('id') if isinstance(c_row, dict) else c_row[0]
+
+                    cursor.execute(
+                        """
+                        INSERT INTO proposal_client_activity
+                        (proposal_id, client_id, event_type, metadata, created_at)
+                        VALUES (%s, %s, %s, %s::jsonb, NOW())
+                        """,
+                        (
+                            proposal_id,
+                            client_id_for_activity,
+                            'proposal_sent',
+                            json.dumps(activity_metadata),
+                        ),
+                    )
+                    conn.commit()
+                    print(f"[APPROVER_ACTIVITY] Logged proposal_sent for proposal {proposal_id}, client_id={client_id_for_activity}")
+                except Exception as activity_err:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    print(f"⚠️ [APPROVER] Failed to log proposal_sent activity for proposal {proposal_id}: {activity_err}")
+
                 log_finance_audit_async(
                     user_id=approver_user_id,
                     username=username,
@@ -691,7 +772,7 @@ def approve_proposal(username=None, proposal_id=None):
                             print(f"⚠️ Failed to insert collaboration invitation: {inv_insert_err}")
                             traceback.print_exc()
 
-                        client_link = f"{frontend_url}/#/client/proposals?token={access_token}"
+                        client_link = f"{frontend_url}/?token={access_token}#/client/proposals"
 
                         sendgrid_configured = bool(
                             (os.getenv('SENDGRID_API_KEY') or '').strip()

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../models/inline_image.dart';
 
 class ImageWidget extends StatelessWidget {
@@ -29,6 +30,8 @@ class ImageWidget extends StatelessWidget {
               width: image.width,
               height: image.height,
               fit: BoxFit.cover,
+              cacheWidth: kIsWeb ? (image.width * 2).round() : null,
+              cacheHeight: kIsWeb ? (image.height * 2).round() : null,
             ),
           ),
           // Delete button

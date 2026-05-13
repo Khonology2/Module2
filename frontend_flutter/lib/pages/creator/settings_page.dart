@@ -19,7 +19,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
   // Form controllers for general settings
   final TextEditingController _companyNameController = TextEditingController();
-  final TextEditingController _openaiApiKeyController = TextEditingController();
 
   // Settings state
   Map<String, dynamic> _generalSettings = {};
@@ -28,7 +27,6 @@ class _SettingsPageState extends State<SettingsPage> {
   Map<String, dynamic> _workflowSettings = {};
   Map<String, dynamic> _integrationSettings = {};
   Map<String, dynamic> _securitySettings = {};
-  Map<String, dynamic> _aiSettings = {};
   Map<String, dynamic> _notificationSettings = {};
 
   bool _isLoading = false;
@@ -44,7 +42,6 @@ class _SettingsPageState extends State<SettingsPage> {
   void dispose() {
     _searchController.dispose();
     _companyNameController.dispose();
-    _openaiApiKeyController.dispose();
     super.dispose();
   }
 
@@ -67,14 +64,12 @@ class _SettingsPageState extends State<SettingsPage> {
         _integrationSettings =
             Map<String, dynamic>.from(data['integrations'] ?? {});
         _securitySettings = Map<String, dynamic>.from(data['security'] ?? {});
-        _aiSettings = Map<String, dynamic>.from(data['ai'] ?? {});
         _notificationSettings =
             Map<String, dynamic>.from(data['notifications'] ?? {});
 
         // Update form controllers
         _companyNameController.text =
             _generalSettings['company_name'] ?? 'Khonology';
-        _openaiApiKeyController.text = _aiSettings['openai_api_key'] ?? '';
         _companyLogoPath = _generalSettings['logo_url'] ?? '';
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -105,13 +100,6 @@ class _SettingsPageState extends State<SettingsPage> {
             'logo_url': _companyLogoPath,
             'default_currency': _generalSettings['default_currency'] ?? 'USD',
             'default_timezone': _generalSettings['default_timezone'] ?? 'est',
-          });
-          break;
-        case 'ai':
-          success = await _updateAISettings({
-            'openai_api_key': _openaiApiKeyController.text,
-            'ai_enabled': _aiSettings['ai_enabled'] ?? true,
-            'ai_model': _aiSettings['ai_model'] ?? 'gpt-3.5-turbo',
           });
           break;
         // Add other cases as needed
@@ -153,27 +141,6 @@ class _SettingsPageState extends State<SettingsPage> {
       return false;
     } catch (e) {
       print('Error updating general settings: $e');
-      return false;
-    }
-  }
-
-  Future<bool> _updateAISettings(Map<String, dynamic> settings) async {
-    try {
-      final response = await http.put(
-        Uri.parse('$baseUrl/api/settings/ai'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(settings),
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          _aiSettings = settings;
-        });
-        return true;
-      }
-      return false;
-    } catch (e) {
-      print('Error updating AI settings: $e');
       return false;
     }
   }
@@ -389,11 +356,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 _buildSettingsNavItem('Security', Icons.security, 'security'),
                 _buildSettingsNavItem(
-                  'AI Configuration',
-                  Icons.psychology,
-                  'ai',
-                ),
-                _buildSettingsNavItem(
                   'Notifications',
                   Icons.notifications,
                   'notifications',
@@ -561,8 +523,6 @@ class _SettingsPageState extends State<SettingsPage> {
         return 'Integrations';
       case 'security':
         return 'Security';
-      case 'ai':
-        return 'AI Configuration';
       case 'notifications':
         return 'Notifications';
       default:
@@ -584,8 +544,6 @@ class _SettingsPageState extends State<SettingsPage> {
         return _buildIntegrations();
       case 'security':
         return _buildSecurity();
-      case 'ai':
-        return _buildAIConfiguration();
       case 'notifications':
         return _buildNotifications();
       default:
@@ -734,60 +692,6 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _buildSecurity() {
     return const Center(
       child: Text('Security Settings - Coming Soon!'),
-    );
-  }
-
-  Widget _buildAIConfiguration() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildFormGroup(
-          'OpenAI API Key',
-          TextField(
-            controller: _openaiApiKeyController,
-            obscureText: true,
-            decoration: const InputDecoration(
-              hintText: 'sk-proj-...',
-              border: OutlineInputBorder(),
-              suffixIcon: Icon(Icons.visibility),
-            ),
-          ),
-        ),
-        _buildCheckboxGroup(
-          'Enable AI Analysis',
-          _aiSettings['ai_enabled'] ?? true,
-          (value) {
-            setState(() {
-              _aiSettings['ai_enabled'] = value ?? false;
-            });
-          },
-        ),
-        _buildFormGroup(
-          'AI Model',
-          DropdownButtonFormField<String>(
-            initialValue: _aiSettings['ai_model'] ?? 'gpt-3.5-turbo',
-            decoration: const InputDecoration(border: OutlineInputBorder()),
-            items: const [
-              DropdownMenuItem(
-                value: 'gpt-3.5-turbo',
-                child: Text('GPT-3.5 Turbo'),
-              ),
-              DropdownMenuItem(value: 'gpt-4', child: Text('GPT-4')),
-              DropdownMenuItem(
-                value: 'gpt-4-turbo',
-                child: Text('GPT-4 Turbo'),
-              ),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                setState(() {
-                  _aiSettings['ai_model'] = value;
-                });
-              }
-            },
-          ),
-        ),
-      ],
     );
   }
 

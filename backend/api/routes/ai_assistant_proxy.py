@@ -17,6 +17,10 @@ import requests
 from dotenv import load_dotenv
 from flask import Blueprint, jsonify, request
 
+from api.routes.ai_assistant_override_headers import (
+    extract_validated_hf_override_headers_from_request_headers,
+    merge_headers_optional,
+)
 from api.utils.decorators import token_required
 from api.utils.database import get_db_connection
 
@@ -226,6 +230,21 @@ def _fallback_improve_text(area_name: str, proposal_text: str) -> str:
     )
 
 
+def _validated_upstream_overrides() -> Tuple[Dict[str, str], Optional[Tuple[int, Any]]]:
+    """
+    Returns (headers_to_forward, optional (status, jsonify_body_dict) error).
+    Second element is a dict suitable for jsonify(), not a Response.
+    """
+    extras, err_t = extract_validated_hf_override_headers_from_request_headers(
+        request.headers,
+        allow_byok_pass_through=_getenv("AI_ALLOW_BYOK_OVERRIDES", "true"),
+    )
+    if err_t is None:
+        return extras, None
+    status, body_dict = err_t
+    return extras, (status, body_dict)
+
+
 def _call_upstream(
     endpoint: str,
     payload: Optional[Dict[str, Any]] = None,
@@ -233,6 +252,7 @@ def _call_upstream(
     include_auth: bool,
     connect_timeout_s: Optional[int] = None,
     read_timeout_s: Optional[int] = None,
+    upstream_override_headers: Optional[Dict[str, str]] = None,
 ) -> Tuple[Any, int]:
     """
     Call HF Space upstream and normalize errors.
@@ -277,6 +297,9 @@ def _call_upstream(
             )
         headers["Authorization"] = f"Bearer {api_key}"
 
+    if upstream_override_headers:
+        merge_headers_optional(headers, upstream_override_headers)
+
     connect_timeout = connect_timeout_s or _getenv_int(
         "AI_ASSISTANT_CONNECT_TIMEOUT_S", 8, minimum=2, maximum=30
     )
@@ -285,10 +308,15 @@ def _call_upstream(
     )
     method = "GET" if payload is None else "POST"
     payload_chars = len(str(payload)) if payload is not None else 0
+    ov_p = (upstream_override_headers or {}).get("X-AI-Provider")
+    ov_m = (upstream_override_headers or {}).get("X-AI-Model")
+    ov_has_key = bool((upstream_override_headers or {}).get("X-Provider-Api-Key"))
     print(
         f"[AI Assistant Proxy] request method={method} endpoint={endpoint} "
         f"url={url} payload_chars={payload_chars} include_auth={include_auth} "
-        f"timeouts=({connect_timeout},{read_timeout})"
+        f"timeouts=({connect_timeout},{read_timeout}) "
+        f"override_provider={ov_p!r} override_model={ov_m!r} "
+        f"override_byok_key_present={ov_has_key}"
     )
     if include_auth:
         print(
@@ -396,6 +424,9 @@ def ai_assistant_health():
 def proxy_generate_section(username=None):
     req_start = time.monotonic()
     req_id = (request.headers.get("X-AI-Request-ID") or "").strip() or f"gen-{int(time.time()*1000)}"
+    extras, ov_err = _validated_upstream_overrides()
+    if ov_err is not None:
+        return jsonify(ov_err[1]), ov_err[0]
     data = request.get_json(silent=True) or {}
     section_name = (data.get("section_name") or "").strip()
     proposal_text = (data.get("proposal_text") or "").strip()
@@ -426,6 +457,7 @@ def proxy_generate_section(username=None):
         "/generate-section",
         primary_payload,
         include_auth=True,
+        upstream_override_headers=extras or None,
     )
     print(f"[AI Assistant Proxy][{req_id}] primary_status={status}")
     # Retry once for upstream server/gateway errors (not timeout) with lighter payload.
@@ -443,6 +475,7 @@ def proxy_generate_section(username=None):
                 fallback_payload,
                 include_auth=True,
                 read_timeout_s=retry_read_timeout,
+                upstream_override_headers=extras or None,
             )
             print(f"[AI Assistant Proxy][{req_id}] retry_status={retry_status} retry_chars={len(fallback_payload['proposal_text'])} retry_tokens={fallback_payload['max_tokens']}")
             if 200 <= retry_status <= 299:
@@ -470,6 +503,9 @@ def proxy_generate_section_async(username=None):
     if not _is_async_enabled():
         return jsonify({"success": False, "error": "Async AI assistant mode is disabled."}), 404
 
+    extras, ov_err = _validated_upstream_overrides()
+    if ov_err is not None:
+        return jsonify(ov_err[1]), ov_err[0]
     data = request.get_json(silent=True) or {}
     section_name = (data.get("section_name") or "").strip()
     proposal_text = (data.get("proposal_text") or "").strip()
@@ -500,7 +536,9 @@ def proxy_generate_section_async(username=None):
             ),
             "max_tokens": max_tokens,
         }
-        body, status = _call_upstream("/generate-section", payload, include_auth=True)
+        body, status = _call_upstream(
+            "/generate-section", payload, include_auth=True, upstream_override_headers=extras or None
+        )
         if 200 <= status <= 299:
             _track_ai_usage(
                 username=username,
@@ -543,6 +581,9 @@ def proxy_ai_job_status(job_id: str, username=None):
 def proxy_improve_area(username=None):
     req_start = time.monotonic()
     req_id = (request.headers.get("X-AI-Request-ID") or "").strip() or f"imp-{int(time.time()*1000)}"
+    extras, ov_err = _validated_upstream_overrides()
+    if ov_err is not None:
+        return jsonify(ov_err[1]), ov_err[0]
     data = request.get_json(silent=True) or {}
     area_name = (data.get("area_name") or "").strip()
     proposal_text = (data.get("proposal_text") or "").strip()
@@ -573,6 +614,7 @@ def proxy_improve_area(username=None):
         "/improve-area",
         primary_payload,
         include_auth=True,
+        upstream_override_headers=extras or None,
     )
     print(f"[AI Assistant Proxy][{req_id}] primary_status={status}")
     # Retry once for upstream server/gateway errors (not timeout) with lighter payload.
@@ -590,6 +632,7 @@ def proxy_improve_area(username=None):
                 fallback_payload,
                 include_auth=True,
                 read_timeout_s=retry_read_timeout,
+                upstream_override_headers=extras or None,
             )
             print(f"[AI Assistant Proxy][{req_id}] retry_status={retry_status} retry_chars={len(fallback_payload['proposal_text'])} retry_tokens={fallback_payload['max_tokens']}")
             if 200 <= retry_status <= 299:
@@ -616,6 +659,9 @@ def proxy_improve_area_async(username=None):
     if not _is_async_enabled():
         return jsonify({"success": False, "error": "Async AI assistant mode is disabled."}), 404
 
+    extras, ov_err = _validated_upstream_overrides()
+    if ov_err is not None:
+        return jsonify(ov_err[1]), ov_err[0]
     data = request.get_json(silent=True) or {}
     area_name = (data.get("area_name") or "").strip()
     proposal_text = (data.get("proposal_text") or "").strip()
@@ -646,7 +692,9 @@ def proxy_improve_area_async(username=None):
             ),
             "max_tokens": max_tokens,
         }
-        body, status = _call_upstream("/improve-area", payload, include_auth=True)
+        body, status = _call_upstream(
+            "/improve-area", payload, include_auth=True, upstream_override_headers=extras or None
+        )
         if 200 <= status <= 299:
             _track_ai_usage(
                 username=username,
@@ -662,4 +710,83 @@ def proxy_improve_area_async(username=None):
 
     _get_async_executor().submit(_run)
     return jsonify({"success": True, "job_id": job_id, "status": "pending"}), 202
+
+
+@bp.post("/ai-assistant/correct-clause")
+@token_required
+def proxy_correct_clause(username=None):
+    req_start = time.monotonic()
+    req_id = (request.headers.get("X-AI-Request-ID") or "").strip() or f"cl-{int(time.time()*1000)}"
+    extras, ov_err = _validated_upstream_overrides()
+    if ov_err is not None:
+        return jsonify(ov_err[1]), ov_err[0]
+    data = request.get_json(silent=True) or {}
+    clause_name = (data.get("clause_name") or "").strip()
+    proposal_text = (data.get("proposal_text") or "").strip()
+    max_tokens = _parse_max_tokens(data.get("max_tokens"), default=96)
+    print(
+        f"[AI Assistant Proxy][{req_id}] action=correct-clause clause={clause_name!r} "
+        f"chars={len(proposal_text)} max_tokens={max_tokens}"
+    )
+    if not clause_name or not proposal_text:
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "clause_name and proposal_text are required.",
+                    "upstream_status": None,
+                }
+            ),
+            400,
+        )
+
+    primary_max_chars = _getenv_int("AI_ASSISTANT_MAX_CHARS", 12000, minimum=1000, maximum=30000)
+    retry_max_chars = _getenv_int("AI_ASSISTANT_RETRY_MAX_CHARS", 5000, minimum=500, maximum=20000)
+    retry_max_tokens = _getenv_int("AI_ASSISTANT_RETRY_MAX_TOKENS", 96, minimum=48, maximum=192)
+    retry_read_timeout = _getenv_int("AI_ASSISTANT_RETRY_TIMEOUT_S", 90, minimum=5, maximum=300)
+    primary_payload = {
+        "clause_name": clause_name,
+        "proposal_text": _compact_text(proposal_text, primary_max_chars),
+        "max_tokens": max_tokens,
+    }
+    body, status = _call_upstream(
+        "/correct-clause",
+        primary_payload,
+        include_auth=True,
+        upstream_override_headers=extras or None,
+    )
+    print(f"[AI Assistant Proxy][{req_id}] primary_status={status}")
+    upstream_status = body.get("upstream_status") if isinstance(body, dict) else None
+    if status in (500, 502, 503) and upstream_status in (500, 502, 503):
+        fallback_payload = {
+            "clause_name": clause_name,
+            "proposal_text": _compact_text(proposal_text, retry_max_chars),
+            "max_tokens": min(max_tokens, retry_max_tokens),
+        }
+        if fallback_payload != primary_payload:
+            time.sleep(1.0)
+            retry_body, retry_status = _call_upstream(
+                "/correct-clause",
+                fallback_payload,
+                include_auth=True,
+                read_timeout_s=retry_read_timeout,
+                upstream_override_headers=extras or None,
+            )
+            print(f"[AI Assistant Proxy][{req_id}] retry_status={retry_status}")
+            if 200 <= retry_status <= 299:
+                return jsonify(retry_body), retry_status
+            body, status = retry_body, retry_status
+
+    total_elapsed_ms = int((time.monotonic() - req_start) * 1000)
+    print(f"[AI Assistant Proxy][{req_id}] completed status={status} total_elapsed_ms={total_elapsed_ms}")
+    if 200 <= status <= 299:
+        _track_ai_usage(
+            username=username,
+            endpoint="correct_clause",
+            prompt_text=proposal_text,
+            section_type=clause_name or "correct_clause",
+            response_tokens=_estimate_response_tokens(body),
+            response_time_ms=total_elapsed_ms,
+        )
+    return jsonify(body), status
 

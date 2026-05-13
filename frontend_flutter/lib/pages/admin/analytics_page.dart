@@ -17,8 +17,6 @@ import '../../widgets/custom_scrollbar.dart';
 import '../../widgets/app_side_nav.dart';
 import '../../widgets/admin/admin_sidebar.dart';
 import '../../widgets/manager_page_background.dart';
-import '../creator/widgets/completion_rates_widget.dart';
-
 enum AnalyticsPageMode {
   auto,
   creator,
@@ -39,11 +37,87 @@ class AnalyticsPage extends StatefulWidget {
 
 class _AnalyticsPageState extends State<AnalyticsPage>
     with TickerProviderStateMixin {
+  // Figma redesign: this page is locked to a dark Figma palette and uses the
+  // named PNGs in assets/images/admin_analytics_page/ which already contain
+  // the red disc + glyph baked in. Other panel icons reuse existing assets.
+  static const String _adminAnalyticsIconDir =
+      'assets/images/admin_analytics_page';
+
+  // ── KPI tiles (top row) ──
+  static const String _icRevenue =
+      '$_adminAnalyticsIconDir/Total_Revenue.png';
+  static const String _icActive =
+      '$_adminAnalyticsIconDir/Active_Proposals.png';
+  static const String _icConversion =
+      '$_adminAnalyticsIconDir/conversion_Rate.png';
+  static const String _icAvgDeal =
+      '$_adminAnalyticsIconDir/average_deal-size.png';
+
+  // ── Panel headers ──
+  static const String _icRevenuePanel =
+      '$_adminAnalyticsIconDir/Revenue_Analytics.png';
+  static const String _icPipeline =
+      '$_adminAnalyticsIconDir/Proposal_Pipeline_view.png';
+  static const String _ic30DayTrend =
+      '$_adminAnalyticsIconDir/30days trend.png';
+  static const String _icOverview =
+      '$_adminAnalyticsIconDir/proposals over view.png';
+
+  // ── Secondary KPI strip ──
+  static const String _icProposals =
+      '$_adminAnalyticsIconDir/Proposals.png';
+  static const String _icPassing =
+      '$_adminAnalyticsIconDir/Passing.png';
+  static const String _icCompletion =
+      '$_adminAnalyticsIconDir/Completion_rate.png';
+  static const String _icSignOff =
+      '$_adminAnalyticsIconDir/sign_off_rate.png';
+  static const String _icAvgScore =
+      '$_adminAnalyticsIconDir/ave_score.png';
+
+  // ── Reused icons (no dedicated asset yet) ──
+  static const String _icWinRate =
+      '$_adminAnalyticsIconDir/Total_Revenue.png';
+  static const String _icRiskGate = '$_adminAnalyticsIconDir/30days trend.png';
+  static const String _icAiUsage =
+      'assets/images/finance_manager_new_icons/AI_Usage.png';
+  static const String _icCollab = '$_adminAnalyticsIconDir/30days trend.png';
+  static const String _icEngagement =
+      '$_adminAnalyticsIconDir/30days trend.png';
+  static const String _icCycleTime =
+      '$_adminAnalyticsIconDir/Proposal_Pipeline_view.png';
+  // Center decorator inside donut charts (Win Rate, Readiness Breakdown).
+  // Filename actually contains an apostrophe.
+  static const String _icInnerPie =
+      "$_adminAnalyticsIconDir/inner_piechart'.png";
+  static const String _icReadiness =
+      '$_adminAnalyticsIconDir/Total_Revenue.png';
+  static const String _icProposalStatus =
+      '$_adminAnalyticsIconDir/30days trend.png';
+
+  // ── Header notification icons (reused from manager dashboard pattern) ──
+  static const String _icHeaderMessages =
+      'assets/images/new icons for manager/messages.png';
+  static const String _icHeaderNotifications =
+      'assets/images/new icons for manager/notifications.png';
+
+  // ── Sizing (matches finance_manager analytics) ──
+  static const double _kpiIconSize = 102.0;
+  static const double _panelIconSize = 102.0;
+  static const double _smallKpiIconSize = 72.0;
+  static const double _headerActionIconDiameter = 80.0;
+  static const double _headerActionIconAssetSize = 52.0;
+
   String _selectedPeriod = 'Last 30 Days';
   String _cycleTimeScope = 'team';
-  bool _cycleTimeAutoRefresh = true;
+  // Disabled by default — every tick rebuilds every panel keyed off
+  // `_cycleTimeRefreshTick` (Risk Gate, Cycle Time, Collaboration Load,
+  // Client Engagement, AI Usage), which makes their values blank out and
+  // re-populate. Users can flip the "Auto" switch to opt in.
+  bool _cycleTimeAutoRefresh = false;
   int _cycleTimeRefreshTick = 0;
   Timer? _cycleTimeRefreshTimer;
+  bool _isRefreshing = false;
   String? _pipelineStageFilter;
   final TextEditingController _cycleTimeOwnerCtrl = TextEditingController();
   final TextEditingController _cycleTimeProposalTypeCtrl =
@@ -95,8 +169,7 @@ class _AnalyticsPageState extends State<AnalyticsPage>
       _cycleTimeScope = 'self';
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final app = context.read<AppState>();
-      app.fetchProposals();
+      _ensureProposalsLoaded();
     });
 
     _cycleTimeRefreshTimer =
@@ -105,6 +178,73 @@ class _AnalyticsPageState extends State<AnalyticsPage>
       if (!_cycleTimeAutoRefresh) return;
       setState(() => _cycleTimeRefreshTick++);
     });
+  }
+
+  /// Ensures `app.proposals` is populated before the dashboard renders KPIs.
+  /// The first `fetchProposals()` call may silently time out (transient
+  /// backend slowness) and leave every panel reading zero. We retry a few
+  /// times with backoff so the page self-heals without a manual reload.
+  Future<void> _ensureProposalsLoaded() async {
+    final app = context.read<AppState>();
+    const maxAttempts = 3;
+    const initialDelay = Duration(seconds: 2);
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (!mounted) return;
+      try {
+        await app.fetchProposals();
+      } catch (_) {/* swallowed inside fetchProposals */}
+      if (!mounted) return;
+      if (app.proposals.isNotEmpty) return;
+      if (attempt < maxAttempts) {
+        await Future<void>.delayed(initialDelay * attempt);
+      }
+    }
+  }
+
+  /// Handler for the header "REFRESH" button. Refetches proposals (with
+  /// retry), refreshes the notification bell, and force-rebuilds every
+  /// FutureBuilder keyed off `_cycleTimeRefreshTick` (risk gate, cycle time,
+  /// collaboration load, client engagement, AI usage). Provides explicit
+  /// loading state + SnackBar feedback so the user can see it actually ran.
+  Future<void> _runManualRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    final app = context.read<AppState>();
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await Future.wait<void>([
+        _ensureProposalsLoaded(),
+        app.fetchNotifications().catchError((_) {}),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _cycleTimeRefreshTick++;
+      });
+      messenger.showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF111827),
+          content: Text(
+            app.proposals.isEmpty
+                ? 'Refreshed — backend returned 0 proposals.'
+                : 'Refreshed ${app.proposals.length} proposals.',
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 3),
+          backgroundColor: const Color(0xFFB91C1C),
+          content: Text('Refresh failed: $e',
+              style: const TextStyle(color: Colors.white)),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
   }
 
   Future<Map<String, dynamic>?> _fetchClientEngagement() async {
@@ -140,6 +280,7 @@ class _AnalyticsPageState extends State<AnalyticsPage>
     }
   }
 
+  // ignore: unused_element
   Future<Map<String, dynamic>?> _fetchPipelineBundle() async {
     try {
       final now = DateTime.now();
@@ -188,6 +329,7 @@ class _AnalyticsPageState extends State<AnalyticsPage>
     }
   }
 
+  // ignore: unused_element
   Widget _buildProposalPipelineView(Map<String, dynamic>? data) {
     final chrome = context.watch<ManagerThemeController>().chrome;
     final stagesRaw = (data?['stages'] as List?) ?? [];
@@ -2410,6 +2552,7 @@ class _AnalyticsPageState extends State<AnalyticsPage>
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final chrome = context.watch<ManagerThemeController>().chrome;
     final sidebarCollapsed = app.isAdminSidebarCollapsed;
     final filtered = _filterProposals(app.proposals);
     final analytics = _calculateAnalytics(filtered);
@@ -2417,6 +2560,32 @@ class _AnalyticsPageState extends State<AnalyticsPage>
     final isAdminUser = _effectiveIsAdmin;
 
     _calculatePipelineCounts(filtered);
+
+    // Resolve a friendly greeting from the current user (Figma: "Hello, Name Surname").
+    final user = app.currentUser ?? const <String, dynamic>{};
+    final greetingName = (() {
+      final full = (user['full_name'] ??
+              user['fullName'] ??
+              user['name'] ??
+              user['displayName'] ??
+              '')
+          .toString()
+          .trim();
+      if (full.isNotEmpty) return full;
+      final email = (user['email'] ?? '').toString();
+      if (email.contains('@')) return email.split('@').first;
+      return 'there';
+    })();
+
+    final pipelineCounts = _calculatePipelineCounts(filtered);
+    final notificationCount = _unreadNotificationCount(app, messagesOnly: false);
+
+    final assetByMetric = <String, String>{
+      'Total Revenue': _icRevenue,
+      'Active Proposals': _icActive,
+      'Conversion Rate': _icConversion,
+      'Avg Deal Size': _icAvgDeal,
+    };
 
     final analyticsContent = CustomScrollbar(
       controller: _scrollController,
@@ -2428,86 +2597,107 @@ class _AnalyticsPageState extends State<AnalyticsPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ──────────────── Figma header ────────────────
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 900;
-                  final actions = Wrap(
+                  final compact = constraints.maxWidth < 1100;
+                  final headerActions = Wrap(
                     spacing: 12,
                     runSpacing: 12,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       _buildGlassDropdown(),
-                      _buildGlassButton(
-                        'Refresh',
+                      _figmaPrimaryButton(
+                        _isRefreshing ? 'Refreshing' : 'Refresh',
                         Icons.refresh,
-                        () async {
-                          await context.read<AppState>().fetchProposals();
-                          if (!mounted) return;
-                          setState(() {
-                            _cycleTimeRefreshTick++;
-                          });
-                        },
+                        _runManualRefresh,
+                        loading: _isRefreshing,
                       ),
-                      _buildGlassButton(
-                        'Export',
-                        Icons.download,
+                      _figmaSecondaryButton(
+                        'Export Data',
+                        Icons.download_rounded,
                         _showExportDialog,
                       ),
+                      _buildHeaderIconButton(
+                        assetPath: _icHeaderMessages,
+                        tooltip: 'Messages',
+                        badge:
+                            _unreadNotificationCount(app, messagesOnly: true),
+                        onTap: () async {
+                          await app.fetchNotifications();
+                          if (!mounted) return;
+                          _showNotificationsSheet(app, messagesOnly: true);
+                        },
+                      ),
+                      _buildHeaderIconButton(
+                        assetPath: _icHeaderNotifications,
+                        tooltip: 'Notifications',
+                        badge:
+                            _unreadNotificationCount(app, messagesOnly: false),
+                        onTap: () async {
+                          await app.fetchNotifications();
+                          if (!mounted) return;
+                          _showNotificationsSheet(app, messagesOnly: false);
+                        },
+                      ),
                     ],
+                  );
+
+                  final titleBlock = RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      children: [
+                        const TextSpan(text: 'Admin Analytics  '),
+                        TextSpan(
+                          text: 'Hello, ',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.55),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        TextSpan(
+                          text: greetingName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
                   );
 
                   if (compact) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Analytics Dashboard',
-                          style: PremiumTheme.displayMedium.copyWith(
-                            fontSize: 28,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Comprehensive business intelligence and performance metrics',
-                          style: PremiumTheme.bodyLarge.copyWith(
-                            color: PremiumTheme.textSecondary,
-                          ),
-                        ),
+                        titleBlock,
                         const SizedBox(height: 16),
-                        actions,
+                        headerActions,
                       ],
                     );
                   }
 
                   return Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Analytics Dashboard',
-                            style: PremiumTheme.displayMedium.copyWith(
-                              fontSize: 28,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Comprehensive business intelligence and performance metrics',
-                            style: PremiumTheme.bodyLarge.copyWith(
-                              color: PremiumTheme.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      actions,
+                      Flexible(child: titleBlock),
+                      headerActions,
                     ],
                   );
                 },
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
               _buildGlobalFilterBar(),
               const SizedBox(height: 24),
+
+              // ──────────────── Top KPI row ────────────────
               LayoutBuilder(
                 builder: (context, constraints) {
                   final compact = constraints.maxWidth < 900;
@@ -2521,6 +2711,7 @@ class _AnalyticsPageState extends State<AnalyticsPage>
                             metrics[i].change,
                             metrics[i].isPositive,
                             metrics[i].subtitle,
+                            iconAsset: assetByMetric[metrics[i].title],
                           ),
                           if (i != metrics.length - 1)
                             const SizedBox(height: 20),
@@ -2539,6 +2730,7 @@ class _AnalyticsPageState extends State<AnalyticsPage>
                             metrics[i].change,
                             metrics[i].isPositive,
                             metrics[i].subtitle,
+                            iconAsset: assetByMetric[metrics[i].title],
                           ),
                         ),
                         if (i != metrics.length - 1)
@@ -2548,128 +2740,190 @@ class _AnalyticsPageState extends State<AnalyticsPage>
                   );
                 },
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
+
+              // ──────────────── Revenue Analytics ────────────────
               _buildGlassChartCard(
                 'Revenue Analytics',
                 _buildRevenueChart(analytics.monthlyPoints),
-                height: 350,
+                height: 320,
+                iconAsset: _icRevenuePanel,
+                subtitle: 'Additional description if required.',
               ),
-              const SizedBox(height: 32),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: FutureBuilder<Map<String, dynamic>?>(
-                      key: ValueKey(
-                        'pipeline_bundle_${_cycleTimeRefreshTick}_${_selectedPeriod}_${_cycleTimeScope}_${_globalClientCtrl.text}_${_globalOwnerCtrl.text}_${_globalProposalTypeCtrl.text}_${_pipelineStageFilter ?? ''}',
-                      ),
-                      future: _fetchPipelineBundle(),
-                      builder: (context, snapshot) {
-                        final waiting =
-                            snapshot.connectionState == ConnectionState.waiting;
-                        final hasError = snapshot.hasError;
-                        final bundle = snapshot.data;
-                        final pipelineData =
-                            (bundle?['pipeline'] as Map?)?.cast<String, dynamic>();
+              const SizedBox(height: 28),
 
-                        Widget pipelineBody;
-                        if (waiting) {
-                          pipelineBody = const Center(
+              // ──────────────── Proposal Pipeline View ────────────────
+              _buildGlassChartCard(
+                'Proposal Pipeline View',
+                _buildPipelinePillStrip(pipelineCounts),
+                height: 80,
+                iconAsset: _icPipeline,
+                subtitle:
+                    'Live usage for AI Assistant + Risk Gate (last 30 days, auto-refresh).',
+              ),
+              const SizedBox(height: 28),
+
+              // ──────────────── Secondary KPI strip (5) ────────────────
+              _buildSecondaryKpiRow(analytics),
+              const SizedBox(height: 28),
+
+              // ──────────────── Readiness / 30-Day Trend ────────────────
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 1100;
+                  // Same height for both cards (Figma parity).
+                  const _trendCardHeight = 320.0;
+                  final pipelineCard = _buildGlassChartCard(
+                    'Readiness Breakdown',
+                    _buildReadinessBreakdownDonut(analytics),
+                    height: _trendCardHeight,
+                    iconAsset: _icReadiness,
+                    subtitle: 'Proposals passing vs below threshold.',
+                  );
+
+                  final completionCard = _buildGlassChartCard(
+                    '30-Day Trend',
+                    _buildThirtyDayTrendChart(app.proposals),
+                    height: _trendCardHeight,
+                    iconAsset: _ic30DayTrend,
+                    subtitle: 'Daily creation vs sign-off volume.',
+                  );
+
+                  if (wide) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: pipelineCard),
+                        const SizedBox(width: 20),
+                        Expanded(child: completionCard),
+                      ],
+                    );
+                  }
+                  return Column(
+                    children: [
+                      pipelineCard,
+                      const SizedBox(height: 20),
+                      completionCard,
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 28),
+
+              // ──────────────── Proposal Readiness / Status ────────────────
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 1100;
+                  final readinessCard = _buildGlassChartCard(
+                    'Proposal Readiness',
+                    Center(
+                      child: Text(
+                        analytics.recentProposals.isEmpty
+                            ? 'No data to display.'
+                            : '${analytics.recentProposals.length} low-scoring proposals',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ),
+                    height: 220,
+                    iconAsset: _icReadiness,
+                    subtitle: 'Low-scoring proposals - tap to fix missing sections.',
+                  );
+                  final statusCard = _buildGlassChartCard(
+                    'Proposal Status',
+                    _buildProposalStatusChart(analytics.statusCounts),
+                    height: 220,
+                    iconAsset: _icProposalStatus,
+                    subtitle: 'Additional description if required.',
+                  );
+                  if (wide) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: readinessCard),
+                        const SizedBox(width: 20),
+                        Expanded(child: statusCard),
+                      ],
+                    );
+                  }
+                  return Column(
+                    children: [
+                      readinessCard,
+                      const SizedBox(height: 20),
+                      statusCard,
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 28),
+
+              // ──────────────── Win Rate / Risk Gate ────────────────
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 1100;
+                  final winRate = _buildGlassChartCard(
+                    'Win Rate',
+                    _buildWinRatePieChart(
+                      analytics.winRate,
+                      analytics.lossRate,
+                    ),
+                    height: 280,
+                    iconAsset: _icWinRate,
+                    subtitle: 'Additional description if required.',
+                  );
+                  final riskGate = _buildGlassChartCard(
+                    'Risk Gate',
+                    FutureBuilder<Map<String, dynamic>?>(
+                      key: ValueKey(
+                        'risk_gate_${_cycleTimeRefreshTick}_${_selectedPeriod}_${_globalClientCtrl.text}_${_globalOwnerCtrl.text}_${_globalProposalTypeCtrl.text}',
+                      ),
+                      future: _fetchRiskGateSummary(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
                             child: CircularProgressIndicator(),
                           );
-                        } else if (hasError || pipelineData == null) {
-                          pipelineBody = Center(
+                        }
+                        if (snapshot.hasError) {
+                          return Center(
                             child: Text(
-                              'Failed to load pipeline view.',
+                              'Failed to load risk gate summary.',
                               style: PremiumTheme.bodyMedium
                                   .copyWith(color: Colors.white70),
                             ),
                           );
-                        } else {
-                          pipelineBody = _buildProposalPipelineView(pipelineData);
                         }
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildGlassChartCard(
-                              'Proposal Pipeline View',
-                              pipelineBody,
-                              height: 520,
-                            ),
-                            const SizedBox(height: 32),
-                            CompletionRatesWidget(
-                              onOpenProposal: (id, status, title) =>
-                                  Navigator.pushNamed(
-                                context,
-                                '/blank-document',
-                                arguments: {
-                                  'proposalId': id.toString(),
-                                  'proposalTitle': title,
-                                  'readOnly': false,
-                                },
-                              ),
-                            ),
-                          ],
-                        );
+                        return _buildRiskGateIndicator(snapshot.data);
                       },
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: _buildGlassChartCard(
-                      'Proposal Status',
-                      _buildProposalStatusChart(analytics.statusCounts),
-                      height: 320,
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: _buildGlassChartCard(
-                      'Win Rate',
-                      _buildWinRatePieChart(
-                        analytics.winRate,
-                        analytics.lossRate,
-                      ),
-                      height: 320,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-              _buildGlassChartCard(
-                'Risk Gate',
-                FutureBuilder<Map<String, dynamic>?>(
-                  key: ValueKey(
-                    'risk_gate_${_cycleTimeRefreshTick}_${_selectedPeriod}_${_globalClientCtrl.text}_${_globalOwnerCtrl.text}_${_globalProposalTypeCtrl.text}',
-                  ),
-                  future: _fetchRiskGateSummary(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Text(
-                          'Failed to load risk gate summary.',
-                          style: PremiumTheme.bodyMedium
-                              .copyWith(color: Colors.white70),
-                        ),
-                      );
-                    }
-                    return _buildRiskGateIndicator(snapshot.data);
-                  },
-                ),
-                height: 170,
+                    height: 280,
+                    iconAsset: _icRiskGate,
+                    subtitle:
+                        'Coverage of proposals analysed (latest run per proposal).',
+                  );
+                  if (wide) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: winRate),
+                        const SizedBox(width: 20),
+                        Expanded(child: riskGate),
+                      ],
+                    );
+                  }
+                  return Column(
+                    children: [
+                      winRate,
+                      const SizedBox(height: 20),
+                      riskGate,
+                    ],
+                  );
+                },
               ),
               if (_canViewAiUsage()) ...[
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
                 _buildGlassChartCard(
                   'AI Usage',
                   FutureBuilder<Map<String, dynamic>?>(
@@ -2694,60 +2948,114 @@ class _AnalyticsPageState extends State<AnalyticsPage>
                     },
                   ),
                   height: 360,
+                  iconAsset: _icAiUsage,
+                  subtitle:
+                      'Live usage for AI Assistant + Risk Gate (last 30 days, auto-refresh).',
                 ),
               ],
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
+
+              // ──────────────── Collaboration / Engagement ────────────────
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 1100;
+                  final collab = _buildGlassChartCard(
+                    'Collaboration Load',
+                    FutureBuilder<Map<String, dynamic>?>(
+                      key: ValueKey(
+                        'collab_${_cycleTimeRefreshTick}_${_selectedPeriod}_${_globalClientCtrl.text}_${_globalOwnerCtrl.text}_${_globalProposalTypeCtrl.text}',
+                      ),
+                      future: _fetchCollaborationLoad(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Text(
+                              'Failed to load collaboration metrics.',
+                              style: PremiumTheme.bodyMedium
+                                  .copyWith(color: Colors.white70),
+                            ),
+                          );
+                        }
+                        return _buildCollaborationLoadCard(snapshot.data);
+                      },
+                    ),
+                    height: 360,
+                    iconAsset: _icCollab,
+                    subtitle: 'Top active proposals',
+                  );
+                  final engagement = _buildGlassChartCard(
+                    'Client Engagement',
+                    FutureBuilder<Map<String, dynamic>?>(
+                      key: ValueKey(
+                        'engagement_${_cycleTimeRefreshTick}_${_selectedPeriod}_${_globalClientCtrl.text}_${_globalOwnerCtrl.text}_${_globalProposalTypeCtrl.text}_${_globalRegionCtrl.text}',
+                      ),
+                      future: _fetchClientEngagement(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Text(
+                              'Failed to load client engagement.',
+                              style: PremiumTheme.bodyMedium
+                                  .copyWith(color: Colors.white70),
+                            ),
+                          );
+                        }
+                        return _buildClientEngagementCard(snapshot.data);
+                      },
+                    ),
+                    height: 360,
+                    iconAsset: _icEngagement,
+                    subtitle: 'Top active proposals',
+                  );
+                  if (wide) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: collab),
+                        const SizedBox(width: 20),
+                        Expanded(child: engagement),
+                      ],
+                    );
+                  }
+                  return Column(
+                    children: [
+                      collab,
+                      const SizedBox(height: 20),
+                      engagement,
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 28),
+
+              // ──────────────── Cycle Time Metrics ────────────────
               _buildGlassChartCard(
-                'Collaboration Load',
-                FutureBuilder<Map<String, dynamic>?>(
-                  key: ValueKey(
-                    'collab_${_cycleTimeRefreshTick}_${_selectedPeriod}_${_globalClientCtrl.text}_${_globalOwnerCtrl.text}_${_globalProposalTypeCtrl.text}',
-                  ),
-                  future: _fetchCollaborationLoad(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Text(
-                          'Failed to load collaboration metrics.',
-                          style: PremiumTheme.bodyMedium
-                              .copyWith(color: Colors.white70),
-                        ),
-                      );
-                    }
-                    return _buildCollaborationLoadCard(snapshot.data);
-                  },
-                ),
-                height: 480,
+                'Cycle Time Metrics',
+                _buildCycleTimeContent(null),
+                height: 360,
+                iconAsset: _icCycleTime,
+                subtitle: 'Additional description if required.',
+              ),
+              const SizedBox(height: 28),
+
+              // ──────────────── Proposals Overview (table) ────────────────
+              _buildProposalsOverviewTable(
+                analytics.recentProposals,
+                notificationCount,
               ),
               const SizedBox(height: 32),
-              _buildGlassChartCard(
-                'Client Engagement',
-                FutureBuilder<Map<String, dynamic>?>(
-                  key: ValueKey(
-                    'engagement_${_cycleTimeRefreshTick}_${_selectedPeriod}_${_globalClientCtrl.text}_${_globalOwnerCtrl.text}_${_globalProposalTypeCtrl.text}_${_globalRegionCtrl.text}',
-                  ),
-                  future: _fetchClientEngagement(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Text(
-                          'Failed to load client engagement.',
-                          style: PremiumTheme.bodyMedium
-                              .copyWith(color: Colors.white70),
-                        ),
-                      );
-                    }
-                    return _buildClientEngagementCard(snapshot.data);
-                  },
-                ),
-                height: 520,
-              ),
             ],
           ),
         ),
@@ -2760,8 +3068,13 @@ class _AnalyticsPageState extends State<AnalyticsPage>
           AdminSidebar(
             isCollapsed: sidebarCollapsed,
             currentPage: 'Analytics',
+            managerChrome: chrome,
             onToggle: app.toggleAdminSidebar,
             onSelect: (label) {
+              if (label == 'AI Configuration') {
+                Navigator.pushNamed(context, '/ai-configuration');
+                return;
+              }
               app.setAdminNavLabel(label);
               _navigatePage(label);
             },
@@ -2780,31 +3093,26 @@ class _AnalyticsPageState extends State<AnalyticsPage>
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: isAdminUser
-          ? Container(color: Colors.transparent, child: body)
-          : ManagerPageBackground(child: body),
+      body: ManagerPageBackground(child: body),
     );
   }
 
   Widget _buildGlassDropdown() {
-    final chrome = context.watch<ManagerThemeController>().chrome;
     final inner = Container(
-      decoration: chrome.isDark
-          ? BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              border: Border.all(color: const Color(0x33FFFFFF)),
-              borderRadius: BorderRadius.circular(8),
-            )
-          : chrome.floatingPanelDecoration(radius: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E22),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        borderRadius: BorderRadius.circular(999),
+      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 4),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
             value: _selectedPeriod,
-            dropdownColor: chrome.dropdownSurface,
-            style: TextStyle(color: chrome.textPrimary),
-            icon: Icon(Icons.keyboard_arrow_down, color: chrome.textPrimary),
-            items: [
+            dropdownColor: const Color(0xFF1E1E22),
+            style: const TextStyle(color: Colors.white),
+            icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+            items: const [
               'Last 7 Days',
               'Last 30 Days',
               'Last 90 Days',
@@ -2813,7 +3121,7 @@ class _AnalyticsPageState extends State<AnalyticsPage>
               return DropdownMenuItem<String>(
                 value: value,
                 child: Text(value,
-                    style: TextStyle(color: chrome.textPrimary)),
+                    style: const TextStyle(color: Colors.white)),
               );
             }).toList(),
             onChanged: (String? newValue) {
@@ -2827,13 +3135,1112 @@ class _AnalyticsPageState extends State<AnalyticsPage>
       ),
     );
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: chrome.isDark
-          ? BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: inner,
-            )
-          : inner,
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: inner,
+      ),
+    );
+  }
+
+  /// Solid red action button used in the Figma header (Refresh).
+  /// When `loading` is true the icon is replaced by a spinner and taps
+  /// are ignored to prevent overlapping refresh calls.
+  Widget _figmaPrimaryButton(
+    String label,
+    IconData icon,
+    VoidCallback onPressed, {
+    bool loading = false,
+  }) {
+    return InkWell(
+      onTap: loading ? null : onPressed,
+      borderRadius: BorderRadius.circular(999),
+      child: Opacity(
+        opacity: loading ? 0.85 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFEF4444), Color(0xFFB91C1C)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.35),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              loading
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Icon(icon, color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                label.toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Compact pill button used in each Proposals Overview row (the Figma "VIEW"
+  /// affordance). Sized so it fits in the table's trailing column without the
+  /// horizontal-overflow stripe pattern.
+  Widget _figmaTableViewButton(VoidCallback onPressed) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.visibility_outlined, color: Colors.white, size: 14),
+            SizedBox(width: 6),
+            Text(
+              'VIEW',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Outlined gray action button used in the Figma header (Export Data).
+  Widget _figmaSecondaryButton(
+      String label, IconData icon, VoidCallback onPressed) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              label.toUpperCase(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Five horizontal pill chips for the Proposal Pipeline View
+  /// (Draft / In Review / Released / Signed / Archived) with live counts.
+  Widget _buildPipelinePillStrip(Map<String, int> counts) {
+    final items = <_PipelinePill>[
+      _PipelinePill('Draft', counts['Draft'] ?? 0),
+      _PipelinePill('In Review', counts['In Review'] ?? 0),
+      _PipelinePill('Released', counts['Released'] ?? 0),
+      _PipelinePill('Signed', counts['Signed'] ?? 0),
+      _PipelinePill('Archived', counts['Archived'] ?? 0),
+    ];
+
+    Widget pill(_PipelinePill p) {
+      final active =
+          (_pipelineStageFilter ?? '').toLowerCase() == p.label.toLowerCase();
+      return InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: () {
+          setState(() {
+            _pipelineStageFilter = active ? null : p.label;
+            _cycleTimeRefreshTick++;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: active
+                ? const Color(0xFFEF4444).withValues(alpha: 0.16)
+                : Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: active
+                  ? const Color(0xFFEF4444).withValues(alpha: 0.55)
+                  : Colors.white.withValues(alpha: 0.18),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                p.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  p.count.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (int i = 0; i < items.length; i++) ...[
+            pill(items[i]),
+            if (i != items.length - 1) const SizedBox(width: 14),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Secondary KPI strip from the Figma frame:
+  /// Proposals (%) / Passing / Completion Rate / Sign-Off Rate / Average Score.
+  Widget _buildSecondaryKpiRow(_AnalyticsSnapshot analytics) {
+    int signedCount = 0;
+    int completedCount = 0;
+    int reviewCount = 0;
+    for (final e in analytics.statusCounts.entries) {
+      final s = e.key.toLowerCase();
+      if (s.contains('signed')) signedCount += e.value;
+      if (s.contains('signed') ||
+          s.contains('approved') ||
+          s.contains('sent')) {
+        completedCount += e.value;
+      }
+      if (s.contains('review') || s.contains('approval')) {
+        reviewCount += e.value;
+      }
+    }
+    final passing = analytics.totalProposals > 0
+        ? analytics.totalProposals - reviewCount
+        : 0;
+    final completionRate = completedCount;
+    final signOffRate = signedCount;
+    final avgScore = analytics.totalProposals == 0
+        ? 0
+        : ((analytics.winRate / 10).clamp(0, 10)).toInt();
+
+    final tiles = <_SmallKpi>[
+      _SmallKpi(
+        title: 'Proposals',
+        subtitle: 'Total Proposals.',
+        value: '${analytics.winRate.toStringAsFixed(0)}%',
+        iconAsset: _icProposals,
+      ),
+      _SmallKpi(
+        title: 'Passing',
+        subtitle: 'Readiness Checks.',
+        value: passing.toString(),
+        iconAsset: _icPassing,
+      ),
+      _SmallKpi(
+        title: 'Completion Rate',
+        subtitle: 'Pass Threshold.',
+        value: completionRate.toString(),
+        iconAsset: _icCompletion,
+      ),
+      _SmallKpi(
+        title: 'Sign-Off Rate',
+        subtitle: 'Signed / Approved.',
+        value: signOffRate.toString(),
+        iconAsset: _icSignOff,
+      ),
+      _SmallKpi(
+        title: 'Average Score',
+        subtitle: 'Readiness Score.',
+        value: avgScore.toString(),
+        iconAsset: _icAvgScore,
+      ),
+    ];
+
+    Widget tileCard(_SmallKpi t) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0x24FFFFFF),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    t.subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    t.value,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _panelIcon(t.iconAsset, size: _smallKpiIconSize),
+          ],
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 1100;
+        if (compact) {
+          return Column(
+            children: [
+              for (int i = 0; i < tiles.length; i++) ...[
+                tileCard(tiles[i]),
+                if (i != tiles.length - 1) const SizedBox(height: 12),
+              ],
+            ],
+          );
+        }
+        return Row(
+          children: [
+            for (int i = 0; i < tiles.length; i++) ...[
+              Expanded(child: tileCard(tiles[i])),
+              if (i != tiles.length - 1) const SizedBox(width: 14),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  /// Bottom Figma "Proposals Overview" table card with status pills + view action.
+  Widget _buildProposalsOverviewTable(
+    List<_ProposalPerformanceRow> rows,
+    int notifications,
+  ) {
+    Color pillColor(String status) {
+      final s = status.toLowerCase();
+      if (s.contains('sent for approval') || s.contains('sent')) {
+        return const Color(0xFF22C55E);
+      }
+      if (s.contains('await') || s.contains('signature')) {
+        return const Color(0xFF3B82F6);
+      }
+      if (s.contains('release')) return const Color(0xFFF59E0B);
+      if (s.contains('signed')) return const Color(0xFF22C55E);
+      if (s.contains('draft')) return const Color(0xFF8B5CF6);
+      if (s.contains('lost') ||
+          s.contains('reject') ||
+          s.contains('declined')) {
+        return const Color(0xFFEF4444);
+      }
+      return const Color(0xFF6B7280);
+    }
+
+    Widget statusPill(String status) {
+      final color = pillColor(status);
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          status,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
+    String fmtUpdated(DateTime? dt) {
+      if (dt == null) return 'Last Modified: --';
+      final today = DateTime.now();
+      final isToday = dt.year == today.year &&
+          dt.month == today.month &&
+          dt.day == today.day;
+      final t = DateFormat('HH:mm').format(dt);
+      if (isToday) return 'Last Modified: Today, $t';
+      return 'Last Modified: ${DateFormat('d MMM, HH:mm').format(dt)}';
+    }
+
+    Widget header() {
+      return Row(
+        children: [
+          _panelIcon(_icOverview, size: _panelIconSize),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Proposals Overview',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  "Manage all your business proposals & SOW's.",
+                  style: TextStyle(color: Color(0xCCFFFFFF), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          _buildGlassDropdown(),
+          const SizedBox(width: 12),
+          _buildHeaderIconButton(
+            assetPath: _icHeaderNotifications,
+            tooltip: 'Notifications',
+            badge: notifications,
+            onTap: () async {
+              final app = context.read<AppState>();
+              await app.fetchNotifications();
+              if (!mounted) return;
+              _showNotificationsSheet(app, messagesOnly: false);
+            },
+          ),
+        ],
+      );
+    }
+
+    Widget tableHeader() {
+      return Padding(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 4).copyWith(bottom: 12),
+        child: Row(
+          children: [
+            const Expanded(
+              flex: 4,
+              child: Text(
+                'Proposal Title',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                'Value',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                'Status',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(
+                'Days',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 110),
+          ],
+        ),
+      );
+    }
+
+    Widget rowTile(_ProposalPerformanceRow r) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 4,
+              child: Row(
+                children: [
+                  _panelIcon(_icOverview, size: 36),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      r.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                r.valueLabel,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Expanded(flex: 2, child: statusPill(r.status)),
+            Expanded(
+              flex: 3,
+              child: Text(
+                fmtUpdated(r.updatedAt),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 110,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _figmaTableViewButton(() {
+                  Navigator.pushNamed(
+                    context,
+                    '/proposal_review',
+                    arguments: {'title': r.title},
+                  );
+                }),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: const Color(0x24FFFFFF),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              header(),
+              const SizedBox(height: 18),
+              Container(
+                height: 1,
+                color: Colors.white.withValues(alpha: 0.06),
+              ),
+              const SizedBox(height: 14),
+              tableHeader(),
+              if (rows.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: Text(
+                      'No proposals to display.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                for (final r in rows) rowTile(r),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────── Header bell / messages ───────────────────────
+  // Mirrors the manager dashboard pattern (`approver_dashboard_page.dart`)
+  // so admin gets a single, real-time notification flow with admin-aware tap
+  // routing — no cross/duplicate functionality.
+
+  Widget _buildHeaderIconButton({
+    required String assetPath,
+    required String tooltip,
+    required VoidCallback onTap,
+    int? badge,
+  }) {
+    final showBadge = (badge ?? 0) > 0;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        SizedBox(
+          width: _headerActionIconDiameter,
+          height: _headerActionIconDiameter,
+          child: IconButton(
+            tooltip: tooltip,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            hoverColor: Colors.transparent,
+            onPressed: onTap,
+            icon: Image.asset(
+              assetPath,
+              width: _headerActionIconAssetSize,
+              height: _headerActionIconAssetSize,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              cacheWidth: (_headerActionIconAssetSize * 4).round(),
+              cacheHeight: (_headerActionIconAssetSize * 4).round(),
+            ),
+          ),
+        ),
+        if (showBadge)
+          Positioned(
+            right: 4,
+            top: 4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: const BoxDecoration(
+                color: Color(0xFFC10D00),
+                borderRadius: BorderRadius.all(Radius.circular(10)),
+              ),
+              child: Text(
+                (badge ?? 0) > 99 ? '99+' : '${badge ?? 0}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  static bool _notificationIsCommentMessage(Map<String, dynamic> n) {
+    final t =
+        (n['notification_type'] ?? n['type'] ?? '').toString().toLowerCase();
+    return t.contains('comment') || t == 'mentioned' || t.contains('mention');
+  }
+
+  static Map<String, dynamic> _asNotificationMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      try {
+        return raw.cast<String, dynamic>();
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }
+    return <String, dynamic>{};
+  }
+
+  int _unreadNotificationCount(AppState app, {required bool messagesOnly}) {
+    var n = 0;
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      final isComment = _notificationIsCommentMessage(item);
+      if (messagesOnly != isComment) continue;
+      if (item['is_read'] != true) n++;
+    }
+    return n;
+  }
+
+  List<Map<String, dynamic>> _notificationsFiltered(
+    AppState app, {
+    required bool messagesOnly,
+  }) {
+    final out = <Map<String, dynamic>>[];
+    for (final raw in app.notifications) {
+      final item = _asNotificationMap(raw);
+      if (item.isEmpty) continue;
+      if (messagesOnly != _notificationIsCommentMessage(item)) continue;
+      out.add(item);
+    }
+    return out;
+  }
+
+  String _formatNotificationTimestamp(dynamic raw) {
+    if (raw == null) return '';
+    final value = raw.toString().trim();
+    if (value.isEmpty) return '';
+    final dt = DateTime.tryParse(value);
+    if (dt == null) return value;
+    final local = dt.toLocal();
+    final diff = DateTime.now().difference(local);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return DateFormat('MMM d, y • HH:mm').format(local);
+  }
+
+  Map<String, dynamic> _parseNotificationMetadata(dynamic raw) {
+    if (raw == null) return <String, dynamic>{};
+    if (raw is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(raw);
+    }
+    if (raw is Map) {
+      try {
+        return raw.cast<String, dynamic>();
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }
+    if (raw is String && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          return decoded.cast<String, dynamic>();
+        }
+      } catch (_) {/* swallow malformed metadata */}
+    }
+    return <String, dynamic>{};
+  }
+
+  int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is String && value.trim().isNotEmpty) {
+      return int.tryParse(value.trim());
+    }
+    return null;
+  }
+
+  String? _asIdString(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty || trimmed.toLowerCase() == 'null') return null;
+      return trimmed;
+    }
+    return value.toString();
+  }
+
+  Future<void> _handleNotificationTap(
+    AppState app,
+    Map<String, dynamic> notification, {
+    int? notificationId,
+    bool isAlreadyRead = false,
+  }) async {
+    final metadata = _parseNotificationMetadata(notification['metadata']);
+    String? proposalId = _asIdString(
+      metadata['proposal_id'] ?? notification['proposal_id'],
+    );
+    proposalId ??= _asIdString(metadata['resource_id']);
+    final proposalTitle =
+        notification['proposal_title']?.toString().trim().isNotEmpty == true
+            ? notification['proposal_title'].toString().trim()
+            : notification['title']?.toString().trim();
+
+    if (notificationId != null && !isAlreadyRead) {
+      try {
+        await app.markNotificationRead(notificationId);
+      } catch (_) {/* swallow; UI will reconcile on next fetch */}
+    }
+
+    if (!mounted) return;
+
+    if (proposalId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This notification is missing proposal details.'),
+        ),
+      );
+      return;
+    }
+
+    final args = <String, dynamic>{
+      'proposalId': proposalId,
+      if (proposalTitle != null && proposalTitle.isNotEmpty)
+        'proposalTitle': proposalTitle,
+    };
+    final sectionIndex = _asInt(metadata['section_index']);
+    final commentId = _asInt(metadata['comment_id']);
+    if (sectionIndex != null) args['initialSectionIndex'] = sectionIndex;
+    if (commentId != null) args['initialCommentId'] = commentId;
+
+    Navigator.of(context).pushNamed('/blank-document', arguments: args);
+  }
+
+  void _showNotificationsSheet(AppState app, {bool messagesOnly = false}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              final notifications =
+                  _notificationsFiltered(app, messagesOnly: messagesOnly);
+              final unreadCount =
+                  _unreadNotificationCount(app, messagesOnly: messagesOnly);
+
+              Future<void> markAllInSheet() async {
+                for (final n
+                    in List<Map<String, dynamic>>.from(notifications)) {
+                  if (n['is_read'] == true) continue;
+                  final idRaw = n['id'];
+                  final id = idRaw is int
+                      ? idRaw
+                      : int.tryParse(idRaw?.toString() ?? '');
+                  if (id != null) await app.markNotificationRead(id);
+                }
+                await app.fetchNotifications();
+                if (context.mounted) setModalState(() {});
+              }
+
+              Future<void> deleteAllInSheet() async {
+                for (final n
+                    in List<Map<String, dynamic>>.from(notifications)) {
+                  final idRaw = n['id'];
+                  final id = idRaw is int
+                      ? idRaw
+                      : int.tryParse(idRaw?.toString() ?? '');
+                  if (id != null) await app.deleteNotification(id);
+                }
+                await app.fetchNotifications();
+                if (context.mounted) setModalState(() {});
+              }
+
+              return Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.7,
+                ),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(10)),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 16),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF2C3E50),
+                        borderRadius:
+                            BorderRadius.vertical(top: Radius.circular(10)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            messagesOnly ? 'Messages' : 'Notifications',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              if (unreadCount > 0)
+                                TextButton(
+                                  onPressed: markAllInSheet,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  child: const Text('Mark all read',
+                                      style: TextStyle(fontSize: 12)),
+                                ),
+                              TextButton(
+                                onPressed: notifications.isEmpty
+                                    ? null
+                                    : deleteAllInSheet,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red.shade200,
+                                ),
+                                child: const Text('Delete all',
+                                    style: TextStyle(fontSize: 12)),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close,
+                                    color: Colors.white),
+                                onPressed: () =>
+                                    Navigator.of(context).pop(),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (notifications.isEmpty)
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            messagesOnly
+                                ? 'No comment messages yet.'
+                                : 'No notifications yet.',
+                            style: const TextStyle(
+                              color: Color(0xFF4A4A4A),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 16),
+                          itemCount: notifications.length,
+                          separatorBuilder: (_, __) =>
+                              const Divider(height: 16),
+                          itemBuilder: (context, index) {
+                            final notification = notifications[index];
+                            final title =
+                                notification['title']?.toString().trim();
+                            final message =
+                                notification['message']?.toString().trim() ??
+                                    '';
+                            final proposalTitle = notification['proposal_title']
+                                ?.toString()
+                                .trim();
+                            final isRead = notification['is_read'] == true;
+                            final timeLabel = _formatNotificationTimestamp(
+                                notification['created_at']);
+                            final dynamic notificationIdRaw =
+                                notification['id'];
+                            final int? notificationId =
+                                notificationIdRaw is int
+                                    ? notificationIdRaw
+                                    : int.tryParse(
+                                        notificationIdRaw?.toString() ?? '',
+                                      );
+
+                            return ListTile(
+                              onTap: () async {
+                                Navigator.of(bottomSheetContext).pop();
+                                await _handleNotificationTap(
+                                  app,
+                                  notification,
+                                  notificationId: notificationId,
+                                  isAlreadyRead: isRead,
+                                );
+                              },
+                              leading: Icon(
+                                messagesOnly
+                                    ? (isRead
+                                        ? Icons.chat_bubble_outline
+                                        : Icons.mark_chat_unread_outlined)
+                                    : (isRead
+                                        ? Icons.notifications_none_outlined
+                                        : Icons.notifications_active),
+                                color: isRead
+                                    ? const Color(0xFF95A5A6)
+                                    : const Color(0xFF3498DB),
+                              ),
+                              title: Text(
+                                title?.isNotEmpty == true
+                                    ? title!
+                                    : 'Notification',
+                                style: TextStyle(
+                                  color: const Color(0xFF2C3E50),
+                                  fontWeight: isRead
+                                      ? FontWeight.w600
+                                      : FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (message.isNotEmpty)
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        message,
+                                        style: const TextStyle(
+                                          color: Color(0xFF4A4A4A),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  if (proposalTitle != null &&
+                                      proposalTitle.isNotEmpty)
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        proposalTitle,
+                                        style: const TextStyle(
+                                          color: Color(0xFF7F8C8D),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ),
+                                  if (timeLabel.isNotEmpty)
+                                    Padding(
+                                      padding:
+                                          const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        timeLabel,
+                                        style: const TextStyle(
+                                          color: Color(0xFF95A5A6),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              isThreeLine: true,
+                              trailing:
+                                  !isRead && notificationId != null
+                                      ? Wrap(
+                                          spacing: 4,
+                                          children: [
+                                            TextButton(
+                                              onPressed: () async {
+                                                await app.markNotificationRead(
+                                                    notificationId);
+                                                setModalState(() {});
+                                              },
+                                              child: const Text('Mark read'),
+                                            ),
+                                            IconButton(
+                                              tooltip: 'Delete',
+                                              onPressed: () async {
+                                                await app.deleteNotification(
+                                                    notificationId);
+                                                setModalState(() {});
+                                              },
+                                              icon: const Icon(
+                                                Icons.delete_outline,
+                                                size: 18,
+                                                color: Colors.redAccent,
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      : (notificationId != null
+                                          ? IconButton(
+                                              tooltip: 'Delete',
+                                              onPressed: () async {
+                                                await app.deleteNotification(
+                                                    notificationId);
+                                                setModalState(() {});
+                                              },
+                                              icon: const Icon(
+                                                Icons.delete_outline,
+                                                size: 18,
+                                                color: Colors.redAccent,
+                                              ),
+                                            )
+                                          : null),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -2842,55 +4249,77 @@ class _AnalyticsPageState extends State<AnalyticsPage>
     String value,
     String change,
     bool isPositive,
-    String subtitle,
-  ) {
-    final chrome = context.watch<ManagerThemeController>().chrome;
-    final radius = chrome.isDark ? 16.0 : 10.0;
-    final decoration = chrome.isDark
-        ? BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.white.withValues(alpha: 0.1),
-                Colors.white.withValues(alpha: 0.05),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(
-              color: PremiumTheme.glassWhiteBorder,
-              width: 1.5,
-            ),
-          )
-        : chrome.floatingPanelDecoration(radius: radius, borderWidth: 1.5);
+    String subtitle, {
+    String? iconAsset,
+    String? subtitleOverride,
+  }) {
+    const radius = 16.0;
+    final decoration = BoxDecoration(
+      color: const Color(0x24FFFFFF),
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.35),
+          blurRadius: 18,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    );
 
     final body = Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: decoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: PremiumTheme.bodyMedium.copyWith(
-              color: chrome.textSecondary,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitleOverride ?? 'Current vs last month.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (iconAsset != null) _panelIcon(iconAsset, size: _kpiIconSize),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 22),
           Text(
             value,
-            style: PremiumTheme.displayMedium.copyWith(
-              fontSize: 32,
-              color: chrome.textPrimary,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.2,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             children: [
               Icon(
                 isPositive ? Icons.trending_up : Icons.trending_down,
-                size: 16,
-                color: isPositive ? PremiumTheme.success : PremiumTheme.error,
+                size: 14,
+                color:
+                    isPositive ? PremiumTheme.success : PremiumTheme.error,
               ),
               const SizedBox(width: 4),
               Flexible(
@@ -2898,11 +4327,11 @@ class _AnalyticsPageState extends State<AnalyticsPage>
                   change,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     color: isPositive
                         ? PremiumTheme.success
                         : PremiumTheme.error,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -2913,8 +4342,8 @@ class _AnalyticsPageState extends State<AnalyticsPage>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
-                    color: chrome.textMuted,
+                    fontSize: 11,
+                    color: Colors.white.withValues(alpha: 0.45),
                   ),
                 ),
               ),
@@ -2926,12 +4355,30 @@ class _AnalyticsPageState extends State<AnalyticsPage>
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
-      child: chrome.isDark
-          ? BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-              child: body,
-            )
-          : body,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: body,
+      ),
+    );
+  }
+
+  /// Renders a Figma analytics PNG at full quality with no tinting. Used for
+  /// every panel header / KPI accent icon. The new icons in
+  /// `assets/images/admin_analytics_page/` already contain the red disc and
+  /// white glyph baked in.
+  Widget _panelIcon(String asset, {double size = _panelIconSize}) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Image.asset(
+        asset,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
+        cacheWidth: (size * 4).round(),
+        cacheHeight: (size * 4).round(),
+        errorBuilder: (_, __, ___) =>
+            const Icon(Icons.broken_image, color: Colors.redAccent, size: 24),
+      ),
     );
   }
 
@@ -2939,38 +4386,73 @@ class _AnalyticsPageState extends State<AnalyticsPage>
     String title,
     Widget chart, {
     double height = 300,
+    String? iconAsset,
+    String? subtitle,
+    Widget? trailing,
   }) {
-    final chrome = context.watch<ManagerThemeController>().chrome;
-    final radius = chrome.isDark ? 16.0 : 10.0;
-    final decoration = chrome.isDark
-        ? BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.white.withValues(alpha: 0.1),
-                Colors.white.withValues(alpha: 0.05),
+    const radius = 16.0;
+    final decoration = BoxDecoration(
+      color: const Color(0x24FFFFFF),
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.35),
+          blurRadius: 18,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    );
+
+    final headerRow = Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (iconAsset != null) ...[
+          _panelIcon(iconAsset, size: _panelIconSize),
+          const SizedBox(width: 14),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if ((subtitle ?? '').isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.55),
+                    fontSize: 12,
+                  ),
+                ),
               ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(
-              color: PremiumTheme.glassWhiteBorder,
-              width: 1.5,
-            ),
-          )
-        : chrome.floatingPanelDecoration(radius: radius, borderWidth: 1.5);
+            ],
+          ),
+        ),
+        if (trailing != null) trailing,
+      ],
+    );
 
     final body = Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       decoration: decoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: PremiumTheme.titleMedium.copyWith(color: chrome.textPrimary),
+          headerRow,
+          const SizedBox(height: 14),
+          Container(
+            height: 1,
+            color: Colors.white.withValues(alpha: 0.06),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
           SizedBox(height: height, child: chart),
         ],
       ),
@@ -2978,12 +4460,10 @@ class _AnalyticsPageState extends State<AnalyticsPage>
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
-      child: chrome.isDark
-          ? BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-              child: body,
-            )
-          : body,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: body,
+      ),
     );
   }
 
@@ -3100,6 +4580,222 @@ class _AnalyticsPageState extends State<AnalyticsPage>
           ),
         ],
       ),
+    );
+  }
+
+  /// 30-day daily trend line chart — Created (green) vs Signed (orange).
+  /// Buckets the supplied proposal list into 30 daily buckets ending today
+  /// and renders two real-data line series with proper X/Y axes.
+  Widget _buildThirtyDayTrendChart(List<dynamic> proposals) {
+    const int days = 30;
+    final today = DateTime.now();
+    final startDay = DateTime(today.year, today.month, today.day)
+        .subtract(const Duration(days: days - 1));
+
+    final created = List<int>.filled(days, 0);
+    final signed = List<int>.filled(days, 0);
+
+    for (final raw in proposals) {
+      if (raw is! Map) continue;
+      final p = raw;
+      final createdAt =
+          _parseDate(p['created_at'] ?? p['createdAt']);
+      if (createdAt != null) {
+        final d = DateTime(createdAt.year, createdAt.month, createdAt.day);
+        final idx = d.difference(startDay).inDays;
+        if (idx >= 0 && idx < days) {
+          created[idx] = created[idx] + 1;
+        }
+      }
+
+      final status = (p['status'] ?? '').toString().toLowerCase();
+      if (_isWinStatus(status)) {
+        final updatedAt =
+            _parseDate(p['updated_at'] ?? p['updatedAt']) ?? createdAt;
+        if (updatedAt != null) {
+          final d = DateTime(updatedAt.year, updatedAt.month, updatedAt.day);
+          final idx = d.difference(startDay).inDays;
+          if (idx >= 0 && idx < days) {
+            signed[idx] = signed[idx] + 1;
+          }
+        }
+      }
+    }
+
+    final createdSpots = <FlSpot>[
+      for (int i = 0; i < days; i++) FlSpot(i.toDouble(), created[i].toDouble())
+    ];
+    final signedSpots = <FlSpot>[
+      for (int i = 0; i < days; i++) FlSpot(i.toDouble(), signed[i].toDouble())
+    ];
+
+    final rawMax = math.max<int>(
+      created.fold<int>(0, math.max),
+      signed.fold<int>(0, math.max),
+    );
+    final yMax = rawMax <= 0 ? 4.0 : (rawMax * 1.25).ceilToDouble();
+    final yInterval = (yMax / 4).ceilToDouble().clamp(1.0, double.infinity);
+
+    String monthAbbr(int m) {
+      const names = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      return names[(m - 1).clamp(0, 11)];
+    }
+
+    Widget legendDot(Color c, String label) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: c,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            legendDot(const Color(0xFF22C55E), 'Created'),
+            const SizedBox(width: 16),
+            legendDot(const Color(0xFFF59E0B), 'Signed'),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: LineChart(
+            LineChartData(
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: yInterval,
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  strokeWidth: 1,
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 36,
+                    interval: yInterval,
+                    getTitlesWidget: (value, meta) {
+                      if (value < 0) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6.0),
+                        child: Text(
+                          value.toInt().toString(),
+                          style: const TextStyle(
+                            color: Color(0xFF9CA3AF),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 26,
+                    interval: 6,
+                    getTitlesWidget: (value, meta) {
+                      final i = value.toInt();
+                      if (i < 0 || i >= days) return const SizedBox.shrink();
+                      // Show labels at days 0, 6, 12, 18, 24, 29 (last).
+                      final isLast = i == days - 1;
+                      final showHere = i % 6 == 0 || isLast;
+                      if (!showHere) return const SizedBox.shrink();
+                      final d = startDay.add(Duration(days: i));
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6.0),
+                        child: Text(
+                          '${monthAbbr(d.month)} ${d.day}',
+                          style: const TextStyle(
+                            color: Color(0xFF9CA3AF),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              minX: 0,
+              maxX: (days - 1).toDouble(),
+              minY: 0,
+              maxY: yMax,
+              lineTouchData: LineTouchData(
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipColor: (_) =>
+                      const Color(0xFF111827).withValues(alpha: 0.95),
+                  getTooltipItems: (spots) {
+                    return spots.map((s) {
+                      final i = s.x.toInt().clamp(0, days - 1);
+                      final d = startDay.add(Duration(days: i));
+                      final label = s.bar.color == const Color(0xFF22C55E)
+                          ? 'Created'
+                          : 'Signed';
+                      return LineTooltipItem(
+                        '$label · ${monthAbbr(d.month)} ${d.day}\n${s.y.toInt()}',
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      );
+                    }).toList();
+                  },
+                ),
+              ),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: createdSpots,
+                  isCurved: false,
+                  color: const Color(0xFF22C55E),
+                  barWidth: 2.4,
+                  isStrokeCapRound: true,
+                  dotData: const FlDotData(show: false),
+                  belowBarData: BarAreaData(show: false),
+                ),
+                LineChartBarData(
+                  spots: signedSpots,
+                  isCurved: false,
+                  color: const Color(0xFFF59E0B),
+                  barWidth: 2.4,
+                  isStrokeCapRound: true,
+                  dotData: const FlDotData(show: false),
+                  belowBarData: BarAreaData(show: false),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -3232,77 +4928,197 @@ class _AnalyticsPageState extends State<AnalyticsPage>
   }
 
   Widget _buildWinRatePieChart(double winRate, double lossRate) {
-    final sections = <PieChartSectionData>[];
+    // All values are live (winRate/lossRate come straight from analytics).
     final pendingRate = math.max(0.0, 100 - winRate - lossRate);
-    if (winRate > 0) {
-      sections.add(
-        PieChartSectionData(
-          color: PremiumTheme.success,
-          value: winRate,
-          title: '${winRate.toStringAsFixed(1)}%',
-          radius: 70,
-          titleStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      );
-    }
-    if (lossRate > 0) {
-      sections.add(
-        PieChartSectionData(
-          color: PremiumTheme.error,
-          value: lossRate,
-          title: '${lossRate.toStringAsFixed(1)}%',
-          radius: 70,
-          titleStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      );
-    }
-    if (pendingRate > 0 && pendingRate < 100) {
-      sections.add(
-        PieChartSectionData(
-          color: PremiumTheme.warning,
-          value: pendingRate,
-          title: '${pendingRate.toStringAsFixed(1)}%',
-          radius: 70,
-          titleStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      );
-    }
-    if (sections.isEmpty) {
-      sections.add(
-        PieChartSectionData(
-          color: Colors.white.withValues(alpha: 0.2),
-          value: 100,
-          title: 'No data',
-          radius: 70,
-          titleStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      );
-    }
-    return PieChart(
-      PieChartData(
-        sectionsSpace: 2,
-        centerSpaceRadius: 60,
-        sections: sections,
-      ),
+    return _buildDonutWithLegend(
+      slices: [
+        _DonutSlice('Wins', winRate, PremiumTheme.success),
+        _DonutSlice('Losses', lossRate, PremiumTheme.error),
+        _DonutSlice('In Progress', pendingRate, const Color(0xFF8B5CF6)),
+      ],
+      centerAsset: _icInnerPie,
     );
   }
 
+  /// Real-time Readiness Breakdown donut. Buckets the live status counts from
+  /// `_calculateAnalytics(...)` into Figma-aligned legend rows.
+  Widget _buildReadinessBreakdownDonut(_AnalyticsSnapshot analytics) {
+    int passing = 0;
+    int below = 0;
+    int inReview = 0;
+    int sent = 0;
+    int lost = 0;
+    for (final entry in analytics.statusCounts.entries) {
+      final s = entry.key.toLowerCase();
+      final v = entry.value;
+      if (s.contains('signed') ||
+          s.contains('approved') ||
+          s.contains('won')) {
+        passing += v;
+      } else if (s.contains('draft')) {
+        below += v;
+      } else if (s.contains('review') || s.contains('pending')) {
+        inReview += v;
+      } else if (s.contains('sent') || s.contains('released')) {
+        sent += v;
+      } else if (s.contains('lost') ||
+          s.contains('reject') ||
+          s.contains('declined')) {
+        lost += v;
+      }
+    }
+    return _buildDonutWithLegend(
+      slices: [
+        _DonutSlice(
+            'Passing', passing.toDouble(), const Color(0xFF22C55E)),
+        _DonutSlice(
+            'Below threshold', below.toDouble(), const Color(0xFFF59E0B)),
+        _DonutSlice(
+            'In Review', inReview.toDouble(), const Color(0xFF8B5CF6)),
+        _DonutSlice(
+            'Sent to Client', sent.toDouble(), const Color(0xFF3B82F6)),
+        _DonutSlice('Lost', lost.toDouble(), const Color(0xFFEF4444)),
+      ],
+      centerAsset: _icInnerPie,
+    );
+  }
+
+  /// Shared donut+legend renderer. Empty (all-zero) data shows a soft ring.
+  Widget _buildDonutWithLegend({
+    required List<_DonutSlice> slices,
+    String? centerAsset,
+    String legendTitle = 'Key Guide:',
+  }) {
+    final total = slices.fold<double>(0, (sum, s) => sum + s.value);
+
+    final sections = <PieChartSectionData>[];
+    if (total <= 0) {
+      sections.add(
+        PieChartSectionData(
+          color: Colors.white.withValues(alpha: 0.10),
+          value: 1,
+          title: '',
+          showTitle: false,
+          radius: 32,
+        ),
+      );
+    } else {
+      for (final s in slices) {
+        if (s.value <= 0) continue;
+        final pct = (s.value / total) * 100;
+        sections.add(
+          PieChartSectionData(
+            color: s.color,
+            value: s.value,
+            title: '${pct.toStringAsFixed(0)}%',
+            radius: 36,
+            titleStyle: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+            titlePositionPercentageOffset: 0.6,
+          ),
+        );
+      }
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          flex: 5,
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                PieChart(
+                  PieChartData(
+                    sectionsSpace: 2,
+                    centerSpaceRadius: 50,
+                    sections: sections,
+                    pieTouchData: PieTouchData(enabled: total > 0),
+                  ),
+                ),
+                if (centerAsset != null)
+                  IgnorePointer(
+                    child: SizedBox(
+                      width: 70,
+                      height: 70,
+                      child: Image.asset(
+                        centerAsset,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        cacheWidth: 280,
+                        cacheHeight: 280,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 18),
+        Expanded(
+          flex: 6,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                legendTitle,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final s in slices)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 44,
+                        child: Text(
+                          total > 0
+                              ? '${((s.value / total) * 100).toStringAsFixed(0)}%'
+                              : '0%',
+                          textAlign: TextAlign.right,
+                          style: TextStyle(
+                            color: s.color,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          s.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ignore: unused_element
   Widget _buildGlassPerformanceTable(List<_ProposalPerformanceRow> rows) {
     final chrome = context.watch<ManagerThemeController>().chrome;
     if (rows.isEmpty) {
@@ -4094,5 +5910,34 @@ class _MetricCardData {
     required this.change,
     required this.isPositive,
     required this.subtitle,
+  });
+}
+
+/// Pipeline pill chip model used by the redesigned Pipeline View strip.
+class _PipelinePill {
+  final String label;
+  final int count;
+  const _PipelinePill(this.label, this.count);
+}
+
+/// Slice descriptor for `_buildDonutWithLegend` (Win Rate, Readiness Breakdown).
+class _DonutSlice {
+  final String label;
+  final double value;
+  final Color color;
+  const _DonutSlice(this.label, this.value, this.color);
+}
+
+/// Small KPI tile model used by the secondary KPI strip in the Figma design.
+class _SmallKpi {
+  final String title;
+  final String subtitle;
+  final String value;
+  final String iconAsset;
+  const _SmallKpi({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.iconAsset,
   });
 }

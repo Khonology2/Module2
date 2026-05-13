@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'ai_persona_settings_store.dart';
 import 'api_service.dart';
 
 /// Only when POST …/async returns 404 — safe to fall back to synchronous proxy.
@@ -46,6 +47,25 @@ class AiAssistantApi {
             ? token.trim()
             : 'Bearer ${token.trim()}',
       };
+
+  /// Combines Bearer auth + optional HF router headers (drops empty keys).
+  static Map<String, String> mergeOutboundHeaders({
+    required String token,
+    required Map<String, String> outbound,
+  }) {
+    final merged = {..._headers(token)};
+    outbound.forEach((key, value) {
+      final t = value.trim();
+      if (t.isEmpty) return;
+      merged[key] = t;
+    });
+    return merged;
+  }
+
+  static Future<Map<String, String>> _routingOrDefault(
+      Map<String, String>? outboundRoutingHeaders) async {
+    return outboundRoutingHeaders ?? await AiPersonaSettingsStore.outboundHeaders();
+  }
 
   static bool _isRetryableStatus(int code) => code == 502;
 
@@ -248,7 +268,11 @@ class AiAssistantApi {
     required String sectionName,
     required String proposalText,
     int maxTokens = 96,
+    Map<String, String>? outboundRoutingHeaders,
   }) async {
+    final routing = await _routingOrDefault(outboundRoutingHeaders);
+    final hm = mergeOutboundHeaders(token: token, outbound: routing);
+
     if (_useAsyncAiAssistant) {
       try {
         return await _generateSectionAsync(
@@ -256,6 +280,7 @@ class AiAssistantApi {
           sectionName: sectionName,
           proposalText: proposalText,
           maxTokens: maxTokens,
+          mergedHeadersForPost: hm,
         );
       } on AsyncAssistantNotEnabled catch (e) {
         print('[AI][generate-section] $e — falling back to sync.');
@@ -269,7 +294,7 @@ class AiAssistantApi {
 
     final resp = await _postJson(
       uri,
-      _headers(token),
+      hm,
       {
         'section_name': sectionName,
         'proposal_text': clipped,
@@ -295,6 +320,7 @@ class AiAssistantApi {
     required String sectionName,
     required String proposalText,
     int maxTokens = 96,
+    required Map<String, String> mergedHeadersForPost,
   }) async {
     final clipped = proposalText.length > _maxProposalChars
         ? proposalText.substring(0, _maxProposalChars)
@@ -305,7 +331,7 @@ class AiAssistantApi {
         Uri.parse('${ApiService.baseUrl}/api/ai-assistant/generate-section/async');
     final startResp = await _postJson(
       startUri,
-      _headers(token),
+      mergedHeadersForPost,
       {
         'section_name': sectionName,
         'proposal_text': clipped,
@@ -348,7 +374,11 @@ class AiAssistantApi {
     required String areaName,
     required String proposalText,
     int maxTokens = 96,
+    Map<String, String>? outboundRoutingHeaders,
   }) async {
+    final routing = await _routingOrDefault(outboundRoutingHeaders);
+    final hm = mergeOutboundHeaders(token: token, outbound: routing);
+
     if (_useAsyncAiAssistant) {
       try {
         return await _improveAreaAsync(
@@ -356,6 +386,7 @@ class AiAssistantApi {
           areaName: areaName,
           proposalText: proposalText,
           maxTokens: maxTokens,
+          mergedHeadersForPost: hm,
         );
       } on AsyncAssistantNotEnabled catch (e) {
         print('[AI][improve-area] $e — falling back to sync.');
@@ -369,7 +400,7 @@ class AiAssistantApi {
 
     final resp = await _postJson(
       uri,
-      _headers(token),
+      hm,
       {
         'area_name': areaName,
         'proposal_text': clipped,
@@ -398,6 +429,7 @@ class AiAssistantApi {
     required String areaName,
     required String proposalText,
     int maxTokens = 96,
+    required Map<String, String> mergedHeadersForPost,
   }) async {
     final clipped = proposalText.length > _maxProposalChars
         ? proposalText.substring(0, _maxProposalChars)
@@ -408,7 +440,7 @@ class AiAssistantApi {
         Uri.parse('${ApiService.baseUrl}/api/ai-assistant/improve-area/async');
     final startResp = await _postJson(
       startUri,
-      _headers(token),
+      mergedHeadersForPost,
       {
         'area_name': areaName,
         'proposal_text': clipped,
@@ -445,5 +477,42 @@ class AiAssistantApi {
       isImproveFlow: true,
     );
   }
-}
 
+  static Future<Map<String, dynamic>> correctClause({
+    required String token,
+    required String clauseName,
+    required String proposalText,
+    int maxTokens = 96,
+    Map<String, String>? outboundRoutingHeaders,
+  }) async {
+    final routing = await _routingOrDefault(outboundRoutingHeaders);
+    final hm = mergeOutboundHeaders(token: token, outbound: routing);
+
+    final uri = Uri.parse('${ApiService.baseUrl}/api/ai-assistant/correct-clause');
+    final clipped = proposalText.length > _maxProposalChars
+        ? proposalText.substring(0, _maxProposalChars)
+        : proposalText;
+
+    final resp = await _postJson(
+      uri,
+      hm,
+      {
+        'clause_name': clauseName,
+        'proposal_text': clipped,
+        'max_tokens': maxTokens,
+      },
+      action: 'correct-clause',
+    );
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final decoded = json.decode(resp.body);
+      final m = (decoded is Map<String, dynamic>) ? decoded : {'result': decoded};
+      if (clipped.length != proposalText.length) {
+        m['client_truncated'] = true;
+        m['client_truncated_chars'] = proposalText.length - clipped.length;
+      }
+      return m;
+    }
+    throw _friendlyError(resp.statusCode, resp.body);
+  }
+}

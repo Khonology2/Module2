@@ -32,6 +32,7 @@ import 'pages/shared/email_verification_page.dart';
 import 'pages/shared/startup_page.dart';
 import 'pages/shared/proposals_page.dart';
 import 'pages/shared/approved_proposals_page.dart';
+import 'pages/shared/learn_more_page.dart';
 import 'pages/guest/guest_collaboration_page.dart';
 import 'pages/shared/collaboration_router.dart';
 import 'pages/client/client_onboarding_page.dart';
@@ -47,6 +48,8 @@ import 'services/role_service.dart';
 import 'api.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme/manager_theme_controller.dart';
+import 'config/app_constants.dart';
+import 'widgets/manager_theme_fab_wrapper.dart';
 
 const String _buildSha =
     String.fromEnvironment('BUILD_SHA', defaultValue: 'dev');
@@ -75,6 +78,11 @@ String? _extractTokenLoose(String input) {
   } catch (_) {
     return null;
   }
+}
+
+/// Helper function to wrap manager screens with the red theme FAB
+Widget _wrapManagerScreen(Widget child) {
+  return ManagerThemeFabWrapper(child: child);
 }
 
 Future<void> main() async {
@@ -130,6 +138,7 @@ Future<void> main() async {
   // Restore persisted auth session on startup (web)
   AuthService.restoreSessionFromStorage();
   print('🧩 Build SHA: $_buildSha');
+  print('MODULE2_UI_STAMP ${AppConstants.fullVersion}');
   runApp(const MyApp());
 }
 
@@ -458,18 +467,13 @@ class MyApp extends StatelessWidget {
           scaffoldBackgroundColor: Colors.transparent,
         ),
         builder: (context, child) {
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Image.asset(
-                    'assets/images/Global BG.jpg',
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              if (child != null) child,
-            ],
+          // Do not paint Global BG here: it sat behind every route and made
+          // screens that bring their own full-bleed background (manager/admin
+          // shell, login carousel, etc.) look unchanged. Use a neutral fallback
+          // only where a route leaves the scaffold transparent.
+          return ColoredBox(
+            color: const Color(0xFF0A0C10),
+            child: child ?? const SizedBox.shrink(),
           );
         },
         home: const AuthWrapper(),
@@ -477,6 +481,7 @@ class MyApp extends StatelessWidget {
         routes: {
           '/login': (context) => const LoginPage(),
           '/register': (context) => const RegisterPage(),
+          '/learn-more': (context) => const LearnMorePage(),
           '/onboard': (context) {
             // This will be handled by onGenerateRoute, but adding as fallback
             final currentUrl = web.window.location.href;
@@ -564,10 +569,10 @@ class MyApp extends StatelessWidget {
             }
             return EmailVerificationPage(token: token);
           },
-          '/home': (context) => const DashboardPage(),
-          '/dashboard': (context) => const DashboardPage(),
-          '/creator_dashboard': (context) => const DashboardPage(),
-          '/proposals': (context) => ProposalsPage(),
+          '/home': (context) => _wrapManagerScreen(const DashboardPage()),
+          '/dashboard': (context) => _wrapManagerScreen(const DashboardPage()),
+          '/creator_dashboard': (context) => _wrapManagerScreen(const DashboardPage()),
+          '/proposals': (context) => _wrapManagerScreen(ProposalsPage()),
           '/compose': (context) {
             final dynamic rawArgs = ModalRoute.of(context)?.settings.arguments;
             Map<String, dynamic>? args;
@@ -650,23 +655,23 @@ class MyApp extends StatelessWidget {
           },
           '/govern': (context) => const GovernPage(),
           '/preview': (context) => const PreviewPage(),
-          '/content_library': (context) => const ContentLibraryPage(),
+          '/content_library': (context) => _wrapManagerScreen(const ContentLibraryPage()),
           '/content': (context) =>
-              const ContentLibraryPage(), // Add missing route
-          '/templates': (context) => const TemplatesPage(),
+              _wrapManagerScreen(const ContentLibraryPage()), // Add missing route
+          '/templates': (context) => _wrapManagerScreen(const TemplatesPage()),
           '/template-builder': (context) {
             final args = ModalRoute.of(context)?.settings.arguments
                 as Map<String, dynamic>?;
             return TemplateBuilder(templateId: args?['templateId']);
           },
-          '/approvals': (context) => const ApproverDashboardPage(),
-          '/approver_dashboard': (context) => const ApproverDashboardPage(),
-          '/finance_dashboard': (context) => const FinanceDashboardV2Page(),
+          '/approvals': (context) => _wrapManagerScreen(const ApproverDashboardPage()),
+          '/approver_dashboard': (context) => _wrapManagerScreen(const ApproverDashboardPage()),
+          '/finance_dashboard': (context) => _wrapManagerScreen(const FinanceDashboardV2Page()),
           '/finance/onboarding': (context) => const FinanceOnboardingPage(),
           '/finance/clients': (context) => const FinanceClientManagementPage(),
           '/finance/clients/add': (context) => const FinanceAddClientPage(),
-          '/approved_proposals': (context) => const ApprovedProposalsPage(),
-          '/admin_approvals': (context) => const AdminApprovalsPage(),
+          '/approved_proposals': (context) => _wrapManagerScreen(const ApprovedProposalsPage()),
+          '/admin_approvals': (context) => _wrapManagerScreen(const AdminApprovalsPage()),
           '/proposal_review': (context) {
             final args = ModalRoute.of(context)?.settings.arguments
                 as Map<String, dynamic>?;
@@ -675,11 +680,11 @@ class MyApp extends StatelessWidget {
               proposalTitle: args?['title']?.toString(),
             );
           },
-          '/admin_dashboard': (context) => const ApproverDashboardPage(),
+          '/admin_dashboard': (context) => _wrapManagerScreen(const ApproverDashboardPage()),
           '/cinematic': (context) => const CinematicSequencePage(),
-          '/client_management': (context) => const ClientManagementPage(),
+          '/client_management': (context) => _wrapManagerScreen(const ClientManagementPage()),
           '/manager_account_profile': (context) =>
-              const ManagerAccountProfilePage(),
+              _wrapManagerScreen(const ManagerAccountProfilePage()),
           '/collaboration': (context) =>
               const ClientManagementPage(), // Redirected to Client Management
           // '/collaborate' is handled by onGenerateRoute to extract token
@@ -695,17 +700,20 @@ class MyApp extends StatelessWidget {
                 roleKey == 'finance manager';
             final isAdmin = roleKey == 'admin' || roleKey == 'ceo';
             if (isFinance) {
-              return const FinanceAnalyticsPage();
+              return _wrapManagerScreen(const FinanceAnalyticsPage());
             }
             if (isAdmin) {
-              return const admin.AnalyticsPage(mode: admin.AnalyticsPageMode.admin);
+              return _wrapManagerScreen(const admin.AnalyticsPage(
+                  mode: admin.AnalyticsPageMode.admin));
             }
-            return const admin.AnalyticsPage(mode: admin.AnalyticsPageMode.creator);
+            return _wrapManagerScreen(const admin.AnalyticsPage(
+                mode: admin.AnalyticsPageMode.creator));
           },
           '/admin_analytics': (context) {
-            return const admin.AnalyticsPage(mode: admin.AnalyticsPageMode.admin);
+            return _wrapManagerScreen(const admin.AnalyticsPage(
+                mode: admin.AnalyticsPageMode.admin));
           },
-          '/admin_history': (context) => const AdminHistoryPage(),
+          '/admin_history': (context) => _wrapManagerScreen(const AdminHistoryPage()),
           '/approved-proposals': (context) => const ApprovedProposalsPage(),
           '/ai-configuration': (context) => const AIConfigurationPage(),
           '/settings': (context) => const SettingsPage(),

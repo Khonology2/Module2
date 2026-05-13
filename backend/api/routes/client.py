@@ -1,7 +1,7 @@
 """
 Client role routes - Viewing proposals, commenting, approving/rejecting, signing
 """
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, redirect, make_response
 from io import BytesIO
 import os
 import json
@@ -93,12 +93,34 @@ def _now_utc():
 
 
 def _ensure_client_activity_schema(cursor):
+    # Older deployments created this table with UUID columns, but the live
+    # `proposals.id` / `clients.id` columns are INTEGER in this app.
+    # If we attempt to CREATE the table with an incompatible FK type,
+    # Postgres errors out before `IF NOT EXISTS` can help (because the table
+    # already exists with the wrong column types).
+    try:
+        cursor.execute(
+            """
+            SELECT column_name, data_type
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'proposal_client_activity'
+              AND column_name IN ('proposal_id', 'client_id')
+            """
+        )
+        cols = {r['column_name']: r['data_type'] for r in (cursor.fetchall() or [])}
+        if cols.get('proposal_id') == 'uuid' or cols.get('client_id') == 'uuid':
+            cursor.execute("DROP TABLE IF EXISTS proposal_client_activity CASCADE")
+    except Exception:
+        # Best-effort; schema will be (re)created below.
+        pass
+
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS proposal_client_activity (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            proposal_id UUID REFERENCES proposals(id) ON DELETE CASCADE,
-            client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
+            id SERIAL PRIMARY KEY,
+            proposal_id INTEGER REFERENCES proposals(id) ON DELETE CASCADE,
+            client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
             event_type VARCHAR(50) NOT NULL,
             metadata JSONB,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -343,6 +365,27 @@ def _create_client_session(cursor, invitation_token: str, device_id: str):
         'session_id': session_id,
         'expires_at': expires_at,
     }
+
+
+def _revoke_other_client_sessions(cursor, invitation_token: str, device_id: str, keep_session_id: str):
+    """
+    Only one active browser session per (invitation_token, device_id).
+    Revoke older rows so stale tokens fail fast and cannot race the UI after OTP.
+    """
+    try:
+        cursor.execute(
+            """
+            UPDATE client_device_sessions
+            SET revoked_at = NOW()
+            WHERE invitation_token = %s
+              AND device_id = %s
+              AND id <> %s
+              AND revoked_at IS NULL
+            """,
+            (invitation_token, device_id, keep_session_id),
+        )
+    except Exception as exc:
+        print(f"[CLIENT_PORTAL] WARN: could not revoke prior device sessions: {exc}")
 
 
 def _require_client_device_session(cursor, invitation_token: str, device_id: str | None, session_token: str | None):
@@ -765,6 +808,9 @@ def start_client_device_session():
                     (invitation_token, device_id),
                 )
                 session = _create_client_session(cursor, invitation_token, device_id)
+                _revoke_other_client_sessions(
+                    cursor, invitation_token, device_id, session['session_id']
+                )
                 conn.commit()
                 return {
                     'otp_required': False,
@@ -933,6 +979,9 @@ def verify_client_device_otp():
                 (invitation_token, device_id),
             )
             session = _create_client_session(cursor, invitation_token, device_id)
+            _revoke_other_client_sessions(
+                cursor, invitation_token, device_id, session['session_id']
+            )
             conn.commit()
 
             return {
@@ -1153,6 +1202,162 @@ def _get_proposal_column_info(cursor):
         'client_name_expr': client_name_expr,
         'client_email_expr': client_email_expr,
     }
+
+
+def _compute_signing_payload_hash(title, content, sections):
+    """Must match the client echo of the same fields from GET proposal details."""
+    payload = {
+        'title': title or '',
+        'content': content,
+        'sections': sections,
+    }
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+
+
+def _ensure_in_app_signing_schema(cursor):
+    try:
+        cursor.execute(
+            """
+            ALTER TABLE proposal_signatures
+            ADD COLUMN IF NOT EXISTS signature_method VARCHAR(64)
+            """
+        )
+        cursor.execute(
+            """
+            ALTER TABLE proposal_signatures
+            ADD COLUMN IF NOT EXISTS content_hash_at_sign VARCHAR(128)
+            """
+        )
+        cursor.execute(
+            """
+            ALTER TABLE proposal_signatures
+            ADD COLUMN IF NOT EXISTS consent_version VARCHAR(64)
+            """
+        )
+        # Allow multiple in-app rows with NULL envelope_id; keep DocuSign envelope_ids unique when set.
+        cursor.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS proposal_signatures_envelope_id_unique_nn
+            ON proposal_signatures (envelope_id)
+            WHERE envelope_id IS NOT NULL AND trim(envelope_id::text) <> ''
+            """
+        )
+    except Exception as ex:
+        print(f"[CLIENT_SIGN] schema note: {ex}")
+
+
+def _merge_proposal_pdf_and_signature_page(proposal_pdf_bytes: bytes, signature_png_bytes: bytes):
+    """Append a signature page to the proposal PDF using ReportLab + PyPDF2."""
+    from io import BytesIO
+
+    from PyPDF2 import PdfMerger
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+
+    sig_buf = BytesIO()
+    c = canvas.Canvas(sig_buf, pagesize=letter)
+    width, height = letter
+    c.setFont('Helvetica-Bold', 14)
+    c.drawString(72, height - 72, 'Electronic signature')
+    c.setFont('Helvetica', 10)
+    c.drawString(72, height - 92, 'By signing below, the signer agrees to the proposal as shown.')
+    img = ImageReader(BytesIO(signature_png_bytes))
+    c.drawImage(img, 72, height - 280, width=320, height=120, preserveAspectRatio=True, mask='auto')
+    c.showPage()
+    c.save()
+    sig_buf.seek(0)
+    sig_pdf_bytes = sig_buf.getvalue()
+
+    merger = PdfMerger()
+    merger.append(BytesIO(proposal_pdf_bytes))
+    merger.append(BytesIO(sig_pdf_bytes))
+    out = BytesIO()
+    merger.write(out)
+    merger.close()
+    return out.getvalue()
+
+
+def _stamp_signature_onto_signature_page(
+    proposal_pdf_bytes: bytes,
+    signature_png_bytes: bytes,
+):
+    """Overlay the signature PNG onto the existing Signature page (anchor: /sig1/).
+
+    This keeps the signature inside the proposal PDF instead of appending a separate page.
+    """
+    from io import BytesIO
+
+    from PyPDF2 import PdfReader, PdfWriter
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.utils import ImageReader
+
+    reader = PdfReader(BytesIO(proposal_pdf_bytes))
+    writer = PdfWriter()
+
+    target_idx = None
+    for i, page in enumerate(reader.pages):
+        try:
+            txt = page.extract_text() or ''
+        except Exception:
+            txt = ''
+        if '/sig1/' in txt:
+            target_idx = i
+            break
+
+    if target_idx is None:
+        target_idx = max(0, len(reader.pages) - 1)
+
+    for i, page in enumerate(reader.pages):
+        if i != target_idx:
+            writer.add_page(page)
+            continue
+
+        try:
+            mb = page.mediabox
+            page_w = float(mb.width)
+            page_h = float(mb.height)
+        except Exception:
+            # Fallback to A4 in points.
+            page_w, page_h = 595.2756, 841.8898
+
+        overlay_buf = BytesIO()
+        c = canvas.Canvas(overlay_buf, pagesize=(page_w, page_h))
+
+        img = ImageReader(BytesIO(signature_png_bytes))
+
+        # Place signature in a "frame" area on the signature page.
+        # Coordinates are in PDF points from bottom-left.
+        x = 72
+        y = page_h * 0.42
+        max_w = page_w - 2 * 72
+        max_h = 90
+        c.drawImage(
+            img,
+            x,
+            y,
+            width=max_w,
+            height=max_h,
+            preserveAspectRatio=True,
+            mask='auto',
+            anchor='c',
+        )
+        c.showPage()
+        c.save()
+        overlay_buf.seek(0)
+
+        overlay_pdf = PdfReader(overlay_buf)
+        try:
+            page.merge_page(overlay_pdf.pages[0])
+        except Exception:
+            # Older PyPDF2 compatibility
+            page.mergePage(overlay_pdf.pages[0])
+        writer.add_page(page)
+
+    out = BytesIO()
+    writer.write(out)
+    return out.getvalue()
 
 
 # ============================================================================
@@ -1516,11 +1721,15 @@ def get_client_proposal_details(proposal_id):
             if not ok:
                 conn.commit()
                 return session_err, session_code
+
+            _ensure_in_app_signing_schema(cursor)
             
             column_info = _get_proposal_column_info(cursor)
             client_name_expr = column_info['client_name_expr']
             client_email_expr = column_info['client_email_expr']
             columns = column_info['columns']
+
+            sections_select_sql = ', p.sections' if 'sections' in columns else ''
 
             if 'user_id' in columns:
                 owner_select_expr = 'p.user_id'
@@ -1558,6 +1767,7 @@ def get_client_proposal_details(proposal_id):
                     {client_email_expr} AS client_email,
                     {owner_select_expr} AS user_id,
                     u.full_name as owner_name, u.email as owner_email
+                    {sections_select_sql}
                     {engagement_select_sql}
                 FROM proposals p
                 {user_join_clause}
@@ -1604,9 +1814,15 @@ def get_client_proposal_details(proposal_id):
             if version_info:
                 proposal_dict['version_number'] = version_info['version_number']
                 proposal_dict['version_created_at'] = version_info['created_at']
+
+            proposal_dict['signing_payload_hash'] = _compute_signing_payload_hash(
+                proposal_dict.get('title'),
+                proposal_dict.get('content'),
+                proposal_dict.get('sections'),
+            )
             
             cursor.execute("""
-                SELECT envelope_id, signing_url, status, sent_at, signed_at
+                SELECT envelope_id, signing_url, status, sent_at, signed_at, signed_document_url
                 FROM proposal_signatures
                 WHERE proposal_id = %s
                 ORDER BY sent_at DESC
@@ -1800,154 +2016,16 @@ def client_approve_proposal(proposal_id):
             proposal = cursor.fetchone()
             if not proposal:
                 return {'detail': 'Proposal not found or access denied'}, 404
-            
-            # Check if DocuSign envelope already exists
-            cursor.execute("""
-                SELECT envelope_id, signing_url, status
-                FROM proposal_signatures
-                WHERE proposal_id = %s
-                ORDER BY sent_at DESC
-                LIMIT 1
-            """, (proposal_id,))
-            
-            existing_signature = cursor.fetchone()
-            
-            # If we have a valid signing URL, return it
-            signing_url = None
-            envelope_id = None
-            
-            if existing_signature and existing_signature.get('signing_url'):
-                status = existing_signature.get('status', '').lower()
-                if status not in ['completed', 'declined', 'voided']:
-                    signing_url = existing_signature['signing_url']
-                    envelope_id = existing_signature['envelope_id']
-            
-            # If no valid signing URL, create a new DocuSign envelope
-            if not signing_url:
-                try:
-                    from api.utils.helpers import generate_proposal_pdf, create_docusign_envelope
-                    import os
-                    
-                    # Generate PDF
-                    pdf_content = generate_proposal_pdf(
-                        proposal_id=proposal_id,
-                        title=proposal['title'],
-                        content=proposal.get('content', ''),
-                        client_name=proposal.get('client_name') or signer_name,
-                        client_email=client_email
-                    )
-                    
-                    # Create DocuSign envelope
-                    # Since we're on HTTP, DocuSign will open in a new tab (not embedded)
-                    # Use a return URL that points back to the client proposals page
-                    from api.utils.helpers import get_frontend_url
-                    frontend_url = get_frontend_url()
-                    # Use collaboration router to land in correct client viewer
-                    return_url = f"{frontend_url}/#/collaborate?token={invitation_token}&signed=true"
-                    
-                    envelope_result = create_docusign_envelope(
-                        proposal_id=proposal_id,
-                        pdf_bytes=pdf_content,
-                        signer_name=signer_name,
-                        signer_email=client_email,
-                        signer_title=signer_title,
-                        return_url=return_url
-                    )
 
-                    if envelope_result.get('disabled'):
-                        return {
-                            'detail': envelope_result.get('detail') or 'DocuSign disabled',
-                            'error': envelope_result.get('reason') or 'docusign_disabled',
-                        }, 501
-                    
-                    signing_url = envelope_result['signing_url']
-                    envelope_id = envelope_result['envelope_id']
-                    
-                    # Store signature record
-                    cursor.execute("""
-                        SELECT id FROM proposal_signatures WHERE proposal_id = %s
-                    """, (proposal_id,))
-                    existing = cursor.fetchone()
-                    
-                    if existing:
-                        # Update existing record
-                        cursor.execute("""
-                            UPDATE proposal_signatures 
-                            SET envelope_id = %s,
-                                signer_name = %s,
-                                signer_email = %s,
-                                signer_title = %s,
-                                signing_url = %s,
-                                status = %s,
-                                sent_at = NOW()
-                            WHERE proposal_id = %s
-                        """, (
-                            envelope_id,
-                            signer_name,
-                            client_email,
-                            signer_title,
-                            signing_url,
-                            'sent',
-                            proposal_id
-                        ))
-                    else:
-                        # Insert new record
-                        cursor.execute("""
-                            INSERT INTO proposal_signatures 
-                            (proposal_id, envelope_id, signer_name, signer_email, signer_title, 
-                             signing_url, status, created_by)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, NULL)
-                        """, (
-                            proposal_id,
-                            envelope_id,
-                            signer_name,
-                            client_email,
-                            signer_title,
-                            signing_url,
-                            'sent'
-                        ))
-
-                    configured, err_or_hash, status = _require_identity_configured(cursor, proposal_id)
-                    if not configured:
-                        return err_or_hash, status
-
-                    allowed, err_payload, status = _require_unlocked_for_invitation(cursor, invitation_token, proposal_id)
-                    if not allowed:
-                        return err_payload, status
-
-                    cursor.execute('SELECT status FROM proposals WHERE id = %s', (proposal_id,))
-                    srow = cursor.fetchone()
-                    old_status = srow.get('status') if isinstance(srow, dict) else (srow[0] if srow else None)
-
-                    cursor.execute(
-                        """
-                        UPDATE proposals 
-                        SET status = 'Sent for Signature', updated_at = NOW()
-                        WHERE id = %s
-                        """,
-                        (proposal_id,),
-                    )
-
-                    conn.commit()
-
-                    if old_status is not None and old_status != 'Sent for Signature':
-                        log_status_change(proposal_id, None, old_status, 'Sent for Signature')
-
-                    print(f"✅ Created DocuSign envelope for proposal {proposal_id} (client: {client_email})")
-                    
-                except ImportError:
-                    return {'detail': 'DocuSign integration not available'}, 503
-                except Exception as docusign_error:
-                    print(f"❌ DocuSign error: {docusign_error}")
-                    traceback.print_exc()
-                    return {'detail': f'Failed to create signing URL: {str(docusign_error)}'}, 500
-            
+            # First-party signing only — client completes signing via POST .../sign in the viewer.
+            conn.commit()
             return {
-                'message': 'Proposal ready for signing',
+                'message': 'Use Sign in the proposal viewer to complete first-party electronic signing.',
                 'proposal_id': proposal['id'],
-                'signing_url': signing_url,
-                'envelope_id': envelope_id,
-                'status': 'Sent for Signature'
+                'signing_url': None,
+                'envelope_id': None,
+                'status': proposal.get('status'),
+                'code': 'in_app_signing_only',
             }, 200
             
     except Exception as e:
@@ -2176,7 +2254,7 @@ def get_client_signing_url(proposal_id):
                 # Use a return URL that points back to the client proposals page
                 frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:8081')
                 # Use collaboration router to land in correct client viewer
-                return_url = f"{frontend_url}/#/collaborate?token={invitation_token}&signed=true"
+                return_url = f"{frontend_url}/?token={invitation_token}&signed=true#/collaborate"
                 
                 envelope_result = create_docusign_envelope(
                     proposal_id=proposal_id,
@@ -2460,298 +2538,11 @@ def client_sign_proposal_token_api(proposal_id):
 
 @bp.post("/api/client/proposals/<int:proposal_id>/docusign/signing-url")
 def client_docusign_signing_url_api(proposal_id):
-    """Mint a fresh DocuSign recipient signing URL for an existing envelope.
-
-    Recipient view URLs can expire quickly. The client portal should call this
-    right before redirecting the client to DocuSign so the link is signable.
-    """
-    try:
-        import time
-        data = request.get_json(silent=True) or {}
-        token = unquote(str(data.get('token') or request.args.get('token') or '')).strip().strip('"').strip("'")
-        if not token:
-            return {'detail': 'Token is required'}, 400
-
-        with get_db_connection() as conn:
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-            _ensure_identity_schema(cursor)
-
-            invitation_token = _resolve_invitation_token(cursor, token)
-
-            inv_info = _get_invitation_column_info(cursor)
-            token_col = inv_info['token_col']
-            email_col = inv_info['email_col']
-            expires_col = inv_info['expires_col']
-            if not token_col or not email_col:
-                return {'detail': 'Client invitations not configured'}, 500
-
-            expires_select = (
-                sql.Identifier(expires_col)
-                if expires_col
-                else sql.SQL('NULL::timestamp')
-            )
-            cursor.execute(
-                sql.SQL(
-                    """
-                    SELECT proposal_id, {email_col} as invited_email, {expires_col} as expires_at
-                    FROM collaboration_invitations
-                    WHERE {token_col} = %s
-                    """
-                ).format(
-                    email_col=sql.Identifier(email_col),
-                    expires_col=expires_select,
-                    token_col=sql.Identifier(token_col),
-                ),
-                (invitation_token,),
-            )
-            invitation = cursor.fetchone()
-            if not invitation:
-                return {'detail': 'Invalid access token'}, 404
-
-            expires_at = _as_utc_aware(invitation.get('expires_at'))
-            if expires_at and _now_utc() > expires_at:
-                return {'detail': 'Access token has expired'}, 403
-
-            token_proposal_id = invitation.get('proposal_id')
-            if token_proposal_id is not None and str(token_proposal_id) != str(proposal_id):
-                # Some deployments may have a legacy/mismatched schema where
-                # collaboration_invitations.proposal_id is not directly comparable
-                # to proposals.id (e.g., uuid vs int). Fall back to validating
-                # the invited email against the proposal's client_email.
-                try:
-                    cursor.execute(
-                        """
-                        SELECT client_email
-                        FROM proposals
-                        WHERE id = %s
-                        """,
-                        (proposal_id,),
-                    )
-                    prow = cursor.fetchone()
-                    proposal_email = (prow.get('client_email') if isinstance(prow, dict) else None) or ''
-                    invited_email = (invitation.get('invited_email') or '').strip()
-                    if not proposal_email or not invited_email or proposal_email.strip().lower() != invited_email.strip().lower():
-                        print(
-                            "[CLIENT_PORTAL] signing-url blocked: token_proposal_id mismatch "
-                            f"token_proposal_id={token_proposal_id} proposal_id={proposal_id} invited_email={invited_email} proposal_email={proposal_email}"
-                        )
-                        return {'detail': 'Token is not valid for this proposal'}, 403
-                    print(
-                        "[CLIENT_PORTAL] signing-url: token_proposal_id mismatch but email matches; allowing access "
-                        f"token_proposal_id={token_proposal_id} proposal_id={proposal_id}"
-                    )
-                except Exception:
-                    return {'detail': 'Token is not valid for this proposal'}, 403
-
-            # Signing URLs must be accessible from the client portal using only the
-            # collaboration invitation token. Identity-unlock gating can block
-            # embedded signing (returning 403) even when the token is valid.
-            # This endpoint therefore relies on:
-            # - invitation token validity + expiry
-            # - proposal scope validation
-            # and does not require identity unlock.
-
-            signer_email = (invitation.get('invited_email') or '').strip() or None
-            signer_name = (data.get('signer_name') or '').strip() or None
-            if not signer_name:
-                signer_name = signer_email
-            if not signer_email:
-                return {'detail': 'Client email not found for this invitation'}, 500
-
-            # For portal signing we use a captive (embedded) signer so DocuSign
-            # will not send a signing email and the portal URL is signable.
-            client_user_id = invitation_token
-
-            t0 = time.monotonic()
-            print(f"[CLIENT_PORTAL] signing-url start proposal_id={proposal_id}")
-
-            cursor.execute(
-                """
-                SELECT envelope_id, status
-                FROM proposal_signatures
-                WHERE proposal_id = %s
-                ORDER BY sent_at DESC
-                LIMIT 1
-                """,
-                (proposal_id,),
-            )
-            sig = cursor.fetchone()
-
-            envelope_id = sig.get('envelope_id') if isinstance(sig, dict) else None
-
-            from api.utils.helpers import (
-                get_frontend_url,
-                create_docusign_signing_url,
-                create_docusign_envelope,
-                generate_proposal_pdf,
-            )
-            frontend_url = get_frontend_url()
-            return_url = f"{frontend_url}/#/client/proposals?token={invitation_token}&signed=true"
-
-            # If an envelope exists, ensure it's a captive recipient envelope.
-            # If not (legacy remote signing), create a new envelope for portal signing.
-            needs_new_envelope = envelope_id is None
-            if envelope_id is not None:
-                try:
-                    t_recips0 = time.monotonic()
-                    from docusign_esign import ApiClient, EnvelopesApi
-                    from api.utils.docusign_utils import get_docusign_jwt_token
-                    access_token = get_docusign_jwt_token()
-                    account_id = os.getenv('DOCUSIGN_ACCOUNT_ID')
-                    base_path = os.getenv('DOCUSIGN_BASE_PATH') or os.getenv(
-                        'DOCUSIGN_BASE_URL', 'https://demo.docusign.net/restapi'
-                    )
-                    api_client = ApiClient()
-                    api_client.host = base_path
-                    api_client.set_default_header("Authorization", f"Bearer {access_token}")
-                    env_api = EnvelopesApi(api_client)
-                    recipients = env_api.list_recipients(account_id, envelope_id)
-                    signers = getattr(recipients, 'signers', None) or []
-                    target = (signer_email or '').strip().lower()
-                    found = None
-                    for s in signers:
-                        try:
-                            if (getattr(s, 'email', '') or '').strip().lower() == target:
-                                found = s
-                                break
-                        except Exception:
-                            continue
-                    existing_client_user_id = getattr(found, 'client_user_id', None) if found is not None else None
-                    if not existing_client_user_id:
-                        needs_new_envelope = True
-                    print(
-                        "[CLIENT_PORTAL] signing-url inspected existing envelope "
-                        f"envelope_id={envelope_id} ms={(time.monotonic() - t_recips0) * 1000:.0f} captive={'yes' if existing_client_user_id else 'no'}"
-                    )
-                except Exception:
-                    # If we cannot inspect recipients, fall back to the existing envelope.
-                    needs_new_envelope = False
-
-            if needs_new_envelope:
-                # Fetch proposal content and generate a fresh PDF
-                t_pdf0 = time.monotonic()
-                cursor.execute(
-                    """
-                    SELECT title, content
-                    FROM proposals
-                    WHERE id = %s
-                    """,
-                    (proposal_id,),
-                )
-                prow = cursor.fetchone()
-                if not prow:
-                    return {'detail': 'Proposal not found'}, 404
-                title = prow.get('title') if isinstance(prow, dict) else None
-                content = prow.get('content') if isinstance(prow, dict) else None
-                pdf_content = generate_proposal_pdf(
-                    proposal_id=proposal_id,
-                    title=title or f"Proposal {proposal_id}",
-                    content=content or '',
-                    client_name=signer_name,
-                    client_email=signer_email,
-                )
-                print(f"[CLIENT_PORTAL] signing-url pdf generated ms={(time.monotonic() - t_pdf0) * 1000:.0f}")
-
-                t_env0 = time.monotonic()
-                env = create_docusign_envelope(
-                    proposal_id=proposal_id,
-                    pdf_bytes=pdf_content,
-                    signer_name=signer_name,
-                    signer_email=signer_email,
-                    signer_title='',
-                    return_url=return_url,
-                    client_user_id=client_user_id,
-                )
-                print(f"[CLIENT_PORTAL] signing-url envelope created ms={(time.monotonic() - t_env0) * 1000:.0f}")
-                if isinstance(env, dict) and env.get('disabled'):
-                    return env, 501
-                envelope_id = env.get('envelope_id') if isinstance(env, dict) else None
-                if not envelope_id:
-                    return {'detail': 'Unable to create DocuSign envelope'}, 500
-
-                # If create_docusign_envelope already minted a recipient-view URL,
-                # reuse it to avoid an extra DocuSign roundtrip.
-                signing_url = env.get('signing_url') if isinstance(env, dict) else None
-
-                # Upsert signature record (portal envelope)
-                cursor.execute(
-                    """
-                    SELECT id
-                    FROM proposal_signatures
-                    WHERE proposal_id = %s
-                    """,
-                    (proposal_id,),
-                )
-                existing = cursor.fetchone()
-                if existing:
-                    cursor.execute(
-                        """
-                        UPDATE proposal_signatures
-                        SET envelope_id = %s,
-                            signer_name = %s,
-                            signer_email = %s,
-                            signer_title = %s,
-                            signing_url = %s,
-                            status = %s,
-                            sent_at = NOW()
-                        WHERE proposal_id = %s
-                        """,
-                        (envelope_id, signer_name, signer_email, '', signing_url, 'sent', proposal_id),
-                    )
-                else:
-                    cursor.execute(
-                        """
-                        INSERT INTO proposal_signatures
-                        (proposal_id, envelope_id, signer_name, signer_email, signer_title, signing_url, status, created_by)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, NULL)
-                        """,
-                        (proposal_id, envelope_id, signer_name, signer_email, '', signing_url, 'sent'),
-                    )
-
-                cursor.execute(
-                    """
-                    UPDATE proposals
-                    SET status = 'Sent for Signature', updated_at = NOW()
-                    WHERE id = %s
-                    """,
-                    (proposal_id,),
-                )
-                conn.commit()
-
-                if signing_url:
-                    print(f"[CLIENT_PORTAL] signing-url done proposal_id={proposal_id} ms={(time.monotonic() - t0) * 1000:.0f} reused_url=yes")
-                    return {
-                        'envelope_id': envelope_id,
-                        'signing_url': signing_url,
-                    }, 200
-
-            t_view0 = time.monotonic()
-            result = create_docusign_signing_url(
-                envelope_id=envelope_id,
-                signer_name=signer_name,
-                signer_email=signer_email,
-                return_url=return_url,
-                client_user_id=client_user_id,
-            )
-            print(f"[CLIENT_PORTAL] signing-url recipient-view ms={(time.monotonic() - t_view0) * 1000:.0f}")
-
-            if isinstance(result, dict) and result.get('disabled'):
-                return result, 501
-
-            signing_url = (result or {}).get('signing_url') if isinstance(result, dict) else None
-            if not signing_url:
-                return {'detail': 'Unable to create signing URL'}, 500
-
-            print(f"[CLIENT_PORTAL] signing-url done proposal_id={proposal_id} ms={(time.monotonic() - t0) * 1000:.0f} reused_url=no")
-            return {
-                'envelope_id': envelope_id,
-                'signing_url': signing_url,
-            }, 200
-    except Exception as e:
-        print(f"❌ Error creating client DocuSign signing URL: {e}")
-        traceback.print_exc()
-        return {'detail': str(e)}, 500
+    """Retired — DocuSign URLs are no longer minted; sign in-app via POST .../sign."""
+    return {
+        "detail": "DocuSign signing URLs are retired. Open the proposal with View and sign in-app.",
+        "code": "docusign_retired",
+    }, 410
 
 
 @bp.get("/api/client/proposals/<int:proposal_id>/docusign/signed-pdf")
@@ -2872,7 +2663,11 @@ def client_docusign_signed_pdf_api(proposal_id):
         envelopes_api = EnvelopesApi(api_client)
 
         # 'combined' returns a PDF that includes all docs plus the certificate
-        pdf_bytes = envelopes_api.get_document(account_id, envelope_id, document_id='combined')
+        pdf_bytes = envelopes_api.get_document(
+            account_id=account_id,
+            envelope_id=envelope_id,
+            document_id='combined',
+        )
         if isinstance(pdf_bytes, str):
             pdf_bytes = pdf_bytes.encode('utf-8')
 
@@ -2980,21 +2775,41 @@ def get_client_dashboard_overview_api():
             if c_row:
                 client_id = c_row.get('id') if isinstance(c_row, dict) else c_row[0]
 
-            if client_id and proposal_ids:
-                cursor.execute(
-                    """
-                    SELECT a.event_type, a.created_at, a.metadata,
-                           p.id::text as proposal_id, p.title as proposal_title, p.status as proposal_status
-                    FROM proposal_client_activity a
-                    JOIN proposals p ON p.id = a.proposal_id
-                    WHERE a.client_id = %s
-                      AND a.proposal_id::text = ANY(%s)
-                    ORDER BY a.created_at DESC
-                    LIMIT 10
-                    """,
-                    (client_id, proposal_ids),
-                )
-                recent_activity = cursor.fetchall() or []
+            print(f"[NOTIFY_DEBUG] client_email={client_email}, client_id={client_id}, proposal_ids={proposal_ids}")
+
+            if proposal_ids:
+                if client_id:
+                    cursor.execute(
+                        """
+                        SELECT a.event_type, a.created_at, a.metadata,
+                               p.id::text as proposal_id, p.title as proposal_title, p.status as proposal_status
+                        FROM proposal_client_activity a
+                        JOIN proposals p ON p.id = a.proposal_id
+                        WHERE (a.client_id = %s OR a.proposal_id::text = ANY(%s))
+                          AND a.proposal_id::text = ANY(%s)
+                        ORDER BY a.created_at DESC
+                        LIMIT 10
+                        """,
+                        (client_id, proposal_ids, proposal_ids),
+                    )
+                    recent_activity = cursor.fetchall() or []
+                else:
+                    # Fallback: query by proposal_ids only (handles case where client wasn't linked during send)
+                    cursor.execute(
+                        """
+                        SELECT a.event_type, a.created_at, a.metadata,
+                               p.id::text as proposal_id, p.title as proposal_title, p.status as proposal_status
+                        FROM proposal_client_activity a
+                        JOIN proposals p ON p.id = a.proposal_id
+                        WHERE a.proposal_id::text = ANY(%s)
+                        ORDER BY a.created_at DESC
+                        LIMIT 10
+                        """,
+                        (proposal_ids,),
+                    )
+                    recent_activity = cursor.fetchall() or []
+
+            print(f"[NOTIFY_DEBUG] activity_count={len(recent_activity)}")
 
             cutoff_sql = "NOW() - (%s || ' weeks')::interval"
             if proposal_ids:
@@ -3362,6 +3177,262 @@ def end_client_session():
         traceback.print_exc()
         return {'detail': str(e)}, 500
 
+
+@bp.post("/api/client/proposals/<int:proposal_id>/sign")
+def client_sign_proposal_in_app(proposal_id):
+    """First-party signature: PNG + consent + payload hash; stores merged PDF (no DocuSign)."""
+    try:
+        data = request.get_json(silent=True) or {}
+        token = _normalize_access_token(data.get('token'))
+        signing_payload_hash = (data.get('signing_payload_hash') or '').strip()
+        signer_name = (data.get('signer_name') or '').strip()
+        consent_version = (data.get('consent_version') or 'v1').strip()
+        consent_acknowledged = bool(data.get('consent_acknowledged'))
+        sig_b64 = data.get('signature_png_base64') or ''
+
+        if not token or not signing_payload_hash or not signer_name:
+            return {'detail': 'token, signing_payload_hash, and signer_name are required'}, 400
+        if not consent_acknowledged:
+            return {'detail': 'Consent must be acknowledged'}, 400
+        if not sig_b64:
+            return {'detail': 'signature_png_base64 is required'}, 400
+
+        device_id, session_token = _extract_client_device_session()
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            _ensure_identity_schema(cursor)
+            _ensure_client_device_session_schema(cursor)
+            _ensure_in_app_signing_schema(cursor)
+
+            invitation_token = _resolve_invitation_token(cursor, token)
+            invitation, err, code = _lookup_invitation_by_token(cursor, invitation_token)
+            if err:
+                return err, code
+
+            ok, session_err, session_code = _require_client_device_session(
+                cursor, invitation_token, device_id, session_token
+            )
+            if not ok:
+                conn.commit()
+                return session_err, session_code
+
+            expires_at = _as_utc_aware(invitation.get('expires_at'))
+            if expires_at and _now_utc() > expires_at:
+                return {'detail': 'Access token has expired'}, 403
+
+            # Identity verification is optional. If configured for the proposal, require the
+            # identity unlock token. Otherwise, MojoAuth device-session verification is enough.
+            expected_identity_hash = _proposal_identity_hash(cursor, proposal_id)
+            if expected_identity_hash:
+                allowed, err_payload, status = _require_unlocked_for_invitation(
+                    cursor, invitation_token, proposal_id
+                )
+                if not allowed:
+                    return err_payload, status
+
+            column_info = _get_proposal_column_info(cursor)
+            cols = column_info['columns']
+            sel_parts = ['p.id', 'p.title', 'p.content', 'p.status', 'p.client_email']
+            if 'sections' in cols:
+                sel_parts.append('p.sections')
+            cursor.execute(
+                f"""
+                SELECT {', '.join(sel_parts)}
+                FROM proposals p
+                WHERE p.id = %s
+                """,
+                (proposal_id,),
+            )
+            proposal = cursor.fetchone()
+            if not proposal:
+                return {'detail': 'Proposal not found or access denied'}, 404
+
+            invited_email = (invitation.get('invited_email') or '').strip().lower()
+            pem = (proposal.get('client_email') or '').strip().lower()
+            if pem and invited_email and pem != invited_email:
+                return {'detail': 'Proposal not found or access denied'}, 404
+
+            expected_hash = _compute_signing_payload_hash(
+                proposal.get('title'),
+                proposal.get('content'),
+                proposal.get('sections'),
+            )
+            if signing_payload_hash != expected_hash:
+                return {
+                    'detail': 'Proposal was updated; refresh the page and review again before signing.',
+                    'code': 'signing_payload_stale',
+                    'expected_signing_payload_hash': expected_hash,
+                }, 409
+
+            status_lower = str(proposal.get('status') or '').lower()
+            if 'client signed' in status_lower or (
+                'signed' in status_lower and 'sent' not in status_lower
+            ):
+                return {'detail': 'Proposal is already signed'}, 400
+
+            cursor.execute(
+                """
+                SELECT status FROM proposal_signatures
+                WHERE proposal_id = %s
+                ORDER BY COALESCE(signed_at, sent_at) DESC NULLS LAST
+                LIMIT 1
+                """,
+                (proposal_id,),
+            )
+            sig_row = cursor.fetchone()
+            if sig_row and str(sig_row.get('status') or '').lower() == 'completed':
+                return {'detail': 'Proposal is already signed'}, 400
+
+            try:
+                raw_png = base64.b64decode(sig_b64)
+            except Exception:
+                return {'detail': 'Invalid signature_png_base64'}, 400
+
+            try:
+                import cloudinary.uploader
+            except ImportError:
+                return {'detail': 'Cloudinary not configured'}, 503
+
+            from api.utils.helpers import generate_proposal_pdf
+
+            client_email = invitation['invited_email']
+            pdf_bytes = generate_proposal_pdf(
+                proposal_id=proposal_id,
+                title=proposal.get('title') or 'Proposal',
+                content=proposal.get('content') or '',
+                client_name=signer_name,
+                client_email=client_email,
+            )
+            merged_pdf_bytes = _stamp_signature_onto_signature_page(pdf_bytes, raw_png)
+
+            merged_upload = cloudinary.uploader.upload(
+                BytesIO(merged_pdf_bytes),
+                resource_type='raw',
+                folder='proposal_builder/in_app_signed',
+                access_mode='public',
+            )
+            merged_url = merged_upload.get('secure_url') or merged_upload.get('url')
+            if not merged_url:
+                return {'detail': 'Failed to store signed PDF'}, 502
+
+            sig_png_upload = cloudinary.uploader.upload(
+                BytesIO(raw_png),
+                resource_type='image',
+                folder='proposal_builder/in_app_signatures',
+                access_mode='public',
+            )
+            sig_png_url = sig_png_upload.get('secure_url') or sig_png_upload.get('url')
+
+            cursor.execute(
+                """
+                INSERT INTO proposal_signatures (
+                    proposal_id, envelope_id, signer_name, signer_email, signer_title,
+                    status, signing_url, signed_at, signed_document_url,
+                    signature_method, content_hash_at_sign, consent_version
+                )
+                VALUES (%s, NULL, %s, %s, %s, %s, NULL, NOW(), %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (
+                    proposal_id,
+                    signer_name,
+                    client_email,
+                    '',
+                    'completed',
+                    merged_url,
+                    'in_app',
+                    signing_payload_hash,
+                    consent_version,
+                ),
+            )
+
+            old_status = proposal.get('status')
+
+            cursor.execute(
+                """
+                UPDATE proposals SET status = 'Client Signed', updated_at = NOW()
+                WHERE id = %s
+                """,
+                (proposal_id,),
+            )
+
+            conn.commit()
+
+            try:
+                if old_status is not None and old_status != 'Client Signed':
+                    log_status_change(proposal_id, None, old_status, 'Client Signed')
+            except Exception:
+                pass
+
+            return {
+                'success': True,
+                'signed_document_url': merged_url,
+                'signature_image_url': sig_png_url,
+                'proposal_id': proposal_id,
+                'status': 'Client Signed',
+            }, 200
+
+    except Exception as e:
+        print(f"❌ Error in-app signing: {e}")
+        traceback.print_exc()
+        return {'detail': str(e)}, 500
+
+
+@bp.get("/api/client/proposals/<int:proposal_id>/signed-document")
+def client_download_signed_document(proposal_id):
+    """Redirect to stored signed PDF URL for first-party (and legacy uploaded) signatures."""
+    try:
+        token = unquote(str(request.args.get('token') or '')).strip().strip('"').strip("'")
+        if not token:
+            return {'detail': 'Access token required'}, 400
+
+        device_id, session_token = _extract_client_device_session()
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            _ensure_identity_schema(cursor)
+            _ensure_client_device_session_schema(cursor)
+
+            invitation_token = _resolve_invitation_token(cursor, token)
+            invitation, err, code = _lookup_invitation_by_token(cursor, invitation_token)
+            if err:
+                return err, code
+
+            ok, session_err, session_code = _require_client_device_session(
+                cursor, invitation_token, device_id, session_token
+            )
+            if not ok:
+                conn.commit()
+                return session_err, session_code
+
+            cursor.execute(
+                """
+                SELECT signed_document_url, status
+                FROM proposal_signatures
+                WHERE proposal_id = %s AND signed_document_url IS NOT NULL
+                  AND signed_document_url <> ''
+                ORDER BY COALESCE(signed_at, sent_at) DESC NULLS LAST
+                LIMIT 1
+                """,
+                (proposal_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return {'detail': 'No signed document available'}, 404
+
+            url = (row.get('signed_document_url') or '').strip()
+            if not url:
+                return {'detail': 'No signed document available'}, 404
+
+            return redirect(url, code=302)
+
+    except Exception as e:
+        print(f"❌ signed-document redirect: {e}")
+        traceback.print_exc()
+        return {'detail': str(e)}, 500
 
 
 

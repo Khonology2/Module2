@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../config/app_constants.dart';
+import '../../services/asset_service.dart';
+import '../../theme/manager_theme_controller.dart';
 import '../../theme/premium_theme.dart';
 
 class FinanceSidebar extends StatelessWidget {
@@ -13,6 +14,8 @@ class FinanceSidebar extends StatelessWidget {
     this.bottomLabel = 'Sign Out',
     this.showAudit = false,
     this.pendingBadge,
+    this.managerChrome,
+    this.showCollapseToggle = false,
   });
 
   final bool isCollapsed;
@@ -22,149 +25,232 @@ class FinanceSidebar extends StatelessWidget {
   final String bottomLabel;
   final bool showAudit;
   final int? pendingBadge;
+  final ManagerChromeTheme? managerChrome;
+  final bool showCollapseToggle;
 
+  static const double collapsedWidth = 76.0;
+  static const double expandedWidth = 220.0;
   static const Color _base = Color(0xFF252525);
-  static const Color _accent = PremiumTheme.teal;
+  static const Color _accent = Color(0xFFC10D00);
 
   @override
   Widget build(BuildContext context) {
+    final c = managerChrome;
+    final effectiveCollapsed = showCollapseToggle ? isCollapsed : false;
     final items = <_FinanceNavItem>[
-      const _FinanceNavItem(label: 'Dashboard', icon: Icons.dashboard_outlined),
+      const _FinanceNavItem(
+        label: 'Dashboard',
+        assetPath: 'assets/images/Dahboard.png',
+      ),
       _FinanceNavItem(
         label: 'Proposals',
-        icon: Icons.description_outlined,
+        assetPath: 'assets/images/new icons for manager/proposals.png',
         badge: pendingBadge,
       ),
       const _FinanceNavItem(
         label: 'Client Management',
-        icon: Icons.business_outlined,
+        assetPath:
+            'assets/images/finance_manager_new_icons/client_management_Sidebar.png',
       ),
       if (showAudit)
         const _FinanceNavItem(
           label: 'Audit',
-          icon: Icons.receipt_long_outlined,
+          assetPath:
+              'assets/images/finance_manager_new_icons/Audit_sidebar.png',
         ),
-      const _FinanceNavItem(label: 'Analytics', icon: Icons.analytics_outlined),
-      const _FinanceNavItem(label: 'Settings', icon: Icons.settings_outlined),
+      const _FinanceNavItem(
+        label: 'Analytics',
+        assetPath: 'assets/images/analytics.png',
+      ),
     ];
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      width: isCollapsed ? 90.0 : 250.0,
+      width: effectiveCollapsed ? collapsedWidth : expandedWidth,
       decoration: BoxDecoration(
-        color: _base,
+        color: c?.sidebarBackground ?? _base,
         border: Border(
           right: BorderSide(
-            color: PremiumTheme.glassWhiteBorder,
+            color: c?.sidebarRightBorder ?? PremiumTheme.glassWhiteBorder,
             width: 1,
           ),
         ),
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final effectiveCollapsed = constraints.maxWidth < 160;
+      child: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(effectiveCollapsed, c),
+            Expanded(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.only(
+                        top: effectiveCollapsed ? 8 : 6,
+                        left: effectiveCollapsed ? 0 : 4,
+                        right: effectiveCollapsed ? 0 : 4,
+                      ),
+                      child: Column(
+                        children: [
+                          for (final item in items)
+                            _FinanceSidebarNavItem(
+                              label: item.label,
+                              assetPath: item.assetPath,
+                              badge: item.badge,
+                              isActive: currentPage == item.label,
+                              isCollapsed: effectiveCollapsed,
+                              onTap: () => onSelect(item.label),
+                              accent: _accent,
+                              managerChrome: c,
+                            ),
+                          SizedBox(height: effectiveCollapsed ? 18 : 40),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: effectiveCollapsed ? 8 : 10),
+                  _FinanceSidebarNavItem(
+                    label: 'Account Profile',
+                    assetPath: 'assets/images/User_Profile.png',
+                    badge: null,
+                    isActive: currentPage == 'Account Profile',
+                    isCollapsed: effectiveCollapsed,
+                    onTap: () => onSelect('Account Profile'),
+                    accent: _accent,
+                    managerChrome: c,
+                    isBottomItem: true,
+                  ),
+                  if (!effectiveCollapsed)
+                    const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      child: Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Color(0xFFFFFFFF),
+                      ),
+                    ),
+                  _FinanceSidebarNavItem(
+                    label: bottomLabel,
+                    assetPath: 'assets/images/Logout_KhonoBuzz.png',
+                    badge: null,
+                    isActive: false,
+                    isCollapsed: effectiveCollapsed,
+                    onTap: () => onSelect(bottomLabel),
+                    accent: _accent,
+                    managerChrome: c,
+                    isBottomItem: true,
+                  ),
+                  SizedBox(height: effectiveCollapsed ? 8 : 10),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-          return Column(
+  Color _subtleFill(ManagerChromeTheme? c) {
+    if (c == null) return Colors.white.withValues(alpha: 0.14);
+    return c.isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : Colors.black.withValues(alpha: 0.06);
+  }
+
+  Color _iconFg(ManagerChromeTheme? c) =>
+      c == null ? Colors.white : c.textPrimary;
+
+  Widget _buildHeader(bool effectiveCollapsed, ManagerChromeTheme? c) {
+    if (effectiveCollapsed) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        child: InkWell(
+          onTap: showCollapseToggle ? onToggle : null,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            height: 36,
+            decoration: BoxDecoration(
+              color: _subtleFill(c),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: showCollapseToggle
+                ? Icon(
+                    Icons.keyboard_arrow_right,
+                    color: _iconFg(c),
+                    size: 20,
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+      child: Stack(
+        children: [
+          if (showCollapseToggle)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: InkWell(
+                onTap: onToggle,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: _subtleFill(c),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.keyboard_arrow_left,
+                    color: _iconFg(c),
+                    size: 18,
+                  ),
+                ),
+              ),
+            ),
+          Column(
             children: [
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: InkWell(
-                  onTap: onToggle,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: _base.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.10),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          effectiveCollapsed
-                              ? Icons.keyboard_arrow_right
-                              : Icons.keyboard_arrow_left,
-                          color: Colors.white,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              const SizedBox(height: 2),
+              Image.asset(
+                'assets/images/new icons for manager/khonology_logo.png',
+                height: 22,
+                fit: BoxFit.contain,
               ),
-              const SizedBox(height: 44),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      for (final item in items)
-                        _FinanceSidebarNavItem(
-                          label: item.label,
-                          icon: item.icon,
-                          badge: item.badge,
-                          isActive: currentPage == item.label,
-                          isCollapsed: effectiveCollapsed,
-                          onTap: () => onSelect(item.label),
-                          accent: _accent,
-                          base: _base,
-                        ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
+              const SizedBox(height: 8),
+              Text(
+                'Welcome to',
+                style: TextStyle(
+                  color:
+                      c?.textSecondary ?? Colors.white.withValues(alpha: 0.7),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
                 ),
+                textAlign: TextAlign.center,
               ),
-              if (!effectiveCollapsed)
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  height: 1,
-                  color: const Color(0xFF2C3E50),
+              const SizedBox(height: 2),
+              Text(
+                'Proposal & SOW Builder',
+                style: TextStyle(
+                  color: _iconFg(c),
+                  fontSize: 12.8,
+                  fontWeight: FontWeight.w700,
                 ),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 12),
-              _FinanceSidebarNavItem(
-                label: bottomLabel,
-                icon: Icons.logout,
-                badge: null,
-                isActive: false,
-                isCollapsed: effectiveCollapsed,
-                onTap: () => onSelect(bottomLabel),
-                accent: _accent,
-                base: _base,
+              Container(
+                height: 1,
+                color: c?.divider ?? Colors.white.withValues(alpha: 0.14),
               ),
-              if (!effectiveCollapsed) ...[
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1F2E),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: const Color(0xFF2C3E50),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      AppConstants.fullVersion,
-                      style: const TextStyle(
-                        color: Color(0xFF9CA3AF),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 20),
             ],
-          );
-        },
+          ),
+        ],
       ),
     );
   }
@@ -172,38 +258,66 @@ class FinanceSidebar extends StatelessWidget {
 
 class _FinanceNavItem {
   final String label;
-  final IconData icon;
+  final String assetPath;
   final int? badge;
 
-  const _FinanceNavItem({required this.label, required this.icon, this.badge});
+  const _FinanceNavItem({
+    required this.label,
+    required this.assetPath,
+    this.badge,
+  });
 }
 
 class _FinanceSidebarNavItem extends StatelessWidget {
   const _FinanceSidebarNavItem({
     required this.label,
-    required this.icon,
+    required this.assetPath,
     required this.badge,
     required this.isActive,
     required this.isCollapsed,
     required this.onTap,
     required this.accent,
-    required this.base,
+    this.managerChrome,
+    this.isBottomItem = false,
   });
 
   final String label;
-  final IconData icon;
+  final String assetPath;
   final int? badge;
   final bool isActive;
   final bool isCollapsed;
   final VoidCallback onTap;
   final Color accent;
-  final Color base;
+  final ManagerChromeTheme? managerChrome;
+  final bool isBottomItem;
+
+  Color _idleRail(ManagerChromeTheme? c) => Colors.transparent;
+
+  Color _labelColor(ManagerChromeTheme? c, {required bool onAccent}) {
+    if (onAccent) return Colors.white;
+    if (c == null) return Colors.white;
+    return c.textPrimary;
+  }
+
+  Widget _buildNavIcon() {
+    final iconSize = isBottomItem ? 31.0 : 34.0;
+    return Center(
+      child: SizedBox(
+        width: iconSize,
+        height: iconSize,
+        child: AssetService.buildImageWidget(assetPath, fit: BoxFit.contain),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final c = managerChrome;
+    final displayLabel = label == 'Sign Out' ? 'Logout' : label;
+
     if (isCollapsed) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.symmetric(vertical: isBottomItem ? 4 : 6),
         child: Tooltip(
           message: label,
           child: Material(
@@ -215,24 +329,13 @@ class _FinanceSidebarNavItem extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
-                      color: base.withValues(alpha: 0.25),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isActive
-                            ? accent
-                            : Colors.white.withValues(alpha: 0.18),
-                        width: isActive ? 2 : 1,
-                      ),
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    padding: const EdgeInsets.all(6),
-                    child: Icon(
-                      icon,
-                      color: isActive ? Colors.white : Colors.white70,
-                      size: 22,
-                    ),
+                    child: _buildNavIcon(),
                   ),
                   if (badge != null)
                     Positioned(
@@ -242,18 +345,22 @@ class _FinanceSidebarNavItem extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.10),
+                          color: isActive
+                              ? Colors.white.withValues(alpha: 0.9)
+                              : Colors.white.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.14),
+                            color: isActive
+                                ? Colors.white.withValues(alpha: 0.9)
+                                : Colors.white.withValues(alpha: 0.14),
                           ),
                         ),
                         child: Text(
                           badge! > 99 ? '99+' : badge.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: isActive ? accent : Colors.white,
                             fontSize: 9,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
@@ -267,57 +374,37 @@ class _FinanceSidebarNavItem extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: isBottomItem ? 1 : 2,
+      ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            height: isBottomItem ? 38 : 40,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              color: isActive
-                  ? base.withValues(alpha: 0.30)
-                  : base.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isActive
-                    ? accent.withValues(alpha: 0.65)
-                    : Colors.white.withValues(alpha: 0.10),
-                width: 1,
-              ),
+              color: isActive ? accent : _idleRail(c),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: base.withValues(alpha: 0.25),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isActive
-                          ? accent
-                          : Colors.white.withValues(alpha: 0.18),
-                      width: isActive ? 2 : 1,
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(6),
-                  child: Icon(
-                    icon,
-                    color: isActive ? Colors.white : const Color(0xFFECF0F1),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
+                _buildNavIcon(),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    label,
+                    displayLabel,
                     style: TextStyle(
-                      color: isActive ? Colors.white : const Color(0xFFECF0F1),
-                      fontSize: 14,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                      color: _labelColor(c, onAccent: isActive),
+                      fontSize: isBottomItem
+                          ? 11.2
+                          : (displayLabel == 'Client Management' ? 11.4 : 11.8),
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                     ),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -326,28 +413,23 @@ class _FinanceSidebarNavItem extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.10),
+                      color: isActive
+                          ? Colors.white.withValues(alpha: 0.9)
+                          : Colors.white.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.12),
+                        color: isActive
+                            ? Colors.white.withValues(alpha: 0.9)
+                            : Colors.white.withValues(alpha: 0.12),
                       ),
                     ),
                     child: Text(
                       badge! > 99 ? '99+' : badge.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: isActive ? accent : Colors.white,
                         fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                       ),
-                    ),
-                  ),
-                if (isActive)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 10),
-                    child: Icon(
-                      Icons.arrow_forward_ios,
-                      size: 12,
-                      color: Colors.white,
                     ),
                   ),
               ],
